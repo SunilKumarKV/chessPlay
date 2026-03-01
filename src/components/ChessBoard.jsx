@@ -15,19 +15,27 @@ const ChessBoard = () => {
 
     const type = piece[1];
 
-    // Pawn movement
+    // Pawn
     if (type === "p") {
       const direction = turn === "w" ? -1 : 1;
+
       if (toCol === fromCol && !target) {
         if (toRow === fromRow + direction) return true;
       }
-    }
 
-    // Rook movement
-    if (type === "r") {
-      if (fromRow === toRow || fromCol === toCol) {
+      if (
+        Math.abs(toCol - fromCol) === 1 &&
+        toRow === fromRow + direction &&
+        target &&
+        target[0] !== turn
+      ) {
         return true;
       }
+    }
+
+    // Rook (no blocking yet)
+    if (type === "r") {
+      if (fromRow === toRow || fromCol === toCol) return true;
     }
 
     return false;
@@ -61,14 +69,19 @@ const ChessBoard = () => {
       </h2>
 
       <div className="grid grid-cols-8 w-fit mx-auto border-4 border-black">
-        {board.map((row, rowIndex) =>
-          row.map((square, colIndex) => {
+        {board.map((rowData, rowIndex) =>
+          rowData.map((square, colIndex) => {
             const isDark = (rowIndex + colIndex) % 2 === 1;
+
+            const isHighlighted =
+              selected && selected[0] === rowIndex && selected[1] === colIndex;
+
             return (
               <Square
                 key={`${rowIndex}-${colIndex}`}
                 piece={square}
                 isDark={isDark}
+                isHighlighted={isHighlighted}
                 onClick={() => handleClick(rowIndex, colIndex)}
               />
             );
