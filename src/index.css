@@ -1,1 +1,36 @@
 @import "tailwindcss";
+
+/* ── Custom scrollbar for move history panel */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(200, 148, 58, 0.4);
+  border-radius: 2px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(200, 148, 58, 0.7);
+}
+
+/* ── Piece transition */
+.piece-enter {
+  animation: pieceIn 0.15s ease-out;
+}
+@keyframes pieceIn {
+  from {
+    transform: scale(0.7);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ── Board square hover */
+.board-square:hover {
+  filter: brightness(1.08);
+}
