@@ -1,7 +1,11 @@
 import { useChessGame } from "../hooks/useChessGame";
-import Panel from "./Panel";
-import CapturedPieces from "./CapturedPieces";
+import Board from "./Board";
+import StatusBar from "./StatusBar";
+import PromotionModal from "./PromotionModal";
 import MoveHistory from "./MoveHistory";
+import CapturedPieces from "./CapturedPieces";
+import Panel from "./Panel";
+import GoldButton from "./GoldButton";
 
 export default function Chess() {
   const { capturedB, capturedW, history } = useChessGame();
@@ -15,6 +19,7 @@ export default function Chess() {
         color: "#e8dcc8",
       }}
     >
+      {/* __ Title  */}
       <h1
         className="text-5xl font-black tracking-widest mb-0"
         style={{
@@ -29,6 +34,7 @@ export default function Chess() {
       <p className="text-xs tracking-widest opacity-50 mb-5">GAME Play</p>
 
       <div className="flex gap-5 item-start flex-wrap justify-center">
+        {/* __ LEFT PANEL  */}
         <div
           className="flex flex-col gap-3"
           style={{ minWidth: 140, maxWidth: 160 }}
@@ -42,6 +48,26 @@ export default function Chess() {
           <Panel title="Move history">
             <MoveHistory history={history} />
           </Panel>
+        </div>
+
+        {/* __ BOARD COLUMN  */}
+        <div>
+          <StatusBar status={status} turn={turn} />
+
+          <Board
+            board={board}
+            flipped={flipped}
+            isSelected={isSelected}
+            isLegalDest={isLegalDest}
+            isLastMove={isLastMove}
+            onSquareClick={handleSquareClick}
+          />
+
+          {/* Controls */}
+          <div className="flex gap-3 mt-4 justify-center">
+            <GoldButton onClick={resetGame}>New Game</GoldButton>
+            <GoldButton onClick={toggleFlip}>Flip Board</GoldButton>
+          </div>
         </div>
       </div>
     </div>
