@@ -1,7 +1,7 @@
 import { useChessGame } from "../hooks/useChessGame";
 import Board from "./Board";
 import StatusBar from "./StatusBar";
-// import PromotionModal from "./PromotionModal";
+import PromotionModal from "./PromotionModal";
 import MoveHistory from "./MoveHistory";
 import CapturedPieces from "./CapturedPieces";
 import Panel from "./Panel";
@@ -15,6 +15,7 @@ export default function Chess() {
     capturedB,
     capturedW,
     history,
+    promotion,
     flipped,
     isSelected,
     isLegalDest,
@@ -83,7 +84,53 @@ export default function Chess() {
             <GoldButton onClick={toggleFlip}>Flip Board</GoldButton>
           </div>
         </div>
+
+        {/* RIGHT PANEL */}
+        <div
+          className="flex flex-col gap-3"
+          style={{ minWidth: 140, maxWidth: 160 }}
+        >
+          <Panel title="Turn">
+            <div className="flex gap-3 items-center justify-center py-2">
+              <div
+                className="rounded-full transition-all duration-300"
+                style={{
+                  width: 28,
+                  height: 28,
+                  background: turn === "w" ? "#f0d9b5" : "#2a2a2a",
+                  border: `3px solid ${turn === "w" ? "#c8943a" : "#7a8bb5"}`,
+                  boxShadow: `0 0 10px ${turn === "w" ? "rgba(200,148,58,0.5)" : "rgba(122,139,181,0.5)"}`,
+                }}
+              />
+              <span className="text-sm">
+                {turn === "w" ? "White" : "Black"}
+              </span>
+            </div>
+          </Panel>
+
+          <Panel title="Legend">
+            <div className="text-xs leading-loose opacity-70">
+              <div>🟡 Last move</div>
+              <div>🟢 Selected</div>
+              <div>⚫ Legal move</div>
+              <div>🔴 Check / Mate</div>
+            </div>
+          </Panel>
+
+          <Panel title="Features">
+            <div className="text-xs leading-loose opacity-65">
+              <div>✓ Castling</div>
+              <div>✓ En passant</div>
+              <div>✓ Promotion</div>
+              <div>✓ Check detect</div>
+              <div>✓ Stalemate</div>
+              <div>✓ Move history</div>
+            </div>
+          </Panel>
+        </div>
       </div>
+
+      {promotion && <PromotionModal turn={turn} onSelect={handlePromotion} />}
     </div>
   );
 }
