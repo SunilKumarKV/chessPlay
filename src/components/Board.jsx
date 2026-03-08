@@ -46,12 +46,12 @@ export default function Board({
               key={`${r}-${c}`}
               row={r}
               col={c}
-              piece={board[r][c]}
+              piece={board?.[r]?.[c]}
               isLight={(r + c) % 2 === 0}
-              isSelected={isSelected(r, c)}
-              isLegalDest={isLegalDest(r, c)}
-              isLastMove={isLastMove(r, c)}
-              onClick={() => onSquareClick(r, c)}
+              isSelected={isSelected?.(r, c)}
+              isLegalDest={isLegalDest?.(r, c)}
+              isLastMove={isLastMove?.(r, c)}
+              onClick={() => onSquareClick?.(r, c)}
             />
           )),
         )}
