@@ -1,6 +1,6 @@
 export const EMPTY = null;
 
-export const PIECE_SyMBOLS = {
+export const PIECE_SYMBOLS = {
   wK: "♔",
   wQ: "♕",
   wR: "♖",

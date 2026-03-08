@@ -1,14 +1,28 @@
 import { useChessGame } from "../hooks/useChessGame";
 import Board from "./Board";
 import StatusBar from "./StatusBar";
-import PromotionModal from "./PromotionModal";
+// import PromotionModal from "./PromotionModal";
 import MoveHistory from "./MoveHistory";
 import CapturedPieces from "./CapturedPieces";
 import Panel from "./Panel";
 import GoldButton from "./GoldButton";
 
 export default function Chess() {
-  const { capturedB, capturedW, history } = useChessGame();
+  const {
+    board,
+    turn,
+    status,
+    capturedB,
+    capturedW,
+    history,
+    flipped,
+    isSelected,
+    isLegalDest,
+    isLastMove,
+    handleSquareClick,
+    resetGame,
+    toggleFlip,
+  } = useChessGame();
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center p-5"
