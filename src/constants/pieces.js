@@ -1,5 +1,6 @@
 export const EMPTY = null;
 
+/** Unicode symbols keyed by piece code e.g. "wK" → "♔" */
 export const PIECE_SYMBOLS = {
   wK: "♔",
   wQ: "♕",
@@ -15,8 +16,10 @@ export const PIECE_SYMBOLS = {
   bP: "♟",
 };
 
+/** Pieces a pawn can promote to */
 export const PROMOTION_PIECES = ["Q", "R", "B", "N"];
 
+/** Human-readable piece names */
 export const PIECE_NAMES = {
   K: "King",
   Q: "Queen",

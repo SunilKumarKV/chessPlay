@@ -15,7 +15,8 @@
   background: rgba(200, 148, 58, 0.7);
 }
 
-── Piece transition */ .piece-enter {
+/* ── Piece transition */
+.piece-enter {
   animation: pieceIn 0.15s ease-out;
 }
 @keyframes pieceIn {
@@ -29,6 +30,7 @@
   }
 }
 
-── Board square hover */ .board-square:hover {
+/* ── Board square hover */
+.board-square:hover {
   filter: brightness(1.08);
 }
