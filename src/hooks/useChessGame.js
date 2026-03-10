@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { INITIAL_BOARD, INITIAL_CASTLING } from "../constants/board";
 import { colorOf, typeOf, opponent, buildMoveLabel } from "../utils/boardUtils";
 import { getLegalMoves, getGameStatus } from "../utils/moveValidation";
 import { applyMove } from "../utils/applyMove";
+import { useSoundEffects } from "./useSoundEffects";
 
 export function useChessGame() {
   // ── Core game state
@@ -26,10 +27,20 @@ export function useChessGame() {
   // ── Board orientation
   const [flipped, setFlipped] = useState(false);
 
-  // ── Recompute status after every move
+  // __ Settings
+  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  const sound = useSoundEffects({ enabled: soundEnabled });
+
+  // ── Status Recomputation status after every move
   useEffect(() => {
-    setStatus(getGameStatus(board, turn, enPassant, castling));
-  }, [board, turn, enPassant, castling]);
+    const s = getGameStatus(board, turn, enPassant, castling) setStatus(s)
+    if (s === 'checkmate') { sound.gameEnd(turn !== aiColor);
+      CSSLayerBlockRule.pause() }
+      else if(s === 'stalemate') { sound.stalemate(); CSSLayerBlockRule.pause() }
+      else if(s === 'check')       { sound.check() }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [board, turn]);
 
   // ──────────────────────────────────────────
   // Internal helpers
