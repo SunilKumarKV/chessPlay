@@ -6,24 +6,15 @@ import MoveHistory from "./MoveHistory";
 import CapturedPieces from "./CapturedPieces";
 import Panel from "./Panel";
 import GoldButton from "./GoldButton";
+import ChessClock from "./ChessClock";
+import AIThinkingIndicator from "./AIThinkingIndicator";
+import SettingsPanel from "./SettingsPanel";
 
 export default function Chess() {
-  const {
-    board,
-    turn,
-    status,
-    capturedB,
-    capturedW,
-    history,
-    promotion,
-    flipped,
-    isSelected,
-    isLegalDest,
-    isLastMove,
-    handleSquareClick,
-    resetGame,
-    toggleFlip,
-  } = useChessGame();
+  const g = useChessGame();
+
+  const isOver = g.status === "checkmate" || g.status === "stalemate";
+
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center p-5"
@@ -34,103 +25,143 @@ export default function Chess() {
         color: "#e8dcc8",
       }}
     >
-      {/* __ Title  */}
+      {/* Title */}
       <h1
-        className="text-5xl font-black tracking-widest mb-0"
+        className="font-black tracking-widest mb-0"
         style={{
           fontFamily: "'Playfair Display', serif",
-          background: "linear-gradient(90deg,#f5d78e, #c8943a, #f5d78e)",
-          webkitBackgroundClip: "text",
+          fontSize: "clamp(1.8rem,4vw,3rem)",
+          background: "linear-gradient(90deg,#f5d78e,#c8943a,#f5d78e)",
+          WebkitBackgroundClip: "text",
           WebkitTextFillColor: "transparent",
         }}
       >
         CHESS
       </h1>
-      <p className="text-xs tracking-widest opacity-50 mb-5">GAME Play</p>
+      <p className="text-xs tracking-widest opacity-40 mb-5">ROYAL GAME</p>
 
-      <div className="flex gap-5 item-start flex-wrap justify-center">
-        {/* __ LEFT PANEL  */}
+      {/* Main 3-column layout */}
+      <div className="flex gap-4 items-start flex-wrap justify-center">
+        {/* ── LEFT: Settings */}
+        <SettingsPanel
+          aiEnabled={g.aiEnabled}
+          setAiEnabled={g.setAiEnabled}
+          aiColor={g.aiColor}
+          setAiColor={g.setAiColor}
+          aiDifficulty={g.aiDifficulty}
+          setAiDifficulty={g.setAiDifficulty}
+          soundEnabled={g.soundEnabled}
+          setSoundEnabled={g.setSoundEnabled}
+          timeControlIdx={g.timeControlIdx}
+          setTimeControlIdx={g.setTimeControlIdx}
+          onReset={g.resetGame}
+        />
+
+        {/* ── CENTER: Clock + Board + Controls */}
         <div
-          className="flex flex-col gap-3"
-          style={{ minWidth: 140, maxWidth: 160 }}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
         >
-          <Panel title="White captured">
-            <CapturedPieces pieces={capturedB} label="" />
-          </Panel>
-          <Panel title="Black captured">
-            <CapturedPieces pieces={capturedW} label="" />
-          </Panel>
-          <Panel title="Move history">
-            <MoveHistory history={history} />
-          </Panel>
-        </div>
+          {/* Clock */}
+          <ChessClock
+            clock={g.clock}
+            turn={g.turn}
+            status={g.status}
+            flipped={g.flipped}
+          />
 
-        {/* __ BOARD COLUMN  */}
-        <div>
-          <StatusBar status={status} turn={turn} />
+          {/* AI thinking */}
+          <AIThinkingIndicator
+            enabled={g.aiEnabled}
+            ready={g.sfReady}
+            thinking={g.sfThinking}
+          />
 
+          {/* Status */}
+          <StatusBar status={g.status} turn={g.turn} />
+
+          {/* Board */}
           <Board
-            board={board}
-            flipped={flipped}
-            isSelected={isSelected}
-            isLegalDest={isLegalDest}
-            isLastMove={isLastMove}
-            onSquareClick={handleSquareClick}
+            board={g.board}
+            flipped={g.flipped}
+            isSelected={g.isSelected}
+            isLegalDest={g.isLegalDest}
+            isLastMove={g.isLastMove}
+            onSquareClick={g.handleSquareClick}
           />
 
           {/* Controls */}
-          <div className="flex gap-3 mt-4 justify-center">
-            <GoldButton onClick={resetGame}>New Game</GoldButton>
-            <GoldButton onClick={toggleFlip}>Flip Board</GoldButton>
+          <div className="flex gap-2 mt-4 flex-wrap justify-center">
+            <GoldButton onClick={g.resetGame}>New Game</GoldButton>
+            <GoldButton onClick={g.toggleFlip}>Flip Board</GoldButton>
+            <GoldButton onClick={g.handleExportPGN}>Export PGN</GoldButton>
           </div>
+
+          {/* Game-over banner */}
+          {isOver && (
+            <div
+              className="mt-4 px-6 py-3 rounded-xl text-center"
+              style={{
+                background: "rgba(200,148,58,0.15)",
+                border: "1px solid rgba(200,148,58,0.4)",
+                maxWidth: "min(480px,90vw)",
+                width: "100%",
+              }}
+            >
+              <p
+                style={{
+                  fontFamily: "'Playfair Display',serif",
+                  fontSize: "1.1rem",
+                  color: "#f5d78e",
+                }}
+              >
+                {g.status === "checkmate"
+                  ? `♛ ${g.turn === "w" ? "Black" : "White"} wins by checkmate!`
+                  : "½ Stalemate — draw!"}
+              </p>
+              <p className="text-xs opacity-50 mt-1">
+                Export the game or start a new one
+              </p>
+            </div>
+          )}
         </div>
 
-        {/* RIGHT PANEL */}
+        {/* ── RIGHT: Captured + History */}
         <div
           className="flex flex-col gap-3"
-          style={{ minWidth: 140, maxWidth: 160 }}
+          style={{ minWidth: 155, maxWidth: 175 }}
         >
-          <Panel title="Turn">
-            <div className="flex gap-3 items-center justify-center py-2">
-              <div
-                className="rounded-full transition-all duration-300"
-                style={{
-                  width: 28,
-                  height: 28,
-                  background: turn === "w" ? "#f0d9b5" : "#2a2a2a",
-                  border: `3px solid ${turn === "w" ? "#c8943a" : "#7a8bb5"}`,
-                  boxShadow: `0 0 10px ${turn === "w" ? "rgba(200,148,58,0.5)" : "rgba(122,139,181,0.5)"}`,
-                }}
-              />
-              <span className="text-sm">
-                {turn === "w" ? "White" : "Black"}
-              </span>
-            </div>
+          <Panel title="Captured by White">
+            <CapturedPieces pieces={g.capturedB} label="" />
           </Panel>
 
+          <Panel title="Captured by Black">
+            <CapturedPieces pieces={g.capturedW} label="" />
+          </Panel>
+
+          <Panel title="Move History">
+            <MoveHistory history={g.history} />
+          </Panel>
+
+          {/* Legend */}
           <Panel title="Legend">
-            <div className="text-xs leading-loose opacity-70">
+            <div className="text-xs leading-loose opacity-65">
               <div>🟡 Last move</div>
               <div>🟢 Selected</div>
               <div>⚫ Legal move</div>
               <div>🔴 Check / Mate</div>
             </div>
           </Panel>
-
-          <Panel title="Features">
-            <div className="text-xs leading-loose opacity-65">
-              <div>✓ Castling</div>
-              <div>✓ En passant</div>
-              <div>✓ Promotion</div>
-              <div>✓ Check detect</div>
-              <div>✓ Stalemate</div>
-              <div>✓ Move history</div>
-            </div>
-          </Panel>
         </div>
       </div>
 
-      {promotion && <PromotionModal turn={turn} onSelect={handlePromotion} />}
+      {/* Promotion modal */}
+      {g.promotion && (
+        <PromotionModal turn={g.turn} onSelect={g.handlePromotion} />
+      )}
     </div>
   );
 }
