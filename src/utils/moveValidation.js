@@ -1,6 +1,8 @@
 import { colorOf, typeOf, opponent, cloneBoard } from "./boardUtils";
 import { getRawMoves } from "./moveGeneration";
 
+// CHECK DETECTION
+
 export function isInCheck(board, color, enPassantTarget, castlingRights) {
   // Locate the king
   let kingRow = -1,

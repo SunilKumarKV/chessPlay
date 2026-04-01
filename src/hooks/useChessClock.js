@@ -1,5 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
+// useChessClock
+// Manages two independent countdown timers (one per player).
+// Supports increment (Fischer timing): after each move, the
+// player who just moved receives +increment seconds.
+//
+// Time controls (examples):
+//   Bullet  :  { initial: 60,   increment: 0  }
+//   Blitz   :  { initial: 300,  increment: 3  }
+//   Rapid   :  { initial: 600,  increment: 5  }
+//   Classical: { initial: 1800, increment: 30 }
+// ─────────────────────────────────────────────────────────────
+
 export const TIME_CONTROLS = [
   { label: "1+0  Bullet", initial: 60, increment: 0 },
   { label: "2+1  Bullet", initial: 120, increment: 1 },
@@ -10,6 +22,7 @@ export const TIME_CONTROLS = [
   { label: "30+0 Classical", initial: 1800, increment: 0 },
   { label: "∞    Unlimited", initial: null, increment: 0 },
 ];
+
 export function useChessClock({
   initialSeconds,
   increment = 0,
