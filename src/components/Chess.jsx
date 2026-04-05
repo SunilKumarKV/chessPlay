@@ -9,6 +9,7 @@ import GoldButton from "./GoldButton";
 import ChessClock from "./ChessClock";
 import AIThinkingIndicator from "./AIThinkingIndicator";
 import SettingsPanel from "./SettingsPanel";
+import PlayerInfo from "./PlayerInfo";
 
 export default function Chess() {
   const g = useChessGame();
@@ -78,6 +79,15 @@ export default function Chess() {
             enabled={g.aiEnabled}
             ready={g.sfReady}
             thinking={g.sfThinking}
+          />
+
+          {/* Player Info */}
+          <PlayerInfo
+            turn={g.turn}
+            aiEnabled={g.aiEnabled}
+            aiColor={g.aiColor}
+            aiDifficulty={g.aiDifficulty}
+            status={g.status}
           />
 
           {/* Status */}
