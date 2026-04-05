@@ -1,8 +1,12 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 
-// Stockfish 16 WASM build served via CDN
-const STOCKFISH_URL =
-  "https://cdn.jsdelivr.net/npm/stockfish@16.0.0/src/stockfish-bnz.js";
+// Local Stockfish WASM worker bundled with the app
+// Falls back to Lichess CDN if local file is not available
+const STOCKFISH_URLS = [
+  "/stockfish-18-lite.js", // Local bundled version (fastest, no CORS issues)
+  "https://unpkg.com/@lichess-org/stockfish-web@latest/dist/stockfish.js",
+  "https://cdn.jsdelivr.net/npm/@lichess-org/stockfish-web@latest/dist/stockfish.js",
+];
 
 export function useStockfish({ enabled, difficulty = 10 }) {
   const workerRef = useRef(null);
@@ -19,15 +23,54 @@ export function useStockfish({ enabled, difficulty = 10 }) {
 
     const createWorker = async () => {
       try {
-        const response = await fetch(STOCKFISH_URL);
-        const source = await response.text();
-        const blob = new Blob([source], { type: "application/javascript" });
-        blobUrl = URL.createObjectURL(blob);
+        let worker = null;
+
+        for (const url of STOCKFISH_URLS) {
+          try {
+            const response = await fetch(url, { method: "HEAD" });
+            if (!response.ok) {
+              console.warn(
+                `Stockfish fetch failed (${response.status}): ${url}`,
+              );
+              continue;
+            }
+
+            if (url.startsWith("/")) {
+              // Local asset: instantiate worker directly so relative WASM fetch resolves correctly.
+              worker = new Worker(url);
+              console.log(`✓ Created Stockfish worker from local URL: ${url}`);
+            } else {
+              // Remote asset: import script inside a worker blob.
+              const importBlob = new Blob([`importScripts("${url}");`], {
+                type: "application/javascript",
+              });
+              blobUrl = URL.createObjectURL(importBlob);
+              worker = new Worker(blobUrl);
+              console.log(
+                `✓ Created Stockfish worker via importScripts: ${url}`,
+              );
+            }
+
+            if (worker) {
+              workerRef.current = worker;
+              break;
+            }
+          } catch (err) {
+            console.warn(
+              `Stockfish worker init error for ${url}:`,
+              err.message,
+            );
+            continue;
+          }
+        }
+
+        if (!worker) {
+          throw new Error(
+            "Failed to load Stockfish from any source. Check that /stockfish-18-lite.js exists or internet connection.",
+          );
+        }
 
         if (!isSubscribed) return;
-
-        const worker = new Worker(blobUrl);
-        workerRef.current = worker;
 
         worker.onmessage = (e) => {
           const line =

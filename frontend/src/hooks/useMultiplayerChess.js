@@ -23,8 +23,12 @@ export function useMultiplayerChess() {
 
   // Connect to server
   useEffect(() => {
-    const targetUrl = `http://${window.location.hostname}:3001`;
-    const newSocket = io(targetUrl);
+    const targetUrl = BACKEND_URL || `http://${window.location.hostname}:3001`;
+    const newSocket = io(targetUrl, {
+      transports: ["polling", "websocket"],
+      reconnectionAttempts: 5,
+      timeout: 5000,
+    });
     socketRef.current = newSocket;
 
     newSocket.on("connect", () => {

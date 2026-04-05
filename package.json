@@ -1,6 +1,6 @@
 {
   "name": "chessplay-monorepo",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Real-time multiplayer chess game with React frontend and Node.js backend",
   "scripts": {
     "dev": "cd frontend && npm run dev",

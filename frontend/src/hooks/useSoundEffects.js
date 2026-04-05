@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback, useEffect, useMemo } from "react";
 
 export function useSoundEffects({ enabled = true }) {
   const ctxRef = useRef(null);
@@ -77,58 +77,56 @@ export function useSoundEffects({ enabled = true }) {
   );
 
   // ── Public sound functions
-  const play = {
-    move: useCallback(() => {
-      noise(0.12, 0.25);
-      tone(180, 0.08, "triangle", 0.15);
-    }, [noise, tone]),
+  const play = useMemo(
+    () => ({
+      move: () => {
+        noise(0.12, 0.25);
+        tone(180, 0.08, "triangle", 0.15);
+      },
 
-    capture: useCallback(() => {
-      noise(0.18, 0.4);
-      tone(120, 0.12, "sawtooth", 0.12);
-      tone(90, 0.2, "triangle", 0.08, 0.05);
-    }, [noise, tone]),
+      capture: () => {
+        noise(0.18, 0.4);
+        tone(120, 0.12, "sawtooth", 0.12);
+        tone(90, 0.2, "triangle", 0.08, 0.05);
+      },
 
-    check: useCallback(() => {
-      tone(440, 0.15, "sine", 0.25);
-      tone(554, 0.15, "sine", 0.2, 0.12);
-      tone(659, 0.25, "sine", 0.2, 0.24);
-    }, [tone]),
+      check: () => {
+        tone(440, 0.15, "sine", 0.25);
+        tone(554, 0.15, "sine", 0.2, 0.12);
+        tone(659, 0.25, "sine", 0.2, 0.24);
+      },
 
-    castle: useCallback(() => {
-      noise(0.1, 0.2);
-      noise(0.1, 0.2, 0.15);
-      tone(220, 0.15, "triangle", 0.12);
-      tone(330, 0.15, "triangle", 0.1, 0.15);
-    }, [noise, tone]),
+      castle: () => {
+        noise(0.1, 0.2);
+        noise(0.1, 0.2, 0.15);
+        tone(220, 0.15, "triangle", 0.12);
+        tone(330, 0.15, "triangle", 0.1, 0.15);
+      },
 
-    promote: useCallback(() => {
-      const notes = [523, 659, 784, 1047];
-      notes.forEach((f, i) => tone(f, 0.2, "sine", 0.22, i * 0.1));
-    }, [tone]),
+      promote: () => {
+        const notes = [523, 659, 784, 1047];
+        notes.forEach((f, i) => tone(f, 0.2, "sine", 0.22, i * 0.1));
+      },
 
-    gameEnd: useCallback(
-      (win = true) => {
+      gameEnd: (win = true) => {
         if (win) {
-          // Triumphant major chord arpeggio
           [261, 329, 392, 523, 659].forEach((f, i) =>
             tone(f, 0.4, "sine", 0.2, i * 0.08),
           );
         } else {
-          // Descending minor run
           [440, 392, 349, 311, 261].forEach((f, i) =>
             tone(f, 0.35, "sine", 0.18, i * 0.1),
           );
         }
       },
-      [tone],
-    ),
 
-    stalemate: useCallback(() => {
-      tone(330, 0.3, "sine", 0.15);
-      tone(330, 0.3, "sine", 0.15, 0.35);
-    }, [tone]),
-  };
+      stalemate: () => {
+        tone(330, 0.3, "sine", 0.15);
+        tone(330, 0.3, "sine", 0.15, 0.35);
+      },
+    }),
+    [noise, tone],
+  );
 
   return play;
 }
