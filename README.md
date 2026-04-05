@@ -4,6 +4,13 @@ A beautiful, modern chess game built with React and Node.js, featuring both sing
 
 ## Features
 
+### 🔐 Authentication
+
+- User registration and login
+- JWT-based authentication
+- Secure password hashing
+- Game history storage
+
 ### 🎯 Single Player Mode
 
 - Play against AI with adjustable difficulty levels
@@ -21,6 +28,7 @@ A beautiful, modern chess game built with React and Node.js, featuring both sing
 - Instant move synchronization
 - Player status indicators
 - Room management and player matching
+- Game history stored in database
 
 ### 🎨 Design
 
@@ -32,8 +40,10 @@ A beautiful, modern chess game built with React and Node.js, featuring both sing
 ## Tech Stack
 
 - **Frontend**: React 19, Vite, Tailwind CSS
-- **Backend**: Node.js, Express, Socket.IO
+- **Backend**: Node.js, Express, Socket.IO, MongoDB
+- **Authentication**: JWT, bcrypt
 - **Real-time**: Socket.IO for multiplayer
+- **Database**: MongoDB with Mongoose
 - **Styling**: Tailwind CSS with custom gradients
 - **Build**: Vite for fast development
 
@@ -42,6 +52,7 @@ A beautiful, modern chess game built with React and Node.js, featuring both sing
 ### Prerequisites
 
 - Node.js 16+
+- MongoDB (local installation or cloud service like MongoDB Atlas)
 - npm or yarn
 
 ### Installation
@@ -59,12 +70,32 @@ cd chessplay
 npm run install:all
 ```
 
+3. Set up MongoDB:
+   - Install MongoDB locally or use MongoDB Atlas
+   - Update `backend/.env` with your MongoDB connection string
+   - Default: `mongodb://localhost:27017/chessplay`
+
 ### Running the Application
 
-#### For Single Player Only
+#### Development Mode (Frontend + Backend)
 
 ```bash
+# Start both frontend and backend
 npm run dev
+
+# Or run separately:
+# Terminal 1 - Backend
+cd backend && npm run dev
+
+# Terminal 2 - Frontend
+npm run dev
+```
+
+#### Production Build
+
+```bash
+npm run build
+cd backend && npm start
 ```
 
 Frontend will be available at `http://localhost:5173`

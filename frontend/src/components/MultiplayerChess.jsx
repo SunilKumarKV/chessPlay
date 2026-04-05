@@ -8,7 +8,13 @@ import CapturedPieces from "./CapturedPieces";
 import Panel from "./Panel";
 import GoldButton from "./GoldButton";
 
-export default function MultiplayerChess() {
+export default function MultiplayerChess({ onBack }) {
+  const [selected, setSelected] = useState(null);
+  const [legalMoves, setLegalMoves] = useState([]);
+  const [playerName, setPlayerName] = useState("");
+  const [joinRoomId, setJoinRoomId] = useState("");
+  const [serverUrl, setServerUrl] = useState("http://localhost:3001");
+
   const {
     isConnected,
     error,
@@ -21,12 +27,8 @@ export default function MultiplayerChess() {
     joinRoom,
     makeMove,
     leaveRoom,
-  } = useMultiplayerChess();
+  } = useMultiplayerChess(serverUrl);
 
-  const [selected, setSelected] = useState(null);
-  const [legalMoves, setLegalMoves] = useState([]);
-  const [playerName, setPlayerName] = useState("");
-  const [joinRoomId, setJoinRoomId] = useState("");
   const showRoomSetup = !gameState;
 
   // Handle square click for multiplayer
@@ -77,6 +79,12 @@ export default function MultiplayerChess() {
           color: "#e8dcc8",
         }}
       >
+        {/* Back Button */}
+        <div className="w-full max-w-md mb-4">
+          <GoldButton onClick={onBack} className="text-sm">
+            ← Back to Menu
+          </GoldButton>
+        </div>
         <h1
           className="font-black tracking-widest mb-8"
           style={{
@@ -91,6 +99,41 @@ export default function MultiplayerChess() {
         </h1>
 
         <div className="flex flex-col gap-6 items-center">
+          {/* Server URL Input */}
+          <div className="flex flex-col gap-3 items-center">
+            <h3 className="text-xl font-semibold">Server Connection</h3>
+            <input
+              type="text"
+              placeholder="Server URL (e.g., http://192.168.1.100:3001)"
+              value={serverUrl}
+              onChange={(e) => setServerUrl(e.target.value)}
+              className="px-4 py-2 rounded bg-white/10 border border-white/20 text-white placeholder-white/50 w-80"
+            />
+            <GoldButton
+              onClick={async () => {
+                try {
+                  const response = await fetch(`${serverUrl}/health`);
+                  const data = await response.json();
+                  if (data.localIP) {
+                    alert(
+                      `Server found! Local IP: ${data.localIP}:${data.port}`,
+                    );
+                  }
+                } catch {
+                  alert("Could not connect to server. Check the URL.");
+                }
+              }}
+              disabled={!serverUrl}
+            >
+              Test Connection
+            </GoldButton>
+            <p className="text-xs opacity-60 text-center">
+              Enter the IP address of the host device running the server
+              <br />
+              Example: http://192.168.1.100:3001
+            </p>
+          </div>
+
           {/* Connection Status */}
           <div className="text-center">
             <div
@@ -150,9 +193,7 @@ export default function MultiplayerChess() {
           </div>
 
           {/* Back to Single Player */}
-          <GoldButton onClick={() => window.location.reload()}>
-            ← Back to Single Player
-          </GoldButton>
+          <GoldButton onClick={onBack}>← Back to Menu</GoldButton>
         </div>
       </div>
     );
@@ -179,6 +220,12 @@ export default function MultiplayerChess() {
         color: "#e8dcc8",
       }}
     >
+      {/* Back Button */}
+      <div className="w-full max-w-6xl mb-4">
+        <GoldButton onClick={onBack} className="text-sm">
+          ← Back to Menu
+        </GoldButton>
+      </div>
       {/* Title */}
       <h1
         className="font-black tracking-widest mb-0"

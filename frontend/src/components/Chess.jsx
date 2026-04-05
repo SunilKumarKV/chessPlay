@@ -11,7 +11,7 @@ import AIThinkingIndicator from "./AIThinkingIndicator";
 import SettingsPanel from "./SettingsPanel";
 import PlayerInfo from "./PlayerInfo";
 
-export default function Chess() {
+export default function Chess({ onBack }) {
   const g = useChessGame();
 
   const isOver = g.status === "checkmate" || g.status === "stalemate";
@@ -26,6 +26,13 @@ export default function Chess() {
         color: "#e8dcc8",
       }}
     >
+      {/* Back Button */}
+      <div className="w-full max-w-6xl mb-4">
+        <GoldButton onClick={onBack} className="text-sm">
+          ← Back to Menu
+        </GoldButton>
+      </div>
+
       {/* Title */}
       <h1
         className="font-black tracking-widest mb-0"

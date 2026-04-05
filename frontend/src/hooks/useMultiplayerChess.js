@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { io } from "socket.io-client";
 import { useSoundEffects } from "./useSoundEffects";
 
-const BACKEND_URL = "http://localhost:3001";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 
-export function useMultiplayerChess() {
+export function useMultiplayerChess(serverUrl = null) {
   const socketRef = useRef(null);
   const sound = useSoundEffects({ enabled: true });
   const [isConnected, setIsConnected] = useState(false);
@@ -23,11 +23,21 @@ export function useMultiplayerChess() {
 
   // Connect to server
   useEffect(() => {
-    const targetUrl = BACKEND_URL || `http://${window.location.hostname}:3001`;
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setError("Authentication required");
+      return;
+    }
+
+    const targetUrl =
+      serverUrl || BACKEND_URL || `http://${window.location.hostname}:3001`;
     const newSocket = io(targetUrl, {
       transports: ["polling", "websocket"],
       reconnectionAttempts: 5,
       timeout: 5000,
+      auth: {
+        token: token,
+      },
     });
     socketRef.current = newSocket;
 
