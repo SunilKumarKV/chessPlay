@@ -14,46 +14,69 @@ export function useStockfish({ enabled, difficulty = 10 }) {
   useEffect(() => {
     if (!enabled) return;
 
-    const worker = new Worker(STOCKFISH_URL);
-    workerRef.current = worker;
+    let isSubscribed = true;
+    let blobUrl = null;
 
-    worker.onmessage = (e) => {
-      const line =
-        typeof e.data === "string" ? e.data : (e.data?.toString?.() ?? "");
+    const createWorker = async () => {
+      try {
+        const response = await fetch(STOCKFISH_URL);
+        const source = await response.text();
+        const blob = new Blob([source], { type: "application/javascript" });
+        blobUrl = URL.createObjectURL(blob);
 
-      if (line === "uciok") {
-        worker.postMessage("isready");
-        return;
-      }
-      if (line === "readyok") {
-        setReady(true);
-        return;
-      }
+        if (!isSubscribed) return;
 
-      // "bestmove e2e4 ponder e7e5"  — we only need the first token after "bestmove"
-      if (line.startsWith("bestmove") && resolveRef.current) {
-        const parts = line.split(" ");
-        const move = parts[1] && parts[1] !== "(none)" ? parts[1] : null;
-        setThinking(false);
-        resolveRef.current(move);
-        resolveRef.current = null;
+        const worker = new Worker(blobUrl);
+        workerRef.current = worker;
+
+        worker.onmessage = (e) => {
+          const line =
+            typeof e.data === "string" ? e.data : (e.data?.toString?.() ?? "");
+
+          if (line === "uciok") {
+            worker.postMessage("isready");
+            return;
+          }
+          if (line === "readyok") {
+            setReady(true);
+            return;
+          }
+
+          if (line.startsWith("bestmove") && resolveRef.current) {
+            const parts = line.split(" ");
+            const move = parts[1] && parts[1] !== "(none)" ? parts[1] : null;
+            setThinking(false);
+            resolveRef.current(move);
+            resolveRef.current = null;
+          }
+        };
+
+        worker.onerror = (err) => {
+          console.error("Stockfish worker error:", err);
+          setThinking(false);
+          if (resolveRef.current) {
+            resolveRef.current(null);
+            resolveRef.current = null;
+          }
+        };
+
+        worker.postMessage("uci");
+      } catch (error) {
+        console.error("Failed to load Stockfish engine:", error);
       }
     };
 
-    worker.onerror = (err) => {
-      console.error("Stockfish worker error:", err);
-      setThinking(false);
-      if (resolveRef.current) {
-        resolveRef.current(null);
-        resolveRef.current = null;
-      }
-    };
-
-    worker.postMessage("uci");
+    createWorker();
 
     return () => {
-      worker.terminate();
-      workerRef.current = null;
+      isSubscribed = false;
+      if (workerRef.current) {
+        workerRef.current.terminate();
+        workerRef.current = null;
+      }
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
       setReady(false);
     };
   }, [enabled]);

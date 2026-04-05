@@ -1,3 +1,7 @@
+function toSquareName([row, col]) {
+  return String.fromCharCode(97 + col) + (8 - row);
+}
+
 export default function MoveHistory({ history }) {
   return (
     <div className="scrollbar-thin overflow-y-auto" style={{ maxHeight: 200 }}>
@@ -6,15 +10,21 @@ export default function MoveHistory({ history }) {
           No moves yet
         </span>
       ) : (
-        history.map((move, i) => (
-          <div
-            key={i}
-            className="text-xs py-0.5 font-mono"
-            style={{ color: move.color === "w" ? "#f5e4b0" : "#a8b8d8" }}
-          >
-            {i + 1}. {move.text}
-          </div>
-        ))
+        history.map((move, i) => {
+          const text =
+            move.text ||
+            `${move.piece}@${toSquareName(move.from)}→${toSquareName(move.to)}`;
+
+          return (
+            <div
+              key={i}
+              className="text-xs py-0.5 font-mono"
+              style={{ color: move.color === "w" ? "#f5e4b0" : "#a8b8d8" }}
+            >
+              {i + 1}. {text}
+            </div>
+          );
+        })
       )}
     </div>
   );

@@ -210,8 +210,16 @@ export default function MultiplayerChess() {
               <div>
                 Room ID: <span className="font-mono">{roomId}</span>
               </div>
-              <div>
-                Status: {isConnected ? "🟢 Connected" : "🔴 Disconnected"}
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    isConnected
+                      ? "bg-green-500/15 text-green-200"
+                      : "bg-red-500/15 text-red-200"
+                  }`}
+                >
+                  {isConnected ? "🟢 Connected to server" : "🔴 Disconnected"}
+                </span>
               </div>
               <div>Turn: {isMyTurn ? "🎯 Your turn" : "⏳ Waiting"}</div>
               {error && <div className="text-red-400">Error: {error}</div>}
@@ -224,6 +232,9 @@ export default function MultiplayerChess() {
             }}
           >
             Leave Game
+          </GoldButton>
+          <GoldButton onClick={() => window.location.reload()}>
+            Back to Player Mode
           </GoldButton>
         </div>
 
@@ -264,11 +275,11 @@ export default function MultiplayerChess() {
           style={{ minWidth: 155, maxWidth: 175 }}
         >
           <Panel title="Captured by White">
-            <CapturedPieces pieces={[]} label="" />
+            <CapturedPieces pieces={gameState.capturedB || []} label="" />
           </Panel>
 
           <Panel title="Captured by Black">
-            <CapturedPieces pieces={[]} label="" />
+            <CapturedPieces pieces={gameState.capturedW || []} label="" />
           </Panel>
 
           <Panel title="Move History">

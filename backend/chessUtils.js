@@ -181,6 +181,10 @@ function isValidMove(gameState, fromRow, fromCol, toRow, toCol) {
   }
 }
 
+function toAlgebraic(row, col) {
+  return String.fromCharCode(97 + col) + (8 - row);
+}
+
 function applyMove(gameState, fromRow, fromCol, toRow, toCol) {
   const board = gameState.board;
   const piece = board[fromRow][fromCol];
@@ -216,8 +220,19 @@ function applyMove(gameState, fromRow, fromCol, toRow, toCol) {
   }
 
   // Pawn promotion
+  let promotionLabel = null;
   if (type === "P" && (toRow === 0 || toRow === 7)) {
     board[toRow][toCol] = color + "Q";
+    promotionLabel = "=Q";
+  }
+
+  // Update captured arrays
+  if (capturedPiece) {
+    if (color === "w") {
+      gameState.capturedB.push(capturedPiece);
+    } else {
+      gameState.capturedW.push(capturedPiece);
+    }
   }
 
   // Update castling rights
@@ -269,10 +284,18 @@ function applyMove(gameState, fromRow, fromCol, toRow, toCol) {
       : null;
 
   gameState.turn = opponent(color);
+
+  const moveText = `${piece}@${toAlgebraic(fromRow, fromCol)}→${toAlgebraic(
+    toRow,
+    toCol,
+  )}${promotionLabel || ""}`;
+
   gameState.moveHistory.push({
     from: [fromRow, fromCol],
     to: [toRow, toCol],
     piece,
+    color,
+    text: moveText,
     captured: capturedPiece || null,
     timestamp: Date.now(),
   });

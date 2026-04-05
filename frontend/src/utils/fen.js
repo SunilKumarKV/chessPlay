@@ -9,7 +9,6 @@
 //   6. Fullmove number
 // ─────────────────────────────────────────────────────────────
 
-import { colorOf, typeOf } from "./boardUtils";
 import { FILES, RANKS } from "../constants/board";
 
 // Map piece codes → FEN characters

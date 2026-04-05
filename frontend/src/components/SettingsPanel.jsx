@@ -19,6 +19,28 @@ const difficultyLabel = (v) => {
   return DIFFICULTY_LABELS[key];
 };
 
+function Toggle({ on, onToggle, toggleStyle, thumbStyle }) {
+  return (
+    <button
+      style={toggleStyle(on)}
+      onClick={onToggle}
+      aria-checked={on}
+      role="switch"
+    >
+      <span style={thumbStyle(on)} />
+    </button>
+  );
+}
+
+function Row({ label, children, labelStyle }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <span style={labelStyle}>{label}</span>
+      {children}
+    </div>
+  );
+}
+
 export default function SettingsPanel({
   aiEnabled,
   setAiEnabled,
@@ -76,24 +98,6 @@ export default function SettingsPanel({
     boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
   });
 
-  const Toggle = ({ on, onToggle }) => (
-    <button
-      style={toggleStyle(on)}
-      onClick={onToggle}
-      aria-checked={on}
-      role="switch"
-    >
-      <span style={thumbStyle(on)} />
-    </button>
-  );
-
-  const Row = ({ label, children }) => (
-    <div style={{ marginBottom: 14 }}>
-      <span style={labelStyle}>{label}</span>
-      {children}
-    </div>
-  );
-
   return (
     <div
       className="flex flex-col gap-1"
@@ -119,7 +123,7 @@ export default function SettingsPanel({
       </p>
 
       {/* ── AI Toggle */}
-      <Row label="AI Opponent">
+      <Row label="AI Opponent" labelStyle={labelStyle}>
         <div className="flex items-center gap-2">
           <Toggle
             on={aiEnabled}
@@ -127,6 +131,8 @@ export default function SettingsPanel({
               setAiEnabled((v) => !v);
               onReset();
             }}
+            toggleStyle={toggleStyle}
+            thumbStyle={thumbStyle}
           />
           <span style={{ fontSize: "0.78rem", color: "#e8dcc8", opacity: 0.7 }}>
             {aiEnabled ? "On" : "Off"}
@@ -136,7 +142,7 @@ export default function SettingsPanel({
 
       {aiEnabled && (
         <>
-          <Row label="AI plays as">
+          <Row label="AI plays as" labelStyle={labelStyle}>
             <select
               style={selectStyle}
               value={aiColor}
@@ -150,7 +156,10 @@ export default function SettingsPanel({
             </select>
           </Row>
 
-          <Row label={`Difficulty — ${difficultyLabel(aiDifficulty)}`}>
+          <Row
+            label={`Difficulty — ${difficultyLabel(aiDifficulty)}`}
+            labelStyle={labelStyle}
+          >
             <div className="flex items-center gap-2">
               <input
                 type="range"
@@ -177,7 +186,7 @@ export default function SettingsPanel({
       )}
 
       {/* ── Clock */}
-      <Row label="Time Control">
+      <Row label="Time Control" labelStyle={labelStyle}>
         <select
           style={selectStyle}
           value={timeControlIdx}
@@ -195,11 +204,13 @@ export default function SettingsPanel({
       </Row>
 
       {/* ── Sound */}
-      <Row label="Sound Effects">
+      <Row label="Sound Effects" labelStyle={labelStyle}>
         <div className="flex items-center gap-2">
           <Toggle
             on={soundEnabled}
             onToggle={() => setSoundEnabled((v) => !v)}
+            toggleStyle={toggleStyle}
+            thumbStyle={thumbStyle}
           />
           <span style={{ fontSize: "0.78rem", color: "#e8dcc8", opacity: 0.7 }}>
             {soundEnabled ? "On" : "Off"}

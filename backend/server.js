@@ -10,7 +10,7 @@ const server = http.createServer(app);
 // Configure CORS for the frontend
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:5173", // Vite dev server
+    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
     methods: ["GET", "POST"],
   },
 });
@@ -48,6 +48,8 @@ function createInitialGameState() {
     },
     status: "playing", // playing, check, checkmate, stalemate
     moveHistory: [],
+    capturedW: [],
+    capturedB: [],
     players: {
       w: { id: null, name: "Player 1" },
       b: { id: null, name: "Player 2" },

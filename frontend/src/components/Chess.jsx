@@ -108,6 +108,9 @@ export default function Chess() {
             <GoldButton onClick={g.resetGame}>New Game</GoldButton>
             <GoldButton onClick={g.toggleFlip}>Flip Board</GoldButton>
             <GoldButton onClick={g.handleExportPGN}>Export PGN</GoldButton>
+            <GoldButton onClick={() => window.location.reload()}>
+              Back to Player Mode
+            </GoldButton>
           </div>
 
           {/* Game-over banner */}

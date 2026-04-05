@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { io } from "socket.io-client";
+import { useSoundEffects } from "./useSoundEffects";
 
 const BACKEND_URL = "http://localhost:3001";
 
 export function useMultiplayerChess() {
   const socketRef = useRef(null);
+  const sound = useSoundEffects({ enabled: true });
   const [isConnected, setIsConnected] = useState(false);
   const [gameState, setGameState] = useState(null);
   const [roomId, setRoomId] = useState(null);
@@ -21,7 +23,8 @@ export function useMultiplayerChess() {
 
   // Connect to server
   useEffect(() => {
-    const newSocket = io(BACKEND_URL);
+    const targetUrl = `http://${window.location.hostname}:3001`;
+    const newSocket = io(targetUrl);
     socketRef.current = newSocket;
 
     newSocket.on("connect", () => {
@@ -34,7 +37,8 @@ export function useMultiplayerChess() {
     });
 
     newSocket.on("connect_error", (err) => {
-      setError(err.message);
+      setError(err.message || "Unable to connect to server");
+      console.error("Socket.IO connect_error:", err);
     });
 
     // Room events
@@ -75,6 +79,26 @@ export function useMultiplayerChess() {
     newSocket.on("moveMade", (data) => {
       setGameState(data.gameState);
       setIsMyTurn(data.gameState.turn === playerColorRef.current);
+
+      const lastMove =
+        data.gameState.moveHistory &&
+        data.gameState.moveHistory[data.gameState.moveHistory.length - 1];
+
+      if (lastMove?.captured) {
+        sound.capture();
+      } else {
+        sound.move();
+      }
+
+      if (data.gameState.status === "check") {
+        sound.check();
+      }
+      if (data.gameState.status === "checkmate") {
+        sound.gameEnd(data.gameState.turn !== playerColorRef.current);
+      }
+      if (data.gameState.status === "stalemate") {
+        sound.stalemate();
+      }
     });
 
     newSocket.on("playerLeft", (data) => {
@@ -90,7 +114,7 @@ export function useMultiplayerChess() {
       newSocket.close();
       socketRef.current = null;
     };
-  }, []);
+  }, [sound]);
 
   // Create a new room
   const createRoom = useCallback(

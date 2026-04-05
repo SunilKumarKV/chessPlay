@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 /* =====================
    CORE GAME CONSTANTS
    ==================== */
@@ -36,7 +36,6 @@ export function useChessGame() {
   const [turn, setTurn] = useState("w"); // whose turn: w | b
   const [enPassant, setEnPassant] = useState(null);
   const [castling, setCastling] = useState(INITIAL_CASTLING);
-  const [status, setStatus] = useState("playing");
 
   // used for FEN generation
   const [fullmove, setFullmove] = useState(1);
@@ -109,44 +108,37 @@ export function useChessGame() {
 
   const sound = useSoundEffects({ enabled: soundEnabled });
 
+  const status = useMemo(() => {
+    if (clock.flagged) return "checkmate";
+    return getGameStatus(board, turn, enPassant, castling);
+  }, [board, turn, enPassant, castling, clock.flagged]);
+
   /* =================================================
      9️⃣ GAME STATUS CHECKER
      Runs after every move
      ================================================= */
 
   useEffect(() => {
-    const s = getGameStatus(board, turn, enPassant, castling);
-    setStatus(s);
-
-    // play sound effects depending on status
-
-    if (s === "checkmate") {
-      sound.gameEnd(turn !== aiColor);
+    if (status === "checkmate") {
+      sound.gameEnd(
+        clock.flagged ? clock.flagged === aiColor : turn !== aiColor,
+      );
       clock.pause();
-    } else if (s === "stalemate") {
+    } else if (status === "stalemate") {
       sound.stalemate();
       clock.pause();
-    } else if (s === "check") {
+    } else if (status === "check") {
       sound.check();
     }
-  }, [board, turn, enPassant, castling, aiColor, sound, clock]);
-
-  /* ====================================================
-     🔟 CLOCK FLAG DETECTION
-     ================================================= */
-
-  useEffect(() => {
-    if (clock.flagged) {
-      setStatus("checkmate");
-      sound.gameEnd(clock.flagged === aiColor);
-    }
-  }, [clock.flagged]);
+  }, [status, sound, clock, aiColor, turn]);
 
   /* ====================================================
      11️⃣ AI MOVE ENGINE
      ================================================= */
 
   const aiThinking = useRef(false);
+
+  const commitMoveRef = useRef(null);
 
   useEffect(() => {
     if (!aiEnabled) return;
@@ -173,6 +165,7 @@ export function useChessGame() {
         commitMoveRef.current(parsed.from, parsed.to, parsed.promotion);
     });
   }, [
+    board,
     turn,
     aiEnabled,
     sfReady,
@@ -189,8 +182,6 @@ export function useChessGame() {
      12️⃣ MOVE EXECUTION ENGINE
      The core function that updates the board
      ================================================= */
-
-  const commitMoveRef = useRef(null);
 
   const commitMove = useCallback(
     (from, to, promotionPiece = null) => {
@@ -263,7 +254,7 @@ export function useChessGame() {
         },
       ]);
     },
-    [board, castling],
+    [board, castling, clock, sound],
   );
 
   useEffect(() => {
@@ -271,9 +262,9 @@ export function useChessGame() {
   }, [commitMove]);
 
   /* ====================================================
-     13️⃣ BOARD CLICK HANDLER
-     Handles user interaction with squares
-     ================================================= */
+   13️⃣ BOARD CLICK HANDLER
+   Handles user interaction with squares
+   ================================================= */
 
   const handleSquareClick = useCallback(
     (row, col) => {
@@ -333,6 +324,8 @@ export function useChessGame() {
       status,
       enPassant,
       castling,
+      clock,
+      commitMove,
     ],
   );
 
@@ -350,7 +343,7 @@ export function useChessGame() {
 
       clock.resume(turn);
     },
-    [promotion, commitMove],
+    [promotion, commitMove, clock, turn],
   );
 
   /* ====================================================
@@ -376,7 +369,7 @@ export function useChessGame() {
     };
 
     downloadPGN(exportPGN(history, meta), `chess-${Date.now()}.pgn`);
-  }, [history, status]);
+  }, [history, status, aiEnabled, aiColor, aiDifficulty, turn]);
 
   /* ====================================================
      16️⃣ RESET GAME
@@ -388,8 +381,6 @@ export function useChessGame() {
     setTurn("w");
     setEnPassant(null);
     setCastling(INITIAL_CASTLING);
-
-    setStatus("playing");
 
     setSelected(null);
     setLegalMoves([]);

@@ -1,4 +1,3 @@
-import { fenToBoard } from "./fen";
 import { INITIAL_BOARD, INITIAL_CASTLING } from "../constants/board";
 
 export function exportPGN(history, meta = {}) {
