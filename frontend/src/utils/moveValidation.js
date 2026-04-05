@@ -61,6 +61,8 @@ export function getLegalMoves(
 
     // ── Special case: castling — also move the rook and check the pass-through square
     if (typeOf(piece) === "K" && Math.abs(tc - col) === 2) {
+      if (isInCheck(board, color, enPassantTarget, castlingRights)) continue;
+
       const baseRow = color === "w" ? 7 : 0;
       const passCol = tc === 6 ? 5 : 3;
       const rookFrom = tc === 6 ? 7 : 0;
@@ -75,8 +77,6 @@ export function getLegalMoves(
       midBoard[baseRow][passCol] = piece;
       midBoard[row][col] = null;
       if (isInCheck(midBoard, color, null, castlingRights)) continue;
-
-      // Cannot castle while in check — already filtered below
     }
 
     // ── Special case: en passant — remove the captured pawn

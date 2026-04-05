@@ -1,36 +1,22 @@
 {
-  "name": "chessplay",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "name": "chessplay-monorepo",
+  "version": "1.0.0",
+  "description": "Real-time multiplayer chess game with React frontend and Node.js backend",
   "scripts": {
-    "dev": "vite",
+    "dev": "cd frontend && npm run dev",
     "dev:multi": "concurrently \"npm run dev\" \"npm run server\"",
     "server": "cd backend && npm run dev",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@tailwindcss/vite": "^4.2.1",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "socket.io-client": "^4.8.3"
+    "build": "cd frontend && npm run build",
+    "lint": "cd frontend && npm run lint",
+    "preview": "cd frontend && npm run preview",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "start": "npm run dev:multi"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@tailwindcss/postcss": "^4.2.1",
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.1",
-    "autoprefixer": "^10.4.27",
-    "concurrently": "^9.2.1",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
-    "postcss": "^8.5.8",
-    "tailwindcss": "^4.2.1",
-    "vite": "^7.3.1"
-  }
+    "concurrently": "^8.2.2"
+  },
+  "workspaces": [
+    "frontend",
+    "backend"
+  ]
 }

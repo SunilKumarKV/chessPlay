@@ -1,16 +1,12 @@
 import { useState } from "react";
 import { useMultiplayerChess } from "../hooks/useMultiplayerChess";
+import { getLegalMoves } from "../utils/moveValidation";
 import Board from "./Board";
 import StatusBar from "./StatusBar";
-import PromotionModal from "./PromotionModal";
 import MoveHistory from "./MoveHistory";
 import CapturedPieces from "./CapturedPieces";
 import Panel from "./Panel";
 import GoldButton from "./GoldButton";
-import ChessClock from "./ChessClock";
-import AIThinkingIndicator from "./AIThinkingIndicator";
-import SettingsPanel from "./SettingsPanel";
-import PlayerInfo from "./PlayerInfo";
 
 export default function MultiplayerChess() {
   const {
@@ -31,7 +27,7 @@ export default function MultiplayerChess() {
   const [legalMoves, setLegalMoves] = useState([]);
   const [playerName, setPlayerName] = useState("");
   const [joinRoomId, setJoinRoomId] = useState("");
-  const [showRoomSetup, setShowRoomSetup] = useState(true);
+  const showRoomSetup = !gameState;
 
   // Handle square click for multiplayer
   const handleSquareClick = (row, col) => {
@@ -44,7 +40,6 @@ export default function MultiplayerChess() {
         setSelected(null);
         setLegalMoves([]);
       } else {
-        // Try to make move
         const isLegalMove = legalMoves.some(([r, c]) => r === row && c === col);
         if (isLegalMove) {
           makeMove(selRow, selCol, row, col);
@@ -52,25 +47,21 @@ export default function MultiplayerChess() {
           setLegalMoves([]);
         }
       }
-    } else {
-      // Select piece
-      const piece = gameState.board[row][col];
-      if (piece && piece[0] === playerColor) {
-        setSelected([row, col]);
-        // For now, allow any square as legal move (simplified)
-        setLegalMoves(
-          [
-            [row + 1, col],
-            [row - 1, col],
-            [row, col + 1],
-            [row, col - 1],
-            [row + 1, col + 1],
-            [row + 1, col - 1],
-            [row - 1, col + 1],
-            [row - 1, col - 1],
-          ].filter(([r, c]) => r >= 0 && r < 8 && c >= 0 && c < 8),
-        );
-      }
+      return;
+    }
+
+    const piece = gameState.board[row][col];
+    if (piece && piece[0] === playerColor) {
+      setSelected([row, col]);
+      setLegalMoves(
+        getLegalMoves(
+          gameState.board,
+          row,
+          col,
+          gameState.enPassant,
+          gameState.castling,
+        ),
+      );
     }
   };
 
@@ -126,7 +117,6 @@ export default function MultiplayerChess() {
               onClick={() => {
                 if (playerName.trim()) {
                   createRoom(playerName.trim());
-                  setShowRoomSetup(false);
                 }
               }}
               disabled={!isConnected || !playerName.trim()}
@@ -149,7 +139,6 @@ export default function MultiplayerChess() {
               onClick={() => {
                 if (joinRoomId.trim() && playerName.trim()) {
                   joinRoom(joinRoomId.trim(), playerName.trim());
-                  setShowRoomSetup(false);
                 }
               }}
               disabled={
@@ -178,8 +167,6 @@ export default function MultiplayerChess() {
     );
   }
 
-  const isOver =
-    gameState.status === "checkmate" || gameState.status === "stalemate";
   const flipped = playerColor === "b"; // Black player sees board flipped
 
   return (
@@ -231,7 +218,11 @@ export default function MultiplayerChess() {
             </div>
           </Panel>
 
-          <GoldButton onClick={() => setShowRoomSetup(true)}>
+          <GoldButton
+            onClick={() => {
+              leaveRoom();
+            }}
+          >
             Leave Game
           </GoldButton>
         </div>
@@ -263,9 +254,7 @@ export default function MultiplayerChess() {
 
           {/* Controls */}
           <div className="flex gap-2 mt-4 flex-wrap justify-center">
-            <GoldButton onClick={() => setShowRoomSetup(true)}>
-              New Game
-            </GoldButton>
+            <GoldButton onClick={() => leaveRoom()}>New Game</GoldButton>
           </div>
         </div>
 

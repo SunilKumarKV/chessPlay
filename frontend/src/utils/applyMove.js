@@ -64,11 +64,24 @@ export function applyMove(
     newCastling[color].kingSide = false;
     newCastling[color].queenSide = false;
   }
-  // Rook moved or captured → lose that side's right
+  // Rook moved → lose that side's right
   if (type === "R") {
     const baseRow = color === "w" ? 7 : 0;
     if (fr === baseRow && fc === 7) newCastling[color].kingSide = false;
     if (fr === baseRow && fc === 0) newCastling[color].queenSide = false;
+  }
+
+  // Rook captured → lose opponent rook rights if the captured rook was on its original square
+  let capturedPiece = board[tr][tc];
+  if (type === "P" && tc !== fc && !board[tr][tc]) {
+    capturedPiece = board[fr][tc];
+  }
+  if (capturedPiece && typeOf(capturedPiece) === "R") {
+    const capturedColor = colorOf(capturedPiece);
+    const baseRow = capturedColor === "w" ? 7 : 0;
+    if (tr === baseRow && tc === 7) newCastling[capturedColor].kingSide = false;
+    if (tr === baseRow && tc === 0)
+      newCastling[capturedColor].queenSide = false;
   }
 
   return { newBoard: next, newEnPassant, newCastling };

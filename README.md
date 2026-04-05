@@ -53,18 +53,10 @@ git clone <repository-url>
 cd chessplay
 ```
 
-2. Install frontend dependencies:
+2. Install all dependencies:
 
 ```bash
-npm install
-```
-
-3. Install backend dependencies:
-
-```bash
-cd backend
-npm install
-cd ..
+npm run install:all
 ```
 
 ### Running the Application
@@ -80,7 +72,7 @@ Frontend will be available at `http://localhost:5173`
 #### For Multiplayer (Frontend + Backend)
 
 ```bash
-npm run dev:multi
+npm start
 ```
 
 - Frontend: `http://localhost:5173`
@@ -90,7 +82,7 @@ npm run dev:multi
 
 ```bash
 # Terminal 1 - Backend
-cd backend && npm run dev
+npm run server
 
 # Terminal 2 - Frontend
 npm run dev
@@ -100,28 +92,21 @@ npm run dev
 
 ```
 chessplay/
-├── src/
-│   ├── components/          # React components
-│   │   ├── Board.jsx       # Chess board component
-│   │   ├── Chess.jsx       # Main single-player game
-│   │   ├── MultiplayerChess.jsx  # Multiplayer game
-│   │   ├── PlayerInfo.jsx  # Player information display
-│   │   └── ...
-│   ├── hooks/              # Custom React hooks
-│   │   ├── useChessGame.js # Single-player game logic
-│   │   ├── useMultiplayerChess.js # Multiplayer logic
-│   │   └── ...
-│   ├── utils/              # Chess utilities
-│   │   ├── moveValidation.js
-│   │   ├── boardUtils.js
-│   │   └── ...
-│   └── constants/          # Game constants
+├── frontend/                # React frontend
+│   ├── src/                # React source code
+│   │   ├── components/     # React components
+│   │   ├── hooks/         # Custom React hooks
+│   │   ├── utils/         # Chess utilities
+│   │   └── constants/     # Game constants
+│   ├── public/            # Static assets
+│   ├── package.json       # Frontend dependencies
+│   └── vite.config.js     # Vite configuration
 ├── backend/                # Node.js backend
 │   ├── server.js          # Socket.IO server
 │   ├── chessUtils.js      # Backend chess utilities
-│   └── package.json
-├── public/                 # Static assets
-└── package.json
+│   └── package.json       # Backend dependencies
+├── package.json           # Root package.json for monorepo
+└── README.md
 ```
 
 ## Game Features

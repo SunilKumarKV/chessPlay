@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 const BACKEND_URL = "http://localhost:3001";
 
 export function useMultiplayerChess() {
-  const [socket, setSocket] = useState(null);
+  const socketRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
   const [gameState, setGameState] = useState(null);
   const [roomId, setRoomId] = useState(null);
@@ -12,11 +12,17 @@ export function useMultiplayerChess() {
   const [opponentName, setOpponentName] = useState(null);
   const [isMyTurn, setIsMyTurn] = useState(false);
   const [error, setError] = useState(null);
+  const playerColorRef = useRef(null);
+
+  const updatePlayerColor = (color) => {
+    playerColorRef.current = color;
+    setPlayerColor(color);
+  };
 
   // Connect to server
   useEffect(() => {
     const newSocket = io(BACKEND_URL);
-    setSocket(newSocket);
+    socketRef.current = newSocket;
 
     newSocket.on("connect", () => {
       setIsConnected(true);
@@ -27,22 +33,40 @@ export function useMultiplayerChess() {
       setIsConnected(false);
     });
 
-    newSocket.on("error", (data) => {
-      setError(data.message);
+    newSocket.on("connect_error", (err) => {
+      setError(err.message);
     });
 
     // Room events
     newSocket.on("roomCreated", (data) => {
       setRoomId(data.roomId);
       setGameState(data.gameState);
-      setPlayerColor("w");
-      setIsMyTurn(true);
+      updatePlayerColor("w");
+      setIsMyTurn(data.gameState.turn === "w");
+      setOpponentName(null);
+      setError(null);
+    });
+
+    newSocket.on("joinedRoom", (data) => {
+      setRoomId(data.roomId);
+      setGameState(data.gameState);
+      updatePlayerColor(data.color);
+      setIsMyTurn(data.gameState.turn === data.color);
+
+      const opponentPlayer =
+        data.color === "w"
+          ? data.gameState.players.b
+          : data.gameState.players.w;
+      setOpponentName(opponentPlayer?.id ? opponentPlayer.name : null);
       setError(null);
     });
 
     newSocket.on("playerJoined", (data) => {
       setGameState(data.gameState);
-      if (data.newPlayer.color !== playerColor) {
+      if (
+        playerColorRef.current &&
+        data.newPlayer.color !== playerColorRef.current
+      ) {
         setOpponentName(data.newPlayer.name);
       }
       setError(null);
@@ -50,7 +74,7 @@ export function useMultiplayerChess() {
 
     newSocket.on("moveMade", (data) => {
       setGameState(data.gameState);
-      setIsMyTurn(data.gameState.turn === playerColor);
+      setIsMyTurn(data.gameState.turn === playerColorRef.current);
     });
 
     newSocket.on("playerLeft", (data) => {
@@ -58,60 +82,67 @@ export function useMultiplayerChess() {
       setError(`${data.name} left the game`);
     });
 
+    newSocket.on("serverError", (data) => {
+      setError(data.message);
+    });
+
     return () => {
       newSocket.close();
+      socketRef.current = null;
     };
   }, []);
 
   // Create a new room
   const createRoom = useCallback(
     (playerName) => {
-      if (socket && isConnected) {
-        socket.emit("createRoom", { playerName });
+      if (socketRef.current && isConnected) {
+        socketRef.current.emit("createRoom", { playerName });
       }
     },
-    [socket, isConnected],
+    [isConnected],
   );
 
   // Join an existing room
   const joinRoom = useCallback(
     (roomId, playerName) => {
-      if (socket && isConnected) {
-        socket.emit("joinRoom", { roomId, playerName });
+      if (socketRef.current && isConnected) {
+        socketRef.current.emit("joinRoom", { roomId, playerName });
       }
     },
-    [socket, isConnected],
+    [isConnected],
   );
 
   // Make a move
   const makeMove = useCallback(
     (fromRow, fromCol, toRow, toCol) => {
-      if (socket && isConnected && isMyTurn) {
-        socket.emit("makeMove", { fromRow, fromCol, toRow, toCol });
+      if (socketRef.current && isConnected && isMyTurn) {
+        socketRef.current.emit("makeMove", { fromRow, fromCol, toRow, toCol });
       }
     },
-    [socket, isConnected, isMyTurn],
+    [isConnected, isMyTurn],
   );
 
   // Get rooms list (for debugging)
   const getRooms = useCallback(() => {
-    if (socket && isConnected) {
-      socket.emit("getRooms");
+    if (socketRef.current && isConnected) {
+      socketRef.current.emit("getRooms");
     }
-  }, [socket, isConnected]);
+  }, [isConnected]);
 
-  // Leave current room
+  // Leave current room without tearing down socket connection
   const leaveRoom = useCallback(() => {
-    if (socket) {
-      socket.disconnect();
-      setGameState(null);
-      setRoomId(null);
-      setPlayerColor(null);
-      setOpponentName(null);
-      setIsMyTurn(false);
-      setError(null);
+    if (socketRef.current && isConnected) {
+      socketRef.current.emit("leaveRoom");
     }
-  }, [socket]);
+
+    setGameState(null);
+    setRoomId(null);
+    setPlayerColor(null);
+    playerColorRef.current = null;
+    setOpponentName(null);
+    setIsMyTurn(false);
+    setError(null);
+  }, [isConnected]);
 
   return {
     // Connection state

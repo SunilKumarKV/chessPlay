@@ -2,7 +2,7 @@ const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
 const cors = require("cors");
-const { isValidMove: validateMove } = require("./chessUtils");
+const { isValidMove: validateMove, applyMove } = require("./chessUtils");
 
 const app = express();
 const server = http.createServer(app);
@@ -55,29 +55,9 @@ function createInitialGameState() {
   };
 }
 
-// Simple move validation (basic implementation)
+// Simple move validation wrapper
 function isValidMove(gameState, fromRow, fromCol, toRow, toCol) {
   return validateMove(gameState, fromRow, fromCol, toRow, toCol);
-}
-
-// Apply a move to the game state
-function applyMove(gameState, fromRow, fromCol, toRow, toCol) {
-  const piece = gameState.board[fromRow][fromCol];
-  gameState.board[fromRow][fromCol] = null;
-  gameState.board[toRow][toCol] = piece;
-
-  // Switch turns
-  gameState.turn = gameState.turn === "w" ? "b" : "w";
-
-  // Add to move history
-  gameState.moveHistory.push({
-    from: [fromRow, fromCol],
-    to: [toRow, toCol],
-    piece: piece,
-    timestamp: Date.now(),
-  });
-
-  return gameState;
 }
 
 io.on("connection", (socket) => {
@@ -106,13 +86,13 @@ io.on("connection", (socket) => {
 
     const gameState = rooms.get(roomId);
     if (!gameState) {
-      socket.emit("error", { message: "Room not found" });
+      socket.emit("serverError", { message: "Room not found" });
       return;
     }
 
     // Check if room is full
     if (gameState.players.w.id && gameState.players.b.id) {
-      socket.emit("error", { message: "Room is full" });
+      socket.emit("serverError", { message: "Room is full" });
       return;
     }
 
@@ -128,7 +108,14 @@ io.on("connection", (socket) => {
     players.set(socket.id, { roomId, color, playerName });
     socket.join(roomId);
 
-    // Notify both players
+    // Notify the joining player directly with room info and assigned color
+    socket.emit("joinedRoom", {
+      roomId,
+      gameState,
+      color,
+    });
+
+    // Notify both players that someone joined
     io.to(roomId).emit("playerJoined", {
       gameState,
       newPlayer: { color, name: playerName },
@@ -143,29 +130,29 @@ io.on("connection", (socket) => {
     const player = players.get(socket.id);
 
     if (!player) {
-      socket.emit("error", { message: "Not in a room" });
+      socket.emit("serverError", { message: "Not in a room" });
       return;
     }
 
     const gameState = rooms.get(player.roomId);
     if (!gameState) {
-      socket.emit("error", { message: "Room not found" });
+      socket.emit("serverError", { message: "Room not found" });
       return;
     }
 
     // Validate turn
     if (gameState.turn !== player.color) {
-      socket.emit("error", { message: "Not your turn" });
+      socket.emit("serverError", { message: "Not your turn" });
       return;
     }
 
     // Validate move
     if (!isValidMove(gameState, fromRow, fromCol, toRow, toCol)) {
-      socket.emit("error", { message: "Invalid move" });
+      socket.emit("serverError", { message: "Invalid move" });
       return;
     }
 
-    // Apply move
+    // Apply move with full rule support
     applyMove(gameState, fromRow, fromCol, toRow, toCol);
 
     // Broadcast move to all players in room
@@ -179,28 +166,41 @@ io.on("connection", (socket) => {
     );
   });
 
+  const cleanupPlayer = (socket, notify = true) => {
+    const player = players.get(socket.id);
+    if (!player) return;
+
+    const gameState = rooms.get(player.roomId);
+    if (gameState) {
+      gameState.players[player.color].id = null;
+      gameState.players[player.color].name =
+        player.color === "w" ? "Player 1" : "Player 2";
+
+      if (!gameState.players.w.id && !gameState.players.b.id) {
+        rooms.delete(player.roomId);
+      } else if (notify) {
+        io.to(player.roomId).emit("playerLeft", {
+          color: player.color,
+          name: player.playerName,
+        });
+      }
+    }
+
+    players.delete(socket.id);
+  };
+
+  socket.on("leaveRoom", () => {
+    const player = players.get(socket.id);
+    if (!player) return;
+
+    socket.leave(player.roomId);
+    cleanupPlayer(socket, true);
+    socket.emit("leftRoom");
+  });
+
   // Handle disconnect
   socket.on("disconnect", () => {
-    const player = players.get(socket.id);
-    if (player) {
-      const gameState = rooms.get(player.roomId);
-      if (gameState) {
-        // Remove player from room
-        gameState.players[player.color].id = null;
-
-        // If room is empty, delete it
-        if (!gameState.players.w.id && !gameState.players.b.id) {
-          rooms.delete(player.roomId);
-        } else {
-          // Notify remaining player
-          io.to(player.roomId).emit("playerLeft", {
-            color: player.color,
-            name: player.playerName,
-          });
-        }
-      }
-      players.delete(socket.id);
-    }
+    cleanupPlayer(socket, true);
     console.log(`Player disconnected: ${socket.id}`);
   });
 

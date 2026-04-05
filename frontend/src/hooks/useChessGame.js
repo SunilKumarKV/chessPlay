@@ -129,7 +129,7 @@ export function useChessGame() {
     } else if (s === "check") {
       sound.check();
     }
-  }, [board, turn]);
+  }, [board, turn, enPassant, castling, aiColor, sound, clock]);
 
   /* ====================================================
      🔟 CLOCK FLAG DETECTION
@@ -172,7 +172,18 @@ export function useChessGame() {
       if (parsed)
         commitMoveRef.current(parsed.from, parsed.to, parsed.promotion);
     });
-  }, [turn, aiEnabled, sfReady, status]);
+  }, [
+    turn,
+    aiEnabled,
+    sfReady,
+    status,
+    aiColor,
+    getBestMove,
+    castling,
+    enPassant,
+    fullmove,
+    aiDifficulty,
+  ]);
 
   /* ====================================================
      12️⃣ MOVE EXECUTION ENGINE
@@ -312,7 +323,17 @@ export function useChessGame() {
         setLegalMoves(getLegalMoves(board, row, col, enPassant, castling));
       }
     },
-    [board, turn, selected, legalMoves],
+    [
+      board,
+      turn,
+      selected,
+      legalMoves,
+      aiEnabled,
+      aiColor,
+      status,
+      enPassant,
+      castling,
+    ],
   );
 
   /* ====================================================
