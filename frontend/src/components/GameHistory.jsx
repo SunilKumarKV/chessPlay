@@ -78,67 +78,92 @@ export default function GameHistory({ onBack }) {
   }
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-start p-5"
-      style={{
-        background:
-          "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)",
-        color: "#e8dcc8",
-        fontFamily: "'Crimson Text', Georgia, serif",
-      }}
-    >
-      <div className="w-full max-w-6xl mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black tracking-widest">Game History</h1>
-          <p className="text-sm opacity-70 mt-2">
-            Review your completed games and replay move-by-move.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <GoldButton onClick={onBack}>← Back</GoldButton>
-        </div>
-      </div>
-
-      <div className="w-full max-w-6xl rounded-3xl bg-white/5 border border-white/10 overflow-hidden">
-        <div className="grid grid-cols-[1fr_1.4fr_1fr_1fr_1fr] gap-0 bg-white/10 px-5 py-4 text-xs uppercase tracking-widest text-white/60">
-          <div>Completed</div>
-          <div>Opponent</div>
-          <div>Result</div>
-          <div>Moves</div>
-          <div>Replay</div>
-        </div>
-
-        {loading ? (
-          <div className="p-8 text-center text-white/70">
-            Loading game history…
-          </div>
-        ) : error ? (
-          <div className="p-8 text-center text-red-300">{error}</div>
-        ) : games.length === 0 ? (
-          <div className="p-8 text-center text-white/70">
-            No completed games yet.
-          </div>
-        ) : (
-          games.map((game) => (
-            <div
-              key={game._id}
-              className="grid grid-cols-[1fr_1.4fr_1fr_1fr_1fr] gap-0 px-5 py-4 border-t border-white/10 items-center"
+    <div className="min-h-screen bg-gray-900 text-white">
+      {/* Header */}
+      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={onBack}
+              className="text-gray-400 hover:text-white transition-colors"
             >
-              <div>
-                {new Date(game.endTime || game.startTime).toLocaleString()}
-              </div>
-              <div>{getOpponentLabel(game)}</div>
-              <div>{getResultLabel(game)}</div>
-              <div>{game.moves?.length ?? 0}</div>
-              <div>
-                <GoldButton onClick={() => setSelectedGame(game)}>
-                  Replay
-                </GoldButton>
-              </div>
+              ← Back to Dashboard
+            </button>
+            <h1 className="text-xl font-semibold text-purple-400">Game History</h1>
+          </div>
+          <div className="text-sm text-gray-400">
+            Review and replay your past games
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-6xl mx-auto px-6 py-8">
+        {/* History Table */}
+        <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+          <div className="grid grid-cols-[200px_1fr_120px_100px_120px] gap-0 bg-gray-700 px-6 py-4 text-sm font-medium text-gray-300">
+            <div>Date</div>
+            <div>Opponent</div>
+            <div className="text-center">Result</div>
+            <div className="text-center">Moves</div>
+            <div className="text-center">Action</div>
+          </div>
+
+          {loading ? (
+            <div className="p-12 text-center text-gray-400">
+              Loading game history...
             </div>
-          ))
-        )}
-      </div>
+          ) : error ? (
+            <div className="p-12 text-center text-red-400">
+              {error}
+            </div>
+          ) : games.length === 0 ? (
+            <div className="p-12 text-center text-gray-400">
+              No completed games yet.
+            </div>
+          ) : (
+            games.map((game) => (
+              <div
+                key={game._id}
+                className="grid grid-cols-[200px_1fr_120px_100px_120px] gap-0 px-6 py-4 border-t border-gray-700 hover:bg-gray-700/50 transition-colors"
+              >
+                <div className="text-sm text-gray-400">
+                  {new Date(game.endTime || game.startTime).toLocaleDateString()}
+                  <br />
+                  <span className="text-xs">
+                    {new Date(game.endTime || game.startTime).toLocaleTimeString()}
+                  </span>
+                </div>
+                <div className="font-medium">
+                  {getOpponentLabel(game)}
+                </div>
+                <div className="text-center">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    getResultLabel(game) === "Win"
+                      ? "bg-green-900/30 text-green-400"
+                      : getResultLabel(game) === "Loss"
+                      ? "bg-red-900/30 text-red-400"
+                      : "bg-gray-700 text-gray-400"
+                  }`}>
+                    {getResultLabel(game)}
+                  </span>
+                </div>
+                <div className="text-center text-gray-400">
+                  {game.moves?.length ?? 0}
+                </div>
+                <div className="text-center">
+                  <button
+                    onClick={() => setSelectedGame(game)}
+                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    Replay
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </main>
     </div>
   );
 }

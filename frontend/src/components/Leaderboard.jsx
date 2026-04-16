@@ -40,110 +40,103 @@ export default function Leaderboard({ onBack }) {
   }, []);
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center p-5"
-      style={{
-        background:
-          "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)",
-        fontFamily: "'Crimson Text', Georgia, serif",
-        color: "#e8dcc8",
-      }}
-    >
-      <div className="w-full max-w-6xl mb-4 flex justify-between items-center">
-        <GoldButton onClick={onBack}>← Back</GoldButton>
-        <div className="text-right text-sm opacity-70">
-          <div>Leaderboard is sorted by wins, then rating.</div>
-          <div>Ratings rise after online victories.</div>
-        </div>
-      </div>
-
-      <h1
-        className="font-black tracking-widest mb-6"
-        style={{
-          fontFamily: "'Playfair Display', serif",
-          fontSize: "clamp(2rem,5vw,3rem)",
-          background: "linear-gradient(90deg,#f5d78e,#c8943a,#f5d78e)",
-          WebkitBackgroundClip: "text",
-          WebkitTextFillColor: "transparent",
-        }}
-      >
-        LEADERBOARD
-      </h1>
-
-      <div className="w-full max-w-4xl mb-5 rounded-3xl bg-white/10 border border-white/10 p-5 backdrop-blur-sm">
-        {currentUser ? (
-          <div className="grid grid-cols-4 gap-4 text-sm text-white/80">
-            <div className="rounded-xl bg-white/5 p-4">
-              <div className="text-xs uppercase opacity-60">Your rank</div>
-              <div className="mt-2 text-2xl font-semibold">
-                {currentUser.rank}
-              </div>
-            </div>
-            <div className="rounded-xl bg-white/5 p-4">
-              <div className="text-xs uppercase opacity-60">Rating</div>
-              <div className="mt-2 text-2xl font-semibold">
-                {currentUser.rating}
-              </div>
-            </div>
-            <div className="rounded-xl bg-white/5 p-4">
-              <div className="text-xs uppercase opacity-60">Wins</div>
-              <div className="mt-2 text-2xl font-semibold">
-                {currentUser.gamesWon}
-              </div>
-            </div>
-            <div className="rounded-xl bg-white/5 p-4">
-              <div className="text-xs uppercase opacity-60">Games played</div>
-              <div className="mt-2 text-2xl font-semibold">
-                {currentUser.gamesPlayed}
-              </div>
-            </div>
+    <div className="min-h-screen bg-gray-900 text-white">
+      {/* Header */}
+      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={onBack}
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              ← Back to Dashboard
+            </button>
+            <h1 className="text-xl font-semibold text-yellow-400">Leaderboard</h1>
           </div>
-        ) : (
-          <div className="text-sm text-white/70">
-            Loading your leaderboard position…
+          <div className="text-sm text-gray-400">
+            Rankings by wins, then rating
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-6xl mx-auto px-6 py-8">
+        {/* User Stats */}
+        {currentUser && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4 text-gray-200">Your Ranking</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                <div className="text-2xl font-bold text-blue-400">#{currentUser.rank}</div>
+                <div className="text-sm text-gray-400">Rank</div>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                <div className="text-2xl font-bold text-purple-400">{currentUser.rating}</div>
+                <div className="text-sm text-gray-400">Rating</div>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                <div className="text-2xl font-bold text-green-400">{currentUser.gamesWon}</div>
+                <div className="text-sm text-gray-400">Wins</div>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                <div className="text-2xl font-bold text-yellow-400">{currentUser.gamesPlayed}</div>
+                <div className="text-sm text-gray-400">Games Played</div>
+              </div>
+            </div>
           </div>
         )}
-      </div>
 
-      <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white/5 border border-white/10">
-        <div className="grid grid-cols-[minmax(120px,1fr)_1.5fr_1fr_1fr_1fr] gap-0 bg-white/10 px-5 py-4 text-xs uppercase tracking-widest text-white/60">
-          <div>#</div>
-          <div>Player</div>
-          <div>Wins</div>
-          <div>Rating</div>
-          <div>Played</div>
+        {/* Leaderboard Table */}
+        <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+          <div className="grid grid-cols-[80px_1fr_120px_120px_120px] gap-0 bg-gray-700 px-6 py-4 text-sm font-medium text-gray-300">
+            <div>Rank</div>
+            <div>Player</div>
+            <div className="text-center">Wins</div>
+            <div className="text-center">Rating</div>
+            <div className="text-center">Games</div>
+          </div>
+
+          {loading ? (
+            <div className="p-12 text-center text-gray-400">
+              Loading leaderboard...
+            </div>
+          ) : error ? (
+            <div className="p-12 text-center text-red-400">
+              {error}
+            </div>
+          ) : leaderboard.length === 0 ? (
+            <div className="p-12 text-center text-gray-400">
+              No leaderboard data yet.
+            </div>
+          ) : (
+            leaderboard.map((player, index) => {
+              const isCurrent = currentUser?.username === player.username;
+              return (
+                <div
+                  key={player.username}
+                  className={`grid grid-cols-[80px_1fr_120px_120px_120px] gap-0 px-6 py-4 border-t border-gray-700 ${
+                    isCurrent ? "bg-blue-900/20" : ""
+                  }`}
+                >
+                  <div className="font-semibold text-lg">
+                    {index === 0 && "🥇"}
+                    {index === 1 && "🥈"}
+                    {index === 2 && "🥉"}
+                    {index > 2 && `#${index + 1}`}
+                  </div>
+                  <div className={`font-medium ${isCurrent ? "text-blue-400" : "text-white"}`}>
+                    {player.username}
+                    {isCurrent && <span className="ml-2 text-xs text-blue-400">(You)</span>}
+                  </div>
+                  <div className="text-center text-green-400 font-semibold">{player.gamesWon}</div>
+                  <div className="text-center text-purple-400 font-semibold">{player.rating}</div>
+                  <div className="text-center text-gray-400">{player.gamesPlayed}</div>
+                </div>
+              );
+            })
+          )}
         </div>
-
-        {loading ? (
-          <div className="p-10 text-center text-white/70">
-            Loading leaderboard…
-          </div>
-        ) : error ? (
-          <div className="p-10 text-center text-red-300">{error}</div>
-        ) : leaderboard.length === 0 ? (
-          <div className="p-10 text-center text-white/70">
-            No leaderboard data yet.
-          </div>
-        ) : (
-          leaderboard.map((player, index) => {
-            const isCurrent = currentUser?.username === player.username;
-            return (
-              <div
-                key={player.username}
-                className={`grid grid-cols-[minmax(120px,1fr)_1.5fr_1fr_1fr_1fr] gap-0 px-5 py-4 border-t border-white/10 ${
-                  isCurrent ? "bg-yellow-400/10" : ""
-                }`}
-              >
-                <div className="font-semibold">{index + 1}</div>
-                <div>{player.username}</div>
-                <div>{player.gamesWon}</div>
-                <div>{player.rating}</div>
-                <div>{player.gamesPlayed}</div>
-              </div>
-            );
-          })
-        )}
-      </div>
+      </main>
     </div>
   );
 }

@@ -107,150 +107,149 @@ export default function MultiplayerChess({ onBack }) {
   // If not connected to game, show room setup
   if (showRoomSetup && !gameState) {
     return (
-      <div
-        className="min-h-screen flex flex-col items-center justify-center p-5"
-        style={{
-          background:
-            "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)",
-          fontFamily: "'Crimson Text', Georgia, serif",
-          color: "#e8dcc8",
-        }}
-      >
-        {/* Back Button */}
-        <div className="w-full max-w-md mb-4">
-          <GoldButton onClick={onBack} className="text-sm">
-            ← Back to Menu
-          </GoldButton>
-        </div>
-        <h1
-          className="font-black tracking-widest mb-8"
-          style={{
-            fontFamily: "'Playfair Display', serif",
-            fontSize: "clamp(2rem,5vw,3rem)",
-            background: "linear-gradient(90deg,#f5d78e,#c8943a,#f5d78e)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-          }}
-        >
-          MULTIPLAYER CHESS
-        </h1>
-
-        <div className="flex flex-col gap-6 items-center">
-          {/* Server URL Input */}
-          <div className="flex flex-col gap-3 items-center">
-            <h3 className="text-xl font-semibold">Server Connection</h3>
-            <input
-              type="text"
-              placeholder="Server URL (e.g., http://192.168.1.100:3001)"
-              value={serverUrl}
-              onChange={(e) => setServerUrl(e.target.value)}
-              className="px-4 py-2 rounded bg-white/10 border border-white/20 text-white placeholder-white/50 w-80"
-            />
-            <GoldButton
-              onClick={async () => {
-                try {
-                  const response = await fetch(`${serverUrl}/health`);
-                  const data = await response.json();
-                  if (data.localIP) {
-                    alert(
-                      `Server found! Local IP: ${data.localIP}:${data.port}`,
-                    );
-                  }
-                } catch {
-                  alert("Could not connect to server. Check the URL.");
-                }
-              }}
-              disabled={!serverUrl}
-            >
-              Test Connection
-            </GoldButton>
-            <p className="text-xs opacity-60 text-center">
-              Enter the IP address of the host device running the server
-              <br />
-              Example: http://192.168.1.100:3001
-            </p>
-          </div>
-
-          {/* Connection Status */}
-          <div className="text-center">
-            <div
-              className={`text-lg ${isConnected ? "text-green-400" : "text-red-400"}`}
-            >
-              {isConnected
-                ? "🟢 Connected to server"
-                : "🔴 Connecting to server..."}
+      <div className="min-h-screen bg-gray-900 text-white">
+        {/* Header */}
+        <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={onBack}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                ← Back to Dashboard
+              </button>
+              <h1 className="text-xl font-semibold text-green-400">Multiplayer Chess</h1>
             </div>
-            {error && <div className="text-red-400 mt-2">{error}</div>}
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="max-w-4xl mx-auto px-6 py-8">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold mb-4">Real-time Chess Games</h2>
+            <p className="text-gray-400">Connect with other players and compete in live matches</p>
           </div>
 
-          {/* Time Control */}
-          <div className="flex flex-col gap-3 items-center w-full max-w-xs">
-            <h3 className="text-xl font-semibold">Time Control</h3>
-            <select
-              value={timeControlIdx}
-              onChange={(e) => setTimeControlIdx(Number(e.target.value))}
-              className="px-4 py-2 rounded bg-white/10 border border-white/20 text-white placeholder-white/50 w-full"
-            >
-              {TIME_CONTROLS.map((tc, idx) => (
-                <option key={idx} value={idx}>
-                  {tc.label}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs opacity-60 text-center">
-              Choose blitz, rapid, or unlimited timing
-            </p>
-          </div>
+          <div className="space-y-8">
+            {/* Server Connection */}
+            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+              <h3 className="text-lg font-semibold mb-4 text-blue-400">Server Connection</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-300">Server URL</label>
+                  <input
+                    type="text"
+                    placeholder="http://192.168.1.100:3001"
+                    value={serverUrl}
+                    onChange={(e) => setServerUrl(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`${serverUrl}/health`);
+                      const data = await response.json();
+                      if (data.localIP) {
+                        alert(
+                          `Server found! Local IP: ${data.localIP}:${data.port}`,
+                        );
+                      }
+                    } catch {
+                      alert("Could not connect to server. Check the URL.");
+                    }
+                  }}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  Test Connection
+                </button>
+                <div className="text-center">
+                  <div className={`text-sm ${isConnected ? "text-green-400" : "text-red-400"}`}>
+                    {isConnected ? "🟢 Connected to server" : "🔴 Connecting to server..."}
+                  </div>
+                  {error && <div className="text-red-400 text-sm mt-2">{error}</div>}
+                </div>
+              </div>
+            </div>
 
-          {/* Create Room */}
-          <div className="flex flex-col gap-3 items-center">
-            <h3 className="text-xl font-semibold">Create New Room</h3>
-            <input
-              type="text"
-              placeholder="Enter your name"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              className="px-4 py-2 rounded bg-white/10 border border-white/20 text-white placeholder-white/50"
-            />
-            <GoldButton
-              onClick={() => {
-                if (playerName.trim()) {
-                  createRoom(playerName.trim());
-                }
-              }}
-              disabled={!isConnected || !playerName.trim()}
-            >
-              Create Room
-            </GoldButton>
-          </div>
+            {/* Time Control */}
+            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+              <h3 className="text-lg font-semibold mb-4 text-purple-400">Time Control</h3>
+              <div className="space-y-4">
+                <select
+                  value={timeControlIdx}
+                  onChange={(e) => setTimeControlIdx(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                >
+                  {TIME_CONTROLS.map((tc, idx) => (
+                    <option key={idx} value={idx} className="bg-gray-700">
+                      {tc.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-sm text-gray-400">
+                  Choose blitz, rapid, or unlimited timing for your games
+                </p>
+              </div>
+            </div>
 
-          {/* Join Room */}
-          <div className="flex flex-col gap-3 items-center">
-            <h3 className="text-xl font-semibold">Join Existing Room</h3>
-            <input
-              type="text"
-              placeholder="Room ID"
-              value={joinRoomId}
-              onChange={(e) => setJoinRoomId(e.target.value.toUpperCase())}
-              className="px-4 py-2 rounded bg-white/10 border border-white/20 text-white placeholder-white/50"
-            />
-            <GoldButton
-              onClick={() => {
-                if (joinRoomId.trim() && playerName.trim()) {
-                  joinRoom(joinRoomId.trim(), playerName.trim());
-                }
-              }}
-              disabled={
-                !isConnected || !joinRoomId.trim() || !playerName.trim()
-              }
-            >
-              Join Room
-            </GoldButton>
-          </div>
+            {/* Create Room */}
+            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+              <h3 className="text-lg font-semibold mb-4 text-green-400">Create New Room</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-300">Your Name</label>
+                  <input
+                    type="text"
+                    placeholder="Enter your name"
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-500"
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    if (playerName.trim()) {
+                      createRoom(playerName.trim());
+                    }
+                  }}
+                  disabled={!isConnected || !playerName.trim()}
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  Create Room
+                </button>
+              </div>
+            </div>
 
-          {/* Back to Single Player */}
-          <GoldButton onClick={onBack}>← Back to Menu</GoldButton>
-        </div>
+            {/* Join Room */}
+            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+              <h3 className="text-lg font-semibold mb-4 text-yellow-400">Join Existing Room</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-300">Room ID</label>
+                  <input
+                    type="text"
+                    placeholder="Enter room ID"
+                    value={joinRoomId}
+                    onChange={(e) => setJoinRoomId(e.target.value.toUpperCase())}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500"
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    if (joinRoomId.trim() && playerName.trim()) {
+                      joinRoom(joinRoomId.trim(), playerName.trim());
+                    }
+                  }}
+                  disabled={!isConnected || !joinRoomId.trim() || !playerName.trim()}
+                  className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  Join Room
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
