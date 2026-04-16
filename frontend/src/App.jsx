@@ -4,11 +4,19 @@ import MultiplayerChess from "./components/MultiplayerChess";
 import Leaderboard from "./components/Leaderboard";
 import GameHistory from "./components/GameHistory";
 import Auth from "./components/Auth";
-import GoldButton from "./components/GoldButton";
+import Dashboard from "./components/Dashboard";
+import Settings from "./components/Settings";
+import Profile from "./components/Profile";
+import { SidebarLink, Modal, PrimaryBtn, SecondaryBtn } from "./components/ui";
 
 export default function App() {
   const [user, setUser] = useState(null);
-  const [gameMode, setGameMode] = useState(null); // null, 'ai', 'multi'
+  const [currentPage, setCurrentPage] = useState("dashboard");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     // Check for stored auth
@@ -26,6 +34,18 @@ export default function App() {
     }
   }, []);
 
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuOpen && !event.target.closest('.user-menu')) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [userMenuOpen]);
+
   const handleLogin = (userData) => {
     setUser(userData);
   };
@@ -34,141 +54,337 @@ export default function App() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     setUser(null);
-    setGameMode(null);
+    setCurrentPage("dashboard");
   };
+
+  const navigation = [
+    { id: "dashboard", label: "Dashboard", icon: "🏠", active: currentPage === "dashboard" },
+    { id: "ai", label: "Play vs AI", icon: "🤖", active: currentPage === "ai" },
+    { id: "multi", label: "Multiplayer", icon: "👥", active: currentPage === "multi" },
+    { id: "history", label: "Game History", icon: "📜", active: currentPage === "history" },
+    { id: "leaderboard", label: "Leaderboard", icon: "🏆", active: currentPage === "leaderboard" },
+    { id: "profile", label: "Profile", icon: "👤", active: currentPage === "profile" },
+    { id: "settings", label: "Settings", icon: "⚙️", active: currentPage === "settings" },
+    { id: "puzzles", label: "Puzzles", icon: "🧩", active: currentPage === "puzzles" },
+    { id: "learn", label: "Learn", icon: "📚", active: currentPage === "learn" },
+    { id: "community", label: "Community", icon: "👥", active: currentPage === "community" },
+  ];
+
+  // Mobile bottom navigation (5 main tabs)
+  const mobileNavigation = [
+    { id: "dashboard", label: "Home", icon: "🏠", active: currentPage === "dashboard" },
+    { id: "ai", label: "Play", icon: "♟️", active: ["ai", "multi"].includes(currentPage) },
+    { id: "puzzles", label: "Puzzle", icon: "🧩", active: currentPage === "puzzles" },
+    { id: "profile", label: "Profile", icon: "👤", active: currentPage === "profile" },
+    { id: "menu", label: "Menu", icon: "☰", active: false },
+  ];
 
   if (!user) {
     return <Auth onLogin={handleLogin} />;
   }
 
-  if (gameMode === null) {
-    return (
-      <div className="min-h-screen bg-gray-900 text-white">
-        {/* Header */}
-        <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-blue-400">ChessPlay</h1>
-              <span className="text-sm text-gray-400">Welcome back, {user.username}</span>
+  const handleStartGame = (gameType, timeControl) => {
+    if (gameType === "ai") {
+      setCurrentPage("ai");
+    } else if (gameType === "multi") {
+      setCurrentPage("multi");
+    }
+    // Store time control for later use
+    localStorage.setItem("selectedTimeControl", timeControl);
+  };
+
+  const renderContent = () => {
+    switch (currentPage) {
+      case "dashboard":
+        return <Dashboard user={user} onStartGame={handleStartGame} onNavigate={setCurrentPage} />;
+      case "ai":
+        const selectedTimeControl = localStorage.getItem("selectedTimeControl") || "3+0";
+        return <Chess onBack={() => setCurrentPage("dashboard")} initialAiEnabled timeControl={selectedTimeControl} />;
+      case "multi":
+        return <MultiplayerChess onBack={() => setCurrentPage("dashboard")} />;
+      case "history":
+        return <GameHistory onBack={() => setCurrentPage("dashboard")} />;
+      case "leaderboard":
+        return <Leaderboard onBack={() => setCurrentPage("dashboard")} />;
+      case "profile":
+        return <Profile user={user} onBack={() => setCurrentPage("dashboard")} />;
+      case "settings":
+        return <Settings user={user} onBack={() => setCurrentPage("dashboard")} />;
+      default:
+        return (
+          <div className="p-8">
+            <div className="bg-[#1a1a1a] rounded-lg p-8 border border-[#2a2a2a] text-center">
+              <h2 className="text-2xl font-bold text-[#e0e0e0] mb-4 font-['Montserrat']">Coming Soon</h2>
+              <p className="text-[#7a7a7a] font-['Inter']">This feature is under development.</p>
             </div>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0e0e0e] text-[#e0e0e0] flex font-['Inter']">
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#1a1a1a] border-t border-[#2a2a2a] z-20">
+        <div className="flex">
+          {mobileNavigation.map((item) => (
             <button
-              onClick={handleLogout}
-              className="px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+              key={item.id}
+              onClick={() => {
+                if (item.id === "menu") {
+                  setMobileMenuOpen(!mobileMenuOpen);
+                } else if (item.id === "profile") {
+                  setCurrentPage("profile");
+                } else {
+                  setCurrentPage(item.id);
+                  setMobileMenuOpen(false);
+                }
+              }}
+              className={`flex-1 flex flex-col items-center py-3 px-2 transition-all duration-200 ${
+                item.active
+                  ? 'text-[#81b64c] bg-[#81b64c]/10'
+                  : 'text-[#7a7a7a] hover:text-[#e0e0e0]'
+              }`}
             >
-              Logout
+              <span className="text-lg mb-1">{item.icon}</span>
+              <span className="text-xs font-medium font-['Inter']">{item.label}</span>
             </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-30">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div className="absolute bottom-16 left-4 right-4 bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] overflow-hidden">
+            {[
+              { id: "history", label: "Game History", icon: "📜" },
+              { id: "leaderboard", label: "Leaderboard", icon: "🏆" },
+              { id: "settings", label: "Settings", icon: "⚙️" },
+              { id: "learn", label: "Learn", icon: "📚" },
+              { id: "community", label: "Community", icon: "👥" },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setCurrentPage(item.id);
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-[#2a2a2a] transition-colors"
+              >
+                <span className="text-lg">{item.icon}</span>
+                <span className="font-medium font-['Inter']">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sidebar - Hidden on mobile and tablet */}
+      <aside className={`hidden lg:flex ${sidebarCollapsed ? 'w-16' : 'w-60'} bg-[#1a1a1a] border-r border-[#2a2a2a] flex-col transition-all duration-300 fixed h-full z-10`}>
+        {/* Logo */}
+        <div className="p-6 border-b border-[#2a2a2a]">
+          <div className="flex items-center space-x-3">
+            <div className="text-2xl">♟️</div>
+            {!sidebarCollapsed && (
+              <div>
+                <h1 className="text-xl font-bold text-[#81b64c] font-['Montserrat']">Chess Pro</h1>
+                <p className="text-xs text-[#7a7a7a] font-['Inter']">Master the Game</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 p-4">
+          <ul className="space-y-2">
+            {navigation.map((item) => (
+              <li key={item.id}>
+                <SidebarLink
+                  icon={item.icon}
+                  label={item.label}
+                  isActive={item.active}
+                  isCollapsed={sidebarCollapsed}
+                  onClick={() => setCurrentPage(item.id)}
+                />
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        {/* User Profile */}
+        <div className="p-4 border-t border-[#2a2a2a]">
+          <button
+            onClick={() => setCurrentPage("profile")}
+            className="w-full flex items-center space-x-3 hover:bg-[#2a2a2a] rounded-lg p-2 transition-colors"
+          >
+            <div className="w-10 h-10 bg-[#81b64c] rounded-full flex items-center justify-center text-[#0e0e0e] font-bold font-['Montserrat']">
+              {user.username?.charAt(0).toUpperCase()}
+            </div>
+            {!sidebarCollapsed && (
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-sm font-medium text-[#e0e0e0] truncate font-['Inter']">{user.username}</p>
+                <p className="text-xs text-[#7a7a7a] font-['Inter']">Rating: {user.rating || 1200}</p>
+              </div>
+            )}
+          </button>
+        </div>
+
+        {/* Collapse Button */}
+        <button
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          className="p-4 border-t border-[#2a2a2a] text-[#7a7a7a] hover:text-[#e0e0e0] transition-colors"
+        >
+          {sidebarCollapsed ? '→' : '←'}
+        </button>
+      </aside>
+
+      {/* Main Content */}
+      <div className={`flex-1 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-60'} transition-all duration-300 pb-16 md:pb-0`}>
+        {/* Top Navbar */}
+        <header className="bg-[#1a1a1a] border-b border-[#2a2a2a] px-4 md:px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4 flex-1">
+              {/* Mobile menu button */}
+              <button
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="md:hidden text-[#7a7a7a] hover:text-[#e0e0e0] transition-colors"
+              >
+                ☰
+              </button>
+
+              <div className="relative flex-1 max-w-md">
+                <input
+                  type="text"
+                  placeholder="Search games, players..."
+                  className="w-full bg-[#2a2a2a] border border-[#2a2a2a] rounded-lg px-4 py-2 text-[#e0e0e0] placeholder-[#7a7a7a] focus:outline-none focus:border-[#81b64c] font-['Inter'] text-sm"
+                />
+                <div className="absolute right-3 top-2.5 text-[#7a7a7a]">🔍</div>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setQuickSettingsOpen(true)}
+                className="text-[#7a7a7a] hover:text-[#e0e0e0] transition-colors"
+                title="Quick Settings"
+              >
+                ⚙️
+              </button>
+              <button className="text-[#7a7a7a] hover:text-[#e0e0e0] transition-colors">
+                🔔
+              </button>
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className="text-[#7a7a7a] hover:text-[#e0e0e0] transition-colors"
+              >
+                {darkMode ? '☀️' : '🌙'}
+              </button>
+              <div className="relative user-menu">
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="flex items-center space-x-2 text-[#e0e0e0] hover:text-[#81b64c] transition-colors"
+                >
+                  <div className="w-8 h-8 bg-[#81b64c] rounded-full flex items-center justify-center text-[#0e0e0e] font-bold font-['Montserrat']">
+                    {user.username?.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="hidden md:inline font-['Inter']">{user.username}</span>
+                  <span>▼</span>
+                </button>
+
+                {/* User Dropdown Menu */}
+                {userMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-lg z-50">
+                    <div className="p-3 border-b border-[#2a2a2a]">
+                      <p className="text-sm font-medium text-[#e0e0e0] font-['Inter']">{user.username}</p>
+                      <p className="text-xs text-[#7a7a7a] font-['Inter']">Rating: {user.rating || 1200}</p>
+                    </div>
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                          setCurrentPage("settings");
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-[#e0e0e0] hover:bg-[#2a2a2a] font-['Inter']"
+                      >
+                        ⚙️ Settings
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleLogout();
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-[#e0e0e0] hover:bg-[#2a2a2a] font-['Inter']"
+                      >
+                        🚪 Logout
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </header>
 
-        {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-6 py-8">
-          {/* User Stats */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4 text-gray-200">Your Stats</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                <div className="text-2xl font-bold text-blue-400">{user.rating || 1200}</div>
-                <div className="text-sm text-gray-400">Rating</div>
-              </div>
-              <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                <div className="text-2xl font-bold text-green-400">{user.gamesWon || 0}</div>
-                <div className="text-sm text-gray-400">Wins</div>
-              </div>
-              <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                <div className="text-2xl font-bold text-purple-400">{user.gamesPlayed || 0}</div>
-                <div className="text-sm text-gray-400">Games Played</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Game Modes */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4 text-gray-200">Play Chess</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Play vs AI */}
-              <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-blue-500 transition-colors cursor-pointer group" onClick={() => setGameMode("ai")}>
-                <div className="text-center">
-                  <div className="text-4xl mb-4">🤖</div>
-                  <h3 className="text-lg font-semibold mb-2 group-hover:text-blue-400 transition-colors">Play vs AI</h3>
-                  <p className="text-sm text-gray-400 mb-4">Challenge Stockfish with adjustable difficulty</p>
-                  <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
-                    Play Now
-                  </button>
-                </div>
-              </div>
-
-              {/* Multiplayer */}
-              <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-green-500 transition-colors cursor-pointer group" onClick={() => setGameMode("multi")}>
-                <div className="text-center">
-                  <div className="text-4xl mb-4">👥</div>
-                  <h3 className="text-lg font-semibold mb-2 group-hover:text-green-400 transition-colors">Multiplayer</h3>
-                  <p className="text-sm text-gray-400 mb-4">Real-time games with other players</p>
-                  <button className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
-                    Find Game
-                  </button>
-                </div>
-              </div>
-
-              {/* Game History */}
-              <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-purple-500 transition-colors cursor-pointer group" onClick={() => setGameMode("history")}>
-                <div className="text-center">
-                  <div className="text-4xl mb-4">📜</div>
-                  <h3 className="text-lg font-semibold mb-2 group-hover:text-purple-400 transition-colors">Game History</h3>
-                  <p className="text-sm text-gray-400 mb-4">Review and replay your past games</p>
-                  <button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
-                    View Games
-                  </button>
-                </div>
-              </div>
-
-              {/* Leaderboard */}
-              <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-yellow-500 transition-colors cursor-pointer group" onClick={() => setGameMode("leaderboard")}>
-                <div className="text-center">
-                  <div className="text-4xl mb-4">🏆</div>
-                  <h3 className="text-lg font-semibold mb-2 group-hover:text-yellow-400 transition-colors">Leaderboard</h3>
-                  <p className="text-sm text-gray-400 mb-4">See top players and rankings</p>
-                  <button className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
-                    View Rankings
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Info */}
-          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <h3 className="text-lg font-semibold mb-4 text-gray-200">Getting Started</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300">
-              <div>
-                <h4 className="font-medium text-blue-400 mb-2">🎯 Play vs AI</h4>
-                <p>Jump straight into a match against our chess engine. Choose from different difficulty levels and time controls.</p>
-              </div>
-              <div>
-                <h4 className="font-medium text-green-400 mb-2">🌐 Multiplayer</h4>
-                <p>Create or join rooms for real-time chess games. Connect with players worldwide using your local network.</p>
-              </div>
-            </div>
-          </div>
+        {/* Page Content */}
+        <main className="min-h-[calc(100vh-80px)] bg-[#0e0e0e]">
+          {renderContent()}
         </main>
       </div>
-    );
-  }
 
-  if (gameMode === "ai") {
-    return <Chess onBack={() => setGameMode(null)} initialAiEnabled />;
-  }
+      {/* Quick Settings Modal */}
+      <Modal
+        isOpen={quickSettingsOpen}
+        onClose={() => setQuickSettingsOpen(false)}
+        title="Quick Settings"
+      >
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold text-[#e0e0e0] mb-4 font-['Montserrat']">Display</h3>
+            <div className="space-y-3">
+              <label className="flex items-center justify-between">
+                <span className="text-[#e0e0e0] font-['Inter']">Dark Mode</span>
+                <button
+                  onClick={() => setDarkMode(!darkMode)}
+                  className={`w-12 h-6 rounded-full transition-colors ${
+                    darkMode ? 'bg-[#81b64c]' : 'bg-[#2a2a2a]'
+                  }`}
+                >
+                  <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                    darkMode ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </label>
+              <label className="flex items-center justify-between">
+                <span className="text-[#e0e0e0] font-['Inter']">Sidebar Collapsed</span>
+                <button
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  className={`w-12 h-6 rounded-full transition-colors ${
+                    sidebarCollapsed ? 'bg-[#81b64c]' : 'bg-[#2a2a2a]'
+                  }`}
+                >
+                  <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                    sidebarCollapsed ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </label>
+            </div>
+          </div>
 
-  if (gameMode === "multi") {
-    return <MultiplayerChess onBack={() => setGameMode(null)} />;
-  }
-
-  if (gameMode === "history") {
-    return <GameHistory onBack={() => setGameMode(null)} />;
-  }
-
-  if (gameMode === "leaderboard") {
-    return <Leaderboard onBack={() => setGameMode(null)} />;
-  }
-
-  return null;
+          <div className="flex space-x-3 justify-end">
+            <SecondaryBtn onClick={() => setQuickSettingsOpen(false)}>
+              Close
+            </SecondaryBtn>
+            <PrimaryBtn onClick={() => setCurrentPage("settings")}>
+              Full Settings
+            </PrimaryBtn>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
 }

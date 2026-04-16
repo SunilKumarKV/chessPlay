@@ -1,5 +1,5 @@
 import { useState } from "react";
-import GoldButton from "./GoldButton";
+import { FormInput, PasswordInput, PrimaryBtn } from "./ui";
 
 export default function Auth({ onLogin }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -72,60 +72,50 @@ export default function Auth({ onLogin }) {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
-              <div>
-                <label className="block text-sm font-medium mb-2 text-gray-300">Username</label>
-                <input
-                  type="text"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  required={!isLogin}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-                  placeholder="Enter username"
-                />
-              </div>
+              <FormInput
+                label="Username"
+                type="text"
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+                required={!isLogin}
+                placeholder="Enter username"
+              />
             )}
 
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-300">Email</label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-                placeholder="Enter email"
-              />
-            </div>
+            <FormInput
+              label="Email"
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+              placeholder="Enter email"
+            />
 
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-300">Password</label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                minLength={6}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-                placeholder="Enter password"
-              />
-            </div>
+            <PasswordInput
+              label="Password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+              minLength={6}
+              placeholder="Enter password"
+            />
 
             {error && (
-              <div className="text-red-400 text-sm text-center bg-red-900/20 border border-red-800 rounded-lg p-3">
+              <div className="text-red-500 text-sm text-center bg-red-900/20 border border-red-800 rounded-lg p-3">
                 {error}
               </div>
             )}
 
-            <button
+            <PrimaryBtn
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              className={`w-full ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               {loading ? "Please wait..." : isLogin ? "Sign In" : "Sign Up"}
-            </button>
+            </PrimaryBtn>
           </form>
 
           <div className="mt-6 text-center">

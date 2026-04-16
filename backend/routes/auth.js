@@ -113,4 +113,88 @@ router.get("/profile", auth, async (req, res) => {
   }
 });
 
+// Get specific user profile by ID
+router.get("/profile/:userId", auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ user });
+  } catch (error) {
+    console.error("Profile error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Update user profile
+router.put("/profile", auth, async (req, res) => {
+  try {
+    const { username, email, bio } = req.body;
+    const userId = req.user.userId;
+
+    // Check if username or email is already taken by another user
+    if (username) {
+      const existingUsername = await User.findOne({
+        username,
+        _id: { $ne: userId }
+      });
+      if (existingUsername) {
+        return res.status(400).json({ message: "Username already taken" });
+      }
+    }
+
+    if (email) {
+      const existingEmail = await User.findOne({
+        email,
+        _id: { $ne: userId }
+      });
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already taken" });
+      }
+    }
+
+    // Update user
+    const updateData = {};
+    if (username) updateData.username = username;
+    if (email) updateData.email = email;
+    if (bio !== undefined) updateData.bio = bio;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true }
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+      message: "Profile updated successfully",
+      user
+    });
+  } catch (error) {
+    console.error("Profile update error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Get leaderboard
+router.get("/leaderboard", auth, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+
+    const users = await User.find({})
+      .select("username rating gamesPlayed gamesWon")
+      .sort({ rating: -1 })
+      .limit(limit);
+
+    res.json(users);
+  } catch (error) {
+    console.error("Leaderboard error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;

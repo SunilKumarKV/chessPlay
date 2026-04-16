@@ -22,6 +22,36 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 6,
   },
+  bio: {
+    type: String,
+    maxlength: 500,
+    default: "",
+  },
+  avatar: {
+    type: String,
+    default: null,
+  },
+  title: {
+    type: String,
+    enum: ["GM", "IM", "FM", "CM", "WGM", "WIM", "WFM", "WCM"],
+    default: null,
+  },
+  country: {
+    type: String,
+    default: "US",
+  },
+  puzzleRating: {
+    type: Number,
+    default: 1200,
+  },
+  highestPuzzleRating: {
+    type: Number,
+    default: 1200,
+  },
+  puzzlesSolved: {
+    type: Number,
+    default: 0,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

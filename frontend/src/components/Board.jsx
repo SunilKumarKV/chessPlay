@@ -6,6 +6,7 @@ export default function Board({
   isSelected,
   isLegalDest,
   isLastMove,
+  isInCheck,
   onSquareClick,
 }) {
   const rows = flipped ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
@@ -16,12 +17,11 @@ export default function Board({
   return (
     <div className="relative">
       {/* Rank labels — left side */}
-      <div className="absolute -left-5 top-0 flex flex-col h-full pointer-events-none">
+      <div className="absolute -left-8 top-0 flex flex-col h-full pointer-events-none z-10">
         {ranks.split("").map((label, i) => (
           <div
             key={i}
-            className="flex-1 flex items-center justify-center text-xs font-mono opacity-50"
-            style={{ color: "#e8dcc8" }}
+            className="flex-1 flex items-center justify-center text-sm font-medium text-[#7a7a7a] font-['JetBrains Mono']"
           >
             {label}
           </div>
@@ -30,14 +30,13 @@ export default function Board({
 
       {/* The board */}
       <div
-        className="grid overflow-hidden rounded-sm"
+        className="relative grid overflow-hidden rounded-lg"
         style={{
           gridTemplateColumns: "repeat(8, 1fr)",
-          border: "3px solid #c8943a",
-          boxShadow:
-            "0 0 40px rgba(200,148,58,0.3), inset 0 0 0 1px rgba(255,255,255,0.05)",
-          width: "min(480px, 90vw)",
-          height: "min(480px, 90vw)",
+          width: "min(500px, 90vw)",
+          height: "min(500px, 90vw)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+          border: "2px solid #2a2a2a",
         }}
       >
         {rows.map((r) =>
@@ -51,6 +50,7 @@ export default function Board({
               isSelected={isSelected?.(r, c)}
               isLegalDest={isLegalDest?.(r, c)}
               isLastMove={isLastMove?.(r, c)}
+              isInCheck={isInCheck && board?.[r]?.[c]?.toLowerCase() === 'k' && ((board[r][c] === 'wK' && !flipped) || (board[r][c] === 'bK' && flipped))}
               onClick={() => onSquareClick?.(r, c)}
             />
           )),
@@ -58,12 +58,11 @@ export default function Board({
       </div>
 
       {/* File labels — bottom */}
-      <div className="flex mt-1">
+      <div className="flex mt-2">
         {files.split("").map((label, i) => (
           <div
             key={i}
-            className="flex-1 text-center text-xs font-mono opacity-50"
-            style={{ color: "#e8dcc8" }}
+            className="flex-1 text-center text-sm font-medium text-[#7a7a7a] font-['JetBrains Mono']"
           >
             {label}
           </div>

@@ -1,18 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
-/* ── Custom scrollbar for move history panel */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 4px;
+/* ── Custom slider styling */
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  background: #81b64c;
+  cursor: pointer;
+  border: 2px solid #0e0e0e;
+  box-shadow: 0 0 0 2px rgba(129, 182, 76, 0.3);
 }
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
+
+.slider::-webkit-slider-thumb:hover {
+  background: #6ba43d;
+  box-shadow: 0 0 0 4px rgba(129, 182, 76, 0.3);
 }
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(200, 148, 58, 0.4);
-  border-radius: 2px;
+
+.slider::-moz-range-thumb {
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  background: #81b64c;
+  cursor: pointer;
+  border: 2px solid #0e0e0e;
+  box-shadow: 0 0 0 2px rgba(129, 182, 76, 0.3);
 }
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(200, 148, 58, 0.7);
+
+.slider::-moz-range-thumb:hover {
+  background: #6ba43d;
+  box-shadow: 0 0 0 4px rgba(129, 182, 76, 0.3);
 }
 
 /* ── Piece transition */
@@ -44,4 +62,29 @@
   50% {
     opacity: 0.5;
   }
+}
+
+/* ── Custom font classes */
+.font-montserrat {
+  font-family: 'Montserrat', sans-serif;
+}
+
+.font-inter {
+  font-family: 'Inter', sans-serif;
+}
+
+.font-jetbrains {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Global styles for the new color scheme */
+body {
+  background-color: #0e0e0e;
+  color: #e0e0e0;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── Smooth transitions for theme changes */
+* {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }

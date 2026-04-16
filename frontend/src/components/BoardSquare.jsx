@@ -10,15 +10,18 @@ export default function BoardSquare({
   isSelected,
   isLegalDest,
   isLastMove,
+  isInCheck,
   onClick,
 }) {
   let bg;
-  if (isSelected) {
-    bg = SQUARE_COLORS.selected;
+  if (isInCheck) {
+    bg = "rgba(220, 53, 69, 0.3)"; // Red background for check
+  } else if (isSelected) {
+    bg = "#81b64c"; // Green for selected
   } else if (isLastMove) {
-    bg = isLight ? SQUARE_COLORS.lightHighlight : SQUARE_COLORS.darkHighlight;
+    bg = "rgba(255, 193, 7, 0.3)"; // Yellow for last move
   } else {
-    bg = isLight ? SQUARE_COLORS.light : SQUARE_COLORS.dark;
+    bg = isLight ? "#f0d9b5" : "#b58863"; // Standard board colors
   }
 
   return (
@@ -26,25 +29,33 @@ export default function BoardSquare({
       role="button"
       aria-label={`Square ${col}-${row}${piece ? ` with ${piece}` : ""}`}
       onClick={onClick}
-      className="board-square relative flex items-center justify-center cursor-pointer select-none transition-all duration-150"
-      style={{ background: bg, aspectRatio: "1" }}
+      className="board-square relative flex items-center justify-center cursor-pointer select-none transition-all duration-150 hover:brightness-110"
+      style={{
+        background: bg,
+        aspectRatio: "1",
+        boxShadow: isInCheck ? "0 0 20px rgba(220, 53, 69, 0.5)" : "none",
+        animation: isInCheck ? "pulse 1s infinite" : "none"
+      }}
     >
       {/* Legal-move indicator */}
       {isLegalDest &&
         (piece ? (
-          // Capture ring around enemy piece
+          // Green ring around enemy piece for capture
           <div
-            className="absolute inset-0 pointer-events-none box-border"
-            style={{ border: "4px solid rgba(0,0,0,0.35)" }}
+            className="absolute inset-0 pointer-events-none rounded-full"
+            style={{
+              border: "3px solid #81b64c",
+              boxShadow: "0 0 10px rgba(129, 182, 76, 0.5)"
+            }}
           />
         ) : (
-          // Dot on an empty square
+          // Green dot on empty square
           <div
-            className="rounded-full pointer-events-none"
+            className="rounded-full pointer-events-none bg-[#81b64c] opacity-80"
             style={{
-              width: "32%",
-              height: "32%",
-              background: "rgba(0,0,0,0.22)",
+              width: "28%",
+              height: "28%",
+              boxShadow: "0 0 8px rgba(129, 182, 76, 0.6)"
             }}
           />
         ))}
@@ -52,15 +63,15 @@ export default function BoardSquare({
       {/* Piece symbol */}
       {piece && (
         <span
-          className="piece-enter relative z-10 leading-none"
+          className="piece-enter relative z-10 leading-none select-none"
           style={{
-            fontSize: "clamp(1.4rem, 5vw, 2.4rem)",
+            fontSize: "clamp(1.6rem, 5vw, 2.6rem)",
             textShadow:
               colorOf(piece) === "w"
-                ? "0 1px 3px rgba(0,0,0,0.6)"
-                : "0 1px 2px rgba(0,0,0,0.3)",
+                ? "0 1px 3px rgba(0,0,0,0.7)"
+                : "0 1px 2px rgba(0,0,0,0.4)",
             filter: isSelected
-              ? "drop-shadow(0 0 6px rgba(80,200,80,0.8))"
+              ? "drop-shadow(0 0 8px rgba(129, 182, 76, 0.8))"
               : "none",
             transition: "filter 0.2s",
           }}
