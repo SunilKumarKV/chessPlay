@@ -129,6 +129,7 @@ function createInitialGameState() {
     moveHistory: [],
     capturedW: [],
     capturedB: [],
+    chatHistory: [],
     players: {
       w: { id: null, name: "Player 1" },
       b: { id: null, name: "Player 2" },
@@ -140,7 +141,42 @@ function createInitialGameState() {
 function isValidMove(gameState, fromRow, fromCol, toRow, toCol) {
   return validateMove(gameState, fromRow, fromCol, toRow, toCol);
 }
+function expectedScore(ratingA, ratingB) {
+  return 1 / (1 + 10 ** ((ratingB - ratingA) / 400));
+}
 
+function computeRating(oldRating, expected, score, k = 32) {
+  return Math.round(oldRating + k * (score - expected));
+}
+
+async function updatePlayerStats(winnerId, loserId) {
+  try {
+    const winner = await User.findById(winnerId);
+    if (!winner) return;
+
+    winner.gamesPlayed += 1;
+    winner.gamesWon += 1;
+
+    if (loserId) {
+      const loser = await User.findById(loserId);
+      if (loser) {
+        loser.gamesPlayed += 1;
+
+        const expectedWinner = expectedScore(winner.rating, loser.rating);
+        const expectedLoser = expectedScore(loser.rating, winner.rating);
+
+        winner.rating = computeRating(winner.rating, expectedWinner, 1);
+        loser.rating = computeRating(loser.rating, expectedLoser, 0);
+
+        await loser.save();
+      }
+    }
+
+    await winner.save();
+  } catch (error) {
+    console.error("User rating update error:", error);
+  }
+}
 io.on("connection", (socket) => {
   console.log(`Player connected: ${socket.id}`);
 
@@ -170,7 +206,11 @@ io.on("connection", (socket) => {
       });
 
       socket.join(roomId);
-      socket.emit("roomCreated", { roomId, gameState });
+      socket.emit("roomCreated", {
+        roomId,
+        gameState,
+        chatHistory: gameState.chatHistory,
+      });
       console.log(`Room ${roomId} created by ${playerName}`);
     } catch (error) {
       console.error("Create room error:", error);
@@ -224,6 +264,7 @@ io.on("connection", (socket) => {
         roomId,
         gameState,
         color,
+        chatHistory: gameState.chatHistory,
       });
 
       // Notify both players that someone joined
@@ -271,11 +312,13 @@ io.on("connection", (socket) => {
       }
 
       // Apply move with full rule support
+      const color = player.color;
       applyMove(gameState, fromRow, fromCol, toRow, toCol);
 
       // Record move in database
       const piece = gameState.board[toRow][toCol];
-      await Game.findByIdAndUpdate(roomData.gameId, {
+      const kingCaptured = piece === "wK" || piece === "bK";
+      let gameUpdate = {
         $push: {
           moves: {
             from: `${String.fromCharCode(97 + fromCol)}${8 - fromRow}`,
@@ -283,7 +326,32 @@ io.on("connection", (socket) => {
             piece: piece,
           },
         },
-      });
+      };
+
+      if (kingCaptured) {
+        const winnerColor = color;
+        const loserColor = opponent(color);
+        gameState.status = "checkmate";
+        gameState.turn = loserColor;
+
+        const winnerId = player.userId;
+        const opponentEntry = Array.from(players.values()).find(
+          (entry) =>
+            entry.roomId === player.roomId && entry.color === loserColor,
+        );
+        const loserId = opponentEntry?.userId || null;
+
+        gameUpdate = {
+          ...gameUpdate,
+          result: winnerColor === "w" ? "white" : "black",
+          winner: winnerId,
+          endTime: new Date(),
+        };
+
+        updatePlayerStats(winnerId, loserId);
+      }
+
+      await Game.findByIdAndUpdate(roomData.gameId, gameUpdate);
 
       // Broadcast move to all players in room
       io.to(player.roomId).emit("moveMade", {
@@ -347,6 +415,43 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     cleanupPlayer(socket, true);
     console.log(`Player disconnected: ${socket.id}`);
+  });
+
+  // Room chat messages
+  socket.on("sendMessage", (data) => {
+    try {
+      const player = players.get(socket.id);
+      if (!player) {
+        socket.emit("serverError", { message: "Not in a room" });
+        return;
+      }
+
+      const roomData = rooms.get(player.roomId);
+      if (!roomData) {
+        socket.emit("serverError", { message: "Room not found" });
+        return;
+      }
+
+      const chatMessage = {
+        userId: socket.user._id,
+        username: socket.user.username,
+        text: String(data.text || "").trim(),
+        timestamp: new Date().toISOString(),
+      };
+
+      if (!chatMessage.text) return;
+
+      roomData.chatHistory = roomData.chatHistory || [];
+      roomData.chatHistory.push(chatMessage);
+      if (roomData.chatHistory.length > 50) {
+        roomData.chatHistory.shift();
+      }
+
+      io.to(player.roomId).emit("chatMessage", chatMessage);
+    } catch (error) {
+      console.error("Chat message error:", error);
+      socket.emit("serverError", { message: "Failed to send message" });
+    }
   });
 
   // Get room list (for debugging)

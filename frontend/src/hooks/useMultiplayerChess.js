@@ -13,6 +13,7 @@ export function useMultiplayerChess(serverUrl = null) {
   const [playerColor, setPlayerColor] = useState(null);
   const [opponentName, setOpponentName] = useState(null);
   const [isMyTurn, setIsMyTurn] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
   const [error, setError] = useState(null);
   const playerColorRef = useRef(null);
 
@@ -59,6 +60,7 @@ export function useMultiplayerChess(serverUrl = null) {
     newSocket.on("roomCreated", (data) => {
       setRoomId(data.roomId);
       setGameState(data.gameState);
+      setChatMessages(data.chatHistory || []);
       updatePlayerColor("w");
       setIsMyTurn(data.gameState.turn === "w");
       setOpponentName(null);
@@ -70,6 +72,7 @@ export function useMultiplayerChess(serverUrl = null) {
       setGameState(data.gameState);
       updatePlayerColor(data.color);
       setIsMyTurn(data.gameState.turn === data.color);
+      setChatMessages(data.chatHistory || []);
 
       const opponentPlayer =
         data.color === "w"
@@ -88,6 +91,10 @@ export function useMultiplayerChess(serverUrl = null) {
         setOpponentName(data.newPlayer.name);
       }
       setError(null);
+    });
+
+    newSocket.on("chatMessage", (message) => {
+      setChatMessages((msgs) => [...msgs, message]);
     });
 
     newSocket.on("moveMade", (data) => {
@@ -124,6 +131,10 @@ export function useMultiplayerChess(serverUrl = null) {
       setError(data.message);
     });
 
+    newSocket.on("chatHistory", (history) => {
+      setChatMessages(history || []);
+    });
+
     return () => {
       newSocket.close();
       socketRef.current = null;
@@ -158,6 +169,15 @@ export function useMultiplayerChess(serverUrl = null) {
       }
     },
     [isConnected, isMyTurn],
+  );
+
+  const sendMessage = useCallback(
+    (text) => {
+      if (socketRef.current && isConnected && text?.trim()) {
+        socketRef.current.emit("sendMessage", { text: text.trim() });
+      }
+    },
+    [isConnected],
   );
 
   // Get rooms list (for debugging)
@@ -200,5 +220,7 @@ export function useMultiplayerChess(serverUrl = null) {
     makeMove,
     getRooms,
     leaveRoom,
+    chatMessages,
+    sendMessage,
   };
 }

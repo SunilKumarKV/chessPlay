@@ -4,11 +4,14 @@ const gameSchema = new mongoose.Schema({
   whitePlayer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
-    required: true,
   },
   blackPlayer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
+  },
+  playerColor: {
+    type: String,
+    enum: ["w", "b"],
   },
   aiOpponent: {
     type: Boolean,

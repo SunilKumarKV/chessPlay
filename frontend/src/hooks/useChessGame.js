@@ -3,7 +3,11 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
    CORE GAME CONSTANTS
    ==================== */
 import { INITIAL_BOARD, INITIAL_CASTLING } from "../constants/board";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 
+function toSquareName([row, col]) {
+  return `${String.fromCharCode(97 + col)}${8 - row}`;
+}
 /* =====================
    BOARD UTILITY FUNCTIONS
    ==================== */
@@ -25,7 +29,12 @@ import { useStockfish } from "./useStockfish";
 import { useChessClock, TIME_CONTROLS } from "./useChessClock";
 import { useSoundEffects } from "./useSoundEffects";
 
-export function useChessGame() {
+export function useChessGame({
+  initialAiEnabled = false,
+  initialAiColor = "b",
+  initialAiDifficulty = 10,
+  initialTimeControlIdx = 7,
+} = {}) {
   /* =====================
      1️⃣ CORE BOARD STATE
      Stores the actual chess position
@@ -58,6 +67,7 @@ export function useChessGame() {
   const [history, setHistory] = useState([]);
   const [capturedW, setCapturedW] = useState([]);
   const [capturedB, setCapturedB] = useState([]);
+  const [hasRecordedGame, setHasRecordedGame] = useState(false);
 
   /* ========================================
      4️⃣ UI STATE
@@ -69,9 +79,9 @@ export function useChessGame() {
      5️⃣ AI SETTINGS (Stockfish)
      =========================================== */
 
-  const [aiEnabled, setAiEnabled] = useState(false);
-  const [aiColor, setAiColor] = useState("b");
-  const [aiDifficulty, setAiDifficulty] = useState(10);
+  const [aiEnabled, setAiEnabled] = useState(initialAiEnabled);
+  const [aiColor, setAiColor] = useState(initialAiColor);
+  const [aiDifficulty, setAiDifficulty] = useState(initialAiDifficulty);
 
   /* ==============================================
      6️⃣ SOUND SETTINGS
@@ -83,7 +93,7 @@ export function useChessGame() {
      7️⃣ CHESS CLOCK
      ============================================== */
 
-  const [timeControlIdx, setTimeControlIdx] = useState(7);
+  const [timeControlIdx, setTimeControlIdx] = useState(initialTimeControlIdx);
   const timeControl = TIME_CONTROLS[timeControlIdx];
 
   /* ==============================================
@@ -131,6 +141,75 @@ export function useChessGame() {
       sound.check();
     }
   }, [status, sound, clock, aiColor, turn]);
+
+  useEffect(() => {
+    if (!aiEnabled) {
+      return;
+    }
+
+    if (status === "playing") {
+      setHasRecordedGame(false);
+      return;
+    }
+
+    if (hasRecordedGame || history.length === 0) return;
+
+    const recordCompletedAIGame = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        const userColor = aiColor === "w" ? "b" : "w";
+        const winnerColor =
+          status === "checkmate" ? (turn === "w" ? "b" : "w") : null;
+        const gameResult =
+          status === "checkmate"
+            ? winnerColor === "w"
+              ? "white"
+              : "black"
+            : "draw";
+
+        const payload = {
+          moves: history.map((move) => ({
+            from: toSquareName(move.from),
+            to: toSquareName(move.to),
+            piece: move.piece,
+            promotion: move.promotion,
+            timestamp: move.timestamp,
+          })),
+          aiOpponent: true,
+          aiDifficulty,
+          playerColor: userColor,
+          result: gameResult,
+          winnerColor: winnerColor === null ? null : winnerColor,
+          duration: null,
+        };
+
+        await fetch(`${BACKEND_URL}/api/games/record`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        setHasRecordedGame(true);
+      } catch (error) {
+        console.error("Failed to record completed AI game:", error);
+      }
+    };
+
+    recordCompletedAIGame();
+  }, [
+    status,
+    aiEnabled,
+    hasRecordedGame,
+    history,
+    aiColor,
+    turn,
+    aiDifficulty,
+  ]);
 
   /* ====================================================
      11️⃣ AI MOVE ENGINE
@@ -251,6 +330,11 @@ export function useChessGame() {
         {
           text: buildMoveLabel(movingPiece, from, to, promotionPiece),
           color,
+          from,
+          to,
+          piece: movingPiece,
+          promotion: promotionPiece || null,
+          timestamp: Date.now(),
         },
       ]);
     },

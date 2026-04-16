@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMultiplayerChess } from "../hooks/useMultiplayerChess";
+import { useChessClock, TIME_CONTROLS } from "../hooks/useChessClock";
 import { getLegalMoves } from "../utils/moveValidation";
 import Board from "./Board";
 import StatusBar from "./StatusBar";
 import MoveHistory from "./MoveHistory";
+import ChatBox from "./ChatBox";
 import CapturedPieces from "./CapturedPieces";
 import Panel from "./Panel";
 import GoldButton from "./GoldButton";
+import ChessClock from "./ChessClock";
 
 export default function MultiplayerChess({ onBack }) {
   const [selected, setSelected] = useState(null);
@@ -14,6 +17,14 @@ export default function MultiplayerChess({ onBack }) {
   const [playerName, setPlayerName] = useState("");
   const [joinRoomId, setJoinRoomId] = useState("");
   const [serverUrl, setServerUrl] = useState("http://localhost:3001");
+  const [timeControlIdx, setTimeControlIdx] = useState(3);
+
+  const timeControl = TIME_CONTROLS[timeControlIdx];
+  const clock = useChessClock({
+    initialSeconds: timeControl.initial,
+    increment: timeControl.increment,
+    enabled: timeControl.initial !== null,
+  });
 
   const {
     isConnected,
@@ -27,9 +38,35 @@ export default function MultiplayerChess({ onBack }) {
     joinRoom,
     makeMove,
     leaveRoom,
+    chatMessages,
+    sendMessage,
   } = useMultiplayerChess(serverUrl);
 
+  const storedUser = localStorage.getItem("user");
+  const currentUser = storedUser ? JSON.parse(storedUser).username : "";
+
   const showRoomSetup = !gameState;
+
+  const prevTurnRef = useRef(gameState?.turn);
+
+  useEffect(() => {
+    if (gameState) {
+      clock.reset();
+      prevTurnRef.current = gameState.turn;
+    }
+  }, [gameState?.roomId, timeControlIdx]);
+
+  useEffect(() => {
+    if (!gameState) return;
+    const previousTurn = prevTurnRef.current;
+    const currentTurn = gameState.turn;
+
+    if (previousTurn && previousTurn !== currentTurn) {
+      clock.switchClock(previousTurn);
+    }
+
+    prevTurnRef.current = currentTurn;
+  }, [gameState?.turn]);
 
   // Handle square click for multiplayer
   const handleSquareClick = (row, col) => {
@@ -144,6 +181,25 @@ export default function MultiplayerChess({ onBack }) {
                 : "🔴 Connecting to server..."}
             </div>
             {error && <div className="text-red-400 mt-2">{error}</div>}
+          </div>
+
+          {/* Time Control */}
+          <div className="flex flex-col gap-3 items-center w-full max-w-xs">
+            <h3 className="text-xl font-semibold">Time Control</h3>
+            <select
+              value={timeControlIdx}
+              onChange={(e) => setTimeControlIdx(Number(e.target.value))}
+              className="px-4 py-2 rounded bg-white/10 border border-white/20 text-white placeholder-white/50 w-full"
+            >
+              {TIME_CONTROLS.map((tc, idx) => (
+                <option key={idx} value={idx}>
+                  {tc.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs opacity-60 text-center">
+              Choose blitz, rapid, or unlimited timing
+            </p>
           </div>
 
           {/* Create Room */}
@@ -293,6 +349,13 @@ export default function MultiplayerChess({ onBack }) {
             alignItems: "center",
           }}
         >
+          {/* Clock */}
+          <ChessClock
+            clock={clock}
+            status={gameState.status}
+            flipped={flipped}
+          />
+
           {/* Status */}
           <StatusBar status={gameState.status} turn={gameState.turn} />
 
@@ -316,10 +379,10 @@ export default function MultiplayerChess({ onBack }) {
           </div>
         </div>
 
-        {/* ── RIGHT: Captured + History */}
+        {/* ── RIGHT: Captured + History + Chat */}
         <div
           className="flex flex-col gap-3"
-          style={{ minWidth: 155, maxWidth: 175 }}
+          style={{ minWidth: 260, maxWidth: 320 }}
         >
           <Panel title="Captured by White">
             <CapturedPieces pieces={gameState.capturedB || []} label="" />
@@ -332,6 +395,12 @@ export default function MultiplayerChess({ onBack }) {
           <Panel title="Move History">
             <MoveHistory history={gameState.moveHistory || []} />
           </Panel>
+
+          <ChatBox
+            messages={chatMessages}
+            onSend={sendMessage}
+            currentUser={currentUser}
+          />
         </div>
       </div>
     </div>

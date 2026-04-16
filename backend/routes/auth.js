@@ -42,6 +42,9 @@ router.post("/register", async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
+        gamesPlayed: user.gamesPlayed,
+        gamesWon: user.gamesWon,
+        rating: user.rating,
       },
     });
   } catch (error) {
@@ -87,6 +90,7 @@ router.post("/login", async (req, res) => {
         email: user.email,
         gamesPlayed: user.gamesPlayed,
         gamesWon: user.gamesWon,
+        rating: user.rating,
       },
     });
   } catch (error) {

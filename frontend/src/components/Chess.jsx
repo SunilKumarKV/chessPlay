@@ -11,8 +11,8 @@ import AIThinkingIndicator from "./AIThinkingIndicator";
 import SettingsPanel from "./SettingsPanel";
 import PlayerInfo from "./PlayerInfo";
 
-export default function Chess({ onBack }) {
-  const g = useChessGame();
+export default function Chess({ onBack, initialAiEnabled = false }) {
+  const g = useChessGame({ initialAiEnabled });
 
   const isOver = g.status === "checkmate" || g.status === "stalemate";
 
