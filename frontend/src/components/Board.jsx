@@ -16,8 +16,8 @@ export default function Board({
 
   return (
     <div className="relative">
-      {/* Rank labels — left side */}
-      <div className="absolute -left-8 top-0 flex flex-col h-full pointer-events-none z-10">
+      {/* Rank labels — left side (hidden on mobile) */}
+      <div className="hidden sm:absolute -left-8 top-0 flex flex-col h-full pointer-events-none z-10">
         {ranks.split("").map((label, i) => (
           <div
             key={i}
@@ -28,13 +28,13 @@ export default function Board({
         ))}
       </div>
 
-      {/* The board */}
+      {/* The board - scales to full width on mobile, center on larger screens */}
       <div
-        className="relative grid overflow-hidden rounded-lg"
+        className="relative grid overflow-hidden rounded-lg mx-auto"
         style={{
           gridTemplateColumns: "repeat(8, 1fr)",
-          width: "min(500px, 90vw)",
-          height: "min(500px, 90vw)",
+          width: "min(500px, calc(100vw - 16px))",
+          height: "min(500px, calc(100vw - 16px))",
           boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
           border: "2px solid #2a2a2a",
         }}

@@ -207,6 +207,27 @@ export function useSettings() {
     return settings[section]?.[key];
   }, [settings]);
 
+  // Generic update method
+  const updateSetting = useCallback(async (section, key, value) => {
+    setSettings(prev => ({
+      ...prev,
+      [section]: { ...prev[section], [key]: value }
+    }));
+
+    // Auto-save certain settings immediately
+    if (section === "appearance" && key === "theme") {
+      try {
+        const updatedSettings = {
+          ...settings,
+          [section]: { ...settings[section], [key]: value }
+        };
+        localStorage.setItem("userSettings", JSON.stringify(updatedSettings));
+      } catch (error) {
+        console.error("Failed to auto-save theme setting:", error);
+      }
+    }
+  }, [settings]);
+
   return {
     settings,
     changes,
@@ -216,6 +237,7 @@ export function useSettings() {
     updateGame,
     updateNotifications,
     updatePrivacy,
+    updateSetting,
     saveSettings,
     resetSettings,
     getSetting,

@@ -5,6 +5,7 @@ import Board from "./Board";
 import PromotionModal from "./PromotionModal";
 import ChessClock from "./ChessClock";
 import AIThinkingIndicator from "./AIThinkingIndicator";
+import { MobileGameDrawer, ClockBar } from "./MobileGameDrawer";
 
 export default function GameScreen({ onBack, initialAiEnabled = false, timeControl = "3+0" }) {
   const settings = useSettings();
@@ -31,6 +32,7 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
 
   const [showSettings, setShowSettings] = useState(false);
   const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
+  const [showMoveDrawer, setShowMoveDrawer] = useState(false);
 
   const isOver = g.status === "checkmate" || g.status === "stalemate";
   const isAnalysisMode = !g.aiEnabled && g.history.length > 0;
@@ -123,13 +125,24 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
   const moves = formatMoves();
 
   return (
-    <div className="min-h-screen bg-[#0e0e0e] text-[#e0e0e0] font-['Inter']">
+    <div className="min-h-screen bg-[#0e0e0e] text-[#e0e0e0] font-['Inter'] flex flex-col">
+      {/* Mobile Clock Bar (top on mobile) */}
+      <div className="md:hidden">
+        <ClockBar
+          whiteTime={g.clock?.w ? `${Math.floor(g.clock.w / 60)}:${String(g.clock.w % 60).padStart(2, '0')}` : '∞'}
+          blackTime={g.clock?.b ? `${Math.floor(g.clock.b / 60)}:${String(g.clock.b % 60).padStart(2, '0')}` : '∞'}
+          whiteName={bottomPlayer.name}
+          blackName={topPlayer.name}
+          isWhiteTurn={g.turn === 'w'}
+        />
+      </div>
+
       {/* Header */}
-      <header className="bg-[#1a1a1a] border-b border-[#2a2a2a] px-6 py-4">
+      <header className="bg-[#1a1a1a] border-b border-[#2a2a2a] px-4 md:px-6 py-3 md:py-4">
         <div className="flex items-center justify-between">
           <button
             onClick={onBack}
-            className="flex items-center space-x-2 text-[#7a7a7a] hover:text-[#e0e0e0] transition-colors"
+            className="flex items-center space-x-2 text-[#7a7a7a] hover:text-[#e0e0e0] transition-colors text-sm md:text-base"
           >
             <span>←</span>
             <span className="font-['Inter']">Back to Dashboard</span>

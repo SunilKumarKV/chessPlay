@@ -8,15 +8,18 @@ import Dashboard from "./components/Dashboard";
 import Settings from "./components/Settings";
 import Profile from "./components/Profile";
 import { SidebarLink, Modal, PrimaryBtn, SecondaryBtn } from "./components/ui";
+import { useSettings } from "./hooks/useSettings";
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [darkMode, setDarkMode] = useState(true);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const settings = useSettings();
+  const isDarkTheme = settings.getSetting("appearance", "theme") === "dark";
 
   useEffect(() => {
     // Check for stored auth
@@ -123,9 +126,9 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0e0e0e] text-[#e0e0e0] flex font-['Inter']">
+    <div className={`min-h-screen ${isDarkTheme ? 'bg-[#0e0e0e] text-[#e0e0e0]' : 'bg-[#f5f5f5] text-[#1a1a1a]'} flex font-['Inter']`}>
       {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#1a1a1a] border-t border-[#2a2a2a] z-20">
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 ${isDarkTheme ? 'bg-[#1a1a1a] border-t border-[#2a2a2a]' : 'bg-white border-t border-gray-200'} z-20`}>
         <div className="flex">
           {mobileNavigation.map((item) => (
             <button
@@ -160,7 +163,7 @@ export default function App() {
             className="absolute inset-0 bg-black/50"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="absolute bottom-16 left-4 right-4 bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] overflow-hidden">
+          <div className={`absolute bottom-16 left-4 right-4 ${isDarkTheme ? 'bg-[#1a1a1a] border-[#2a2a2a]' : 'bg-white border-gray-200'} rounded-lg border overflow-hidden`}>
             {[
               { id: "history", label: "Game History", icon: "📜" },
               { id: "leaderboard", label: "Leaderboard", icon: "🏆" },
@@ -174,7 +177,7 @@ export default function App() {
                   setCurrentPage(item.id);
                   setMobileMenuOpen(false);
                 }}
-                className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-[#2a2a2a] transition-colors"
+                className={`w-full flex items-center space-x-3 px-4 py-3 text-left ${isDarkTheme ? 'hover:bg-[#2a2a2a]' : 'hover:bg-gray-100'} transition-colors`}
               >
                 <span className="text-lg">{item.icon}</span>
                 <span className="font-medium font-['Inter']">{item.label}</span>
@@ -185,9 +188,9 @@ export default function App() {
       )}
 
       {/* Sidebar - Hidden on mobile and tablet */}
-      <aside className={`hidden lg:flex ${sidebarCollapsed ? 'w-16' : 'w-60'} bg-[#1a1a1a] border-r border-[#2a2a2a] flex-col transition-all duration-300 fixed h-full z-10`}>
+      <aside className={`hidden lg:flex ${sidebarCollapsed ? 'w-16' : 'w-60'} ${isDarkTheme ? 'bg-[#1a1a1a] border-r border-[#2a2a2a]' : 'bg-white border-r border-gray-200'} flex-col transition-all duration-300 fixed h-full z-10`}>
         {/* Logo */}
-        <div className="p-6 border-b border-[#2a2a2a]">
+        <div className={`p-6 ${isDarkTheme ? 'border-b border-[#2a2a2a]' : 'border-b border-gray-200'}`}>
           <div className="flex items-center space-x-3">
             <div className="text-2xl">♟️</div>
             {!sidebarCollapsed && (
@@ -210,6 +213,7 @@ export default function App() {
                   isActive={item.active}
                   isCollapsed={sidebarCollapsed}
                   onClick={() => setCurrentPage(item.id)}
+                  isDarkTheme={isDarkTheme}
                 />
               </li>
             ))}
@@ -244,15 +248,15 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <div className={`flex-1 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-60'} transition-all duration-300 pb-16 md:pb-0`}>
+      <div className={`flex-1 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'} transition-all duration-300 pb-16 md:pb-0`}>
         {/* Top Navbar */}
-        <header className="bg-[#1a1a1a] border-b border-[#2a2a2a] px-4 md:px-6 py-4">
+        <header className={`${isDarkTheme ? 'bg-[#1a1a1a] border-b border-[#2a2a2a]' : 'bg-white border-b border-gray-200'} px-4 md:px-6 py-4`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4 flex-1">
-              {/* Mobile menu button */}
+              {/* Sidebar toggle for medium screens */}
               <button
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className="md:hidden text-[#7a7a7a] hover:text-[#e0e0e0] transition-colors"
+                className={`lg:hidden ${isDarkTheme ? 'text-[#7a7a7a] hover:text-[#e0e0e0]' : 'text-gray-600 hover:text-gray-900'} transition-colors`}
               >
                 ☰
               </button>
@@ -261,7 +265,7 @@ export default function App() {
                 <input
                   type="text"
                   placeholder="Search games, players..."
-                  className="w-full bg-[#2a2a2a] border border-[#2a2a2a] rounded-lg px-4 py-2 text-[#e0e0e0] placeholder-[#7a7a7a] focus:outline-none focus:border-[#81b64c] font-['Inter'] text-sm"
+                  className={`w-full ${isDarkTheme ? 'bg-[#2a2a2a] border-[#2a2a2a] text-[#e0e0e0] placeholder-[#7a7a7a]' : 'bg-gray-100 border-gray-300 text-gray-900 placeholder-gray-500'} rounded-lg px-4 py-2 focus:outline-none focus:border-[#81b64c] font-['Inter'] text-sm`}
                 />
                 <div className="absolute right-3 top-2.5 text-[#7a7a7a]">🔍</div>
               </div>
@@ -270,24 +274,27 @@ export default function App() {
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => setQuickSettingsOpen(true)}
-                className="text-[#7a7a7a] hover:text-[#e0e0e0] transition-colors"
+                className={`${isDarkTheme ? 'text-[#7a7a7a] hover:text-[#e0e0e0]' : 'text-gray-600 hover:text-gray-900'} transition-colors`}
                 title="Quick Settings"
               >
                 ⚙️
               </button>
-              <button className="text-[#7a7a7a] hover:text-[#e0e0e0] transition-colors">
+              <button className={`${isDarkTheme ? 'text-[#7a7a7a] hover:text-[#e0e0e0]' : 'text-gray-600 hover:text-gray-900'} transition-colors`}>
                 🔔
               </button>
               <button
-                onClick={() => setDarkMode(!darkMode)}
-                className="text-[#7a7a7a] hover:text-[#e0e0e0] transition-colors"
+                onClick={() => {
+                  const newTheme = isDarkTheme ? "light" : "dark";
+                  settings.updateSetting("appearance", "theme", newTheme);
+                }}
+                className={`${isDarkTheme ? 'text-[#7a7a7a] hover:text-[#e0e0e0]' : 'text-gray-600 hover:text-gray-900'} transition-colors`}
               >
-                {darkMode ? '☀️' : '🌙'}
+                {isDarkTheme ? '☀️' : '🌙'}
               </button>
               <div className="relative user-menu">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center space-x-2 text-[#e0e0e0] hover:text-[#81b64c] transition-colors"
+                  className={`flex items-center space-x-2 ${isDarkTheme ? 'text-[#e0e0e0] hover:text-[#81b64c]' : 'text-gray-900 hover:text-[#81b64c]'} transition-colors`}
                 >
                   <div className="w-8 h-8 bg-[#81b64c] rounded-full flex items-center justify-center text-[#0e0e0e] font-bold font-['Montserrat']">
                     {user.username?.charAt(0).toUpperCase()}
@@ -298,10 +305,10 @@ export default function App() {
 
                 {/* User Dropdown Menu */}
                 {userMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-lg z-50">
-                    <div className="p-3 border-b border-[#2a2a2a]">
-                      <p className="text-sm font-medium text-[#e0e0e0] font-['Inter']">{user.username}</p>
-                      <p className="text-xs text-[#7a7a7a] font-['Inter']">Rating: {user.rating || 1200}</p>
+                  <div className={`absolute right-0 mt-2 w-48 ${isDarkTheme ? 'bg-[#1a1a1a] border-[#2a2a2a]' : 'bg-white border-gray-200'} border rounded-lg shadow-lg z-50`}>
+                    <div className={`p-3 ${isDarkTheme ? 'border-b border-[#2a2a2a]' : 'border-b border-gray-200'}`}>
+                      <p className={`text-sm font-medium ${isDarkTheme ? 'text-[#e0e0e0]' : 'text-gray-900'} font-['Inter']`}>{user.username}</p>
+                      <p className={`text-xs ${isDarkTheme ? 'text-[#7a7a7a]' : 'text-gray-500'} font-['Inter']`}>Rating: {user.rating || 1200}</p>
                     </div>
                     <div className="py-1">
                       <button
@@ -309,7 +316,7 @@ export default function App() {
                           setCurrentPage("settings");
                           setUserMenuOpen(false);
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-[#e0e0e0] hover:bg-[#2a2a2a] font-['Inter']"
+                        className={`w-full text-left px-3 py-2 text-sm ${isDarkTheme ? 'text-[#e0e0e0] hover:bg-[#2a2a2a]' : 'text-gray-900 hover:bg-gray-100'} font-['Inter']`}
                       >
                         ⚙️ Settings
                       </button>
@@ -318,7 +325,7 @@ export default function App() {
                           handleLogout();
                           setUserMenuOpen(false);
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-[#e0e0e0] hover:bg-[#2a2a2a] font-['Inter']"
+                        className={`w-full text-left px-3 py-2 text-sm ${isDarkTheme ? 'text-[#e0e0e0] hover:bg-[#2a2a2a]' : 'text-gray-900 hover:bg-gray-100'} font-['Inter']`}
                       >
                         🚪 Logout
                       </button>
@@ -331,7 +338,7 @@ export default function App() {
         </header>
 
         {/* Page Content */}
-        <main className="min-h-[calc(100vh-80px)] bg-[#0e0e0e]">
+        <main className={`min-h-[calc(100vh-80px)] ${isDarkTheme ? 'bg-[#0e0e0e]' : 'bg-[#f5f5f5]'}`}>
           {renderContent()}
         </main>
       </div>
@@ -347,24 +354,27 @@ export default function App() {
             <h3 className="text-lg font-semibold text-[#e0e0e0] mb-4 font-['Montserrat']">Display</h3>
             <div className="space-y-3">
               <label className="flex items-center justify-between">
-                <span className="text-[#e0e0e0] font-['Inter']">Dark Mode</span>
+                <span className={`${isDarkTheme ? 'text-[#e0e0e0]' : 'text-gray-900'} font-['Inter']`}>Dark Mode</span>
                 <button
-                  onClick={() => setDarkMode(!darkMode)}
+                  onClick={() => {
+                    const newTheme = isDarkTheme ? "light" : "dark";
+                    settings.updateSetting("appearance", "theme", newTheme);
+                  }}
                   className={`w-12 h-6 rounded-full transition-colors ${
-                    darkMode ? 'bg-[#81b64c]' : 'bg-[#2a2a2a]'
+                    isDarkTheme ? 'bg-[#81b64c]' : 'bg-gray-300'
                   }`}
                 >
                   <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                    darkMode ? 'translate-x-6' : 'translate-x-1'
+                    isDarkTheme ? 'translate-x-6' : 'translate-x-1'
                   }`} />
                 </button>
               </label>
               <label className="flex items-center justify-between">
-                <span className="text-[#e0e0e0] font-['Inter']">Sidebar Collapsed</span>
+                <span className={`${isDarkTheme ? 'text-[#e0e0e0]' : 'text-gray-900'} font-['Inter']`}>Sidebar Collapsed</span>
                 <button
                   onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
                   className={`w-12 h-6 rounded-full transition-colors ${
-                    sidebarCollapsed ? 'bg-[#81b64c]' : 'bg-[#2a2a2a]'
+                    sidebarCollapsed ? 'bg-[#81b64c]' : 'bg-gray-300'
                   }`}
                 >
                   <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
