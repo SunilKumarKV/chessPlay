@@ -98,7 +98,14 @@ export default function App() {
   const renderContent = () => {
     switch (currentPage) {
       case "dashboard":
-        return <Dashboard user={user} onStartGame={handleStartGame} onNavigate={setCurrentPage} />;
+        return (
+          <Dashboard
+            user={user}
+            onStartGame={handleStartGame}
+            onNavigate={setCurrentPage}
+            onAuthError={handleLogout}
+          />
+        );
       case "ai": {
         const selectedTimeControl = localStorage.getItem("selectedTimeControl") || "3+0";
         return <Chess onBack={() => setCurrentPage("dashboard")} initialAiEnabled timeControl={selectedTimeControl} />;

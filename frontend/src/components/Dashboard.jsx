@@ -3,12 +3,34 @@ import { StatCard, GameCard } from "./ui";
 
 const API_BASE = "http://localhost:3001/api";
 
-export default function Dashboard({ user, onStartGame, onNavigate }) {
+export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }) {
   const [stats, setStats] = useState(null);
   const [recentGames, setRecentGames] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [selectedTimeControl, setSelectedTimeControl] = useState("3+0");
   const [loading, setLoading] = useState(true);
+
+  const fetchWithAuth = async (url) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      if (typeof onAuthError === "function") onAuthError();
+      throw new Error("Unauthorized");
+    }
+
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        if (typeof onAuthError === "function") onAuthError();
+      }
+      throw new Error(data.message || "Failed to fetch dashboard data");
+    }
+
+    return data;
+  };
 
   const timeControls = [
     { id: "1+0", label: "1+0 Bullet", icon: "⚡" },
@@ -24,31 +46,21 @@ export default function Dashboard({ user, onStartGame, onNavigate }) {
 
   const fetchDashboardData = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const statsData = await fetchWithAuth(`${API_BASE}/auth/profile`);
+      setStats(statsData.user || null);
 
-      // Fetch user stats
-      const statsResponse = await fetch(`${API_BASE}/auth/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const statsData = await statsResponse.json();
-      setStats(statsData.user);
-
-      // Fetch recent games
-      const gamesResponse = await fetch(`${API_BASE}/games/history?page=1&limit=5`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const gamesData = await gamesResponse.json();
+      const gamesData = await fetchWithAuth(`${API_BASE}/games/history?page=1&limit=5`);
       setRecentGames(gamesData.games || []);
 
-      // Fetch leaderboard (top 5)
-      const leaderboardResponse = await fetch(`${API_BASE}/auth/leaderboard?limit=5`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const leaderboardData = await leaderboardResponse.json();
-      setLeaderboard(leaderboardData || []);
-
+      const leaderboardData = await fetchWithAuth(`${API_BASE}/auth/leaderboard?limit=5`);
+      const leaderboardItems = Array.isArray(leaderboardData)
+        ? leaderboardData
+        : leaderboardData.leaderboard || [];
+      setLeaderboard(leaderboardItems);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
+      setRecentGames([]);
+      setLeaderboard([]);
     } finally {
       setLoading(false);
     }
