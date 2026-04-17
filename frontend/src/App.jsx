@@ -11,7 +11,22 @@ import { SidebarLink, Modal, PrimaryBtn, SecondaryBtn } from "./components/ui";
 import { useSettings } from "./hooks/useSettings";
 
 export default function App() {
-  const [user, setUser] = useState(null);
+  // Initialize user from localStorage
+  const [user, setUser] = useState(() => {
+    const token = localStorage.getItem("token");
+    const storedUser = localStorage.getItem("user");
+    if (token && storedUser) {
+      try {
+        return JSON.parse(storedUser);
+      } catch (_error) {
+        // Invalid stored data, clear it
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        return null;
+      }
+    }
+    return null;
+  });
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -20,22 +35,6 @@ export default function App() {
 
   const settings = useSettings();
   const isDarkTheme = settings.getSetting("appearance", "theme") === "dark";
-
-  useEffect(() => {
-    // Check for stored auth
-    const token = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user");
-
-    if (token && storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        // Invalid stored data, clear it
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-      }
-    }
-  }, []);
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -100,9 +99,10 @@ export default function App() {
     switch (currentPage) {
       case "dashboard":
         return <Dashboard user={user} onStartGame={handleStartGame} onNavigate={setCurrentPage} />;
-      case "ai":
+      case "ai": {
         const selectedTimeControl = localStorage.getItem("selectedTimeControl") || "3+0";
         return <Chess onBack={() => setCurrentPage("dashboard")} initialAiEnabled timeControl={selectedTimeControl} />;
+      }
       case "multi":
         return <MultiplayerChess onBack={() => setCurrentPage("dashboard")} />;
       case "history":
