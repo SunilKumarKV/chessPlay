@@ -4,6 +4,7 @@ import MultiplayerChess from "./components/MultiplayerChess";
 import Leaderboard from "./components/Leaderboard";
 import GameHistory from "./components/GameHistory";
 import Auth from "./components/Auth";
+import LandingPage from "./components/LandingPage";
 import Dashboard from "./components/Dashboard";
 import Settings from "./components/Settings";
 import Profile from "./components/Profile";
@@ -18,7 +19,7 @@ export default function App() {
     if (token && storedUser) {
       try {
         return JSON.parse(storedUser);
-      } catch (_error) {
+      } catch {
         // Invalid stored data, clear it
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -82,7 +83,7 @@ export default function App() {
   ];
 
   if (!user) {
-    return <Auth onLogin={handleLogin} />;
+    return <LandingPage onLogin={handleLogin} />;
   }
 
   const handleStartGame = (gameType, timeControl) => {
