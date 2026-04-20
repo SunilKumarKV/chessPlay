@@ -5,23 +5,31 @@ import Board from "./Board";
 import PromotionModal from "./PromotionModal";
 import ChessClock from "./ChessClock";
 import AIThinkingIndicator from "./AIThinkingIndicator";
+import SettingsPanel from "./SettingsPanel";
 import { MobileGameDrawer, ClockBar } from "./MobileGameDrawer";
 
-export default function GameScreen({ onBack, initialAiEnabled = false, timeControl = "3+0" }) {
+export default function GameScreen({
+  onBack,
+  initialAiEnabled = false,
+  timeControl = "3+0",
+}) {
   const settings = useSettings();
 
   // Map time control string to index
   const timeControlMap = {
-    "1+0": 0,   // Bullet
-    "2+1": 1,   // Bullet
-    "3+0": 2,   // Blitz
-    "5+3": 3,   // Blitz
-    "10+0": 4,  // Rapid
-    "10+5": 5,  // Rapid
-    "30+0": 6,  // Classical
+    "1+0": 0, // Bullet
+    "2+1": 1, // Bullet
+    "3+0": 2, // Blitz
+    "5+3": 3, // Blitz
+    "10+0": 4, // Rapid
+    "10+5": 5, // Rapid
+    "30+0": 6, // Classical
   };
 
-  const timeControlIdx = settings.getSetting("game", "defaultTimeControl") || timeControlMap[timeControl] || 2;
+  const timeControlIdx =
+    settings.getSetting("game", "defaultTimeControl") ||
+    timeControlMap[timeControl] ||
+    2;
 
   const g = useChessGame({
     initialAiEnabled,
@@ -43,12 +51,12 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
     let whiteMaterial = 0;
     let blackMaterial = 0;
 
-    g.capturedW.forEach(piece => {
+    g.capturedW.forEach((piece) => {
       const type = piece.toUpperCase();
       blackMaterial += pieceValues[type] || 0;
     });
 
-    g.capturedB.forEach(piece => {
+    g.capturedB.forEach((piece) => {
       const type = piece.toUpperCase();
       whiteMaterial += pieceValues[type] || 0;
     });
@@ -66,40 +74,40 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
           name: `Stockfish Lv${g.aiDifficulty}`,
           rating: null,
           avatar: "🤖",
-          isAI: true
+          isAI: true,
         };
       } else {
         return {
           name: "You",
           rating: 1200, // This should come from user state
           avatar: "👤",
-          isAI: false
+          isAI: false,
         };
       }
     } else {
       // Multiplayer - this would need to be updated for real multiplayer
       return {
-        name: color === 'w' ? 'White' : 'Black',
+        name: color === "w" ? "White" : "Black",
         rating: 1200,
-        avatar: color === 'w' ? '👤' : '👤',
-        isAI: false
+        avatar: color === "w" ? "👤" : "👤",
+        isAI: false,
       };
     }
   };
 
-  const topPlayer = getPlayerInfo(g.flipped ? 'b' : 'w');
-  const bottomPlayer = getPlayerInfo(g.flipped ? 'w' : 'b');
+  const topPlayer = getPlayerInfo(g.flipped ? "b" : "w");
+  const bottomPlayer = getPlayerInfo(g.flipped ? "w" : "b");
 
   // Get captured pieces for display
   const getCapturedPieces = (color) => {
-    const captured = color === 'w' ? g.capturedB : g.capturedW;
-    const pieceSymbols = { P: '♟', N: '♞', B: '♗', R: '♜', Q: '♛', K: '♚' };
+    const captured = color === "w" ? g.capturedB : g.capturedW;
+    const pieceSymbols = { P: "♟", N: "♞", B: "♗", R: "♜", Q: "♛", K: "♚" };
 
     // Sort by value (highest first)
     const sortedPieces = captured
-      .map(piece => ({ piece, value: 'PNBRQK'.indexOf(piece.toUpperCase()) }))
+      .map((piece) => ({ piece, value: "PNBRQK".indexOf(piece.toUpperCase()) }))
       .sort((a, b) => b.value - a.value)
-      .map(item => pieceSymbols[item.piece.toUpperCase()] || item.piece);
+      .map((item) => pieceSymbols[item.piece.toUpperCase()] || item.piece);
 
     return sortedPieces;
   };
@@ -109,14 +117,14 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
     const moves = [];
     for (let i = 0; i < g.history.length; i += 2) {
       const moveNumber = Math.floor(i / 2) + 1;
-      const whiteMove = g.history[i]?.san || g.history[i]?.text || '-';
-      const blackMove = g.history[i + 1]?.san || g.history[i + 1]?.text || '';
+      const whiteMove = g.history[i]?.san || g.history[i]?.text || "-";
+      const blackMove = g.history[i + 1]?.san || g.history[i + 1]?.text || "";
 
       moves.push({
         number: moveNumber,
         white: whiteMove,
         black: blackMove,
-        isLatest: i + 1 >= g.history.length - 1
+        isLatest: i + 1 >= g.history.length - 1,
       });
     }
     return moves;
@@ -129,11 +137,19 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
       {/* Mobile Clock Bar (top on mobile) */}
       <div className="md:hidden">
         <ClockBar
-          whiteTime={g.clock?.w ? `${Math.floor(g.clock.w / 60)}:${String(g.clock.w % 60).padStart(2, '0')}` : '∞'}
-          blackTime={g.clock?.b ? `${Math.floor(g.clock.b / 60)}:${String(g.clock.b % 60).padStart(2, '0')}` : '∞'}
+          whiteTime={
+            g.clock?.w
+              ? `${Math.floor(g.clock.w / 60)}:${String(g.clock.w % 60).padStart(2, "0")}`
+              : "∞"
+          }
+          blackTime={
+            g.clock?.b
+              ? `${Math.floor(g.clock.b / 60)}:${String(g.clock.b % 60).padStart(2, "0")}`
+              : "∞"
+          }
           whiteName={bottomPlayer.name}
           blackName={topPlayer.name}
-          isWhiteTurn={g.turn === 'w'}
+          isWhiteTurn={g.turn === "w"}
         />
       </div>
 
@@ -150,9 +166,11 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
 
           <div className="flex items-center space-x-4">
             <div className="text-sm text-[#7a7a7a] font-['Inter']">
-              {g.aiEnabled ? `vs ${topPlayer.name}` : 'Analysis Mode'}
+              {g.aiEnabled ? `vs ${topPlayer.name}` : "Analysis Mode"}
             </div>
-            <div className={`w-3 h-3 rounded-full ${g.turn === 'w' ? 'bg-white' : 'bg-gray-600'}`}></div>
+            <div
+              className={`w-3 h-3 rounded-full ${g.turn === "w" ? "bg-white" : "bg-gray-600"}`}
+            ></div>
           </div>
         </div>
       </header>
@@ -165,7 +183,9 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
             {/* Evaluation fill */}
             <div
               className="absolute bottom-0 w-full bg-gradient-to-t from-[#81b64c] to-[#6ba03d] transition-all duration-300"
-              style={{ height: `${Math.min(100, Math.max(0, 50 + (materialAdvantage * 5)))}%` }}
+              style={{
+                height: `${Math.min(100, Math.max(0, 50 + materialAdvantage * 5))}%`,
+              }}
             ></div>
             {/* Center line */}
             <div className="absolute top-1/2 left-0 right-0 h-px bg-[#7a7a7a]"></div>
@@ -182,9 +202,13 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
                   {topPlayer.avatar}
                 </div>
                 <div>
-                  <div className="font-medium text-[#e0e0e0] font-['Inter']">{topPlayer.name}</div>
+                  <div className="font-medium text-[#e0e0e0] font-['Inter']">
+                    {topPlayer.name}
+                  </div>
                   {topPlayer.rating && (
-                    <div className="text-sm text-[#7a7a7a] font-['Inter']">Rating: {topPlayer.rating}</div>
+                    <div className="text-sm text-[#7a7a7a] font-['Inter']">
+                      Rating: {topPlayer.rating}
+                    </div>
                   )}
                 </div>
               </div>
@@ -192,25 +216,34 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
               <div className="flex items-center space-x-4">
                 {/* Captured pieces */}
                 <div className="flex space-x-1">
-                  {getCapturedPieces(g.flipped ? 'b' : 'w').slice(0, 6).map((piece, i) => (
-                    <span key={i} className="text-lg opacity-75">{piece}</span>
-                  ))}
-                  {getCapturedPieces(g.flipped ? 'b' : 'w').length > 6 && (
-                    <span className="text-sm text-[#7a7a7a]">+{getCapturedPieces(g.flipped ? 'b' : 'w').length - 6}</span>
+                  {getCapturedPieces(g.flipped ? "b" : "w")
+                    .slice(0, 6)
+                    .map((piece, i) => (
+                      <span key={i} className="text-lg opacity-75">
+                        {piece}
+                      </span>
+                    ))}
+                  {getCapturedPieces(g.flipped ? "b" : "w").length > 6 && (
+                    <span className="text-sm text-[#7a7a7a]">
+                      +{getCapturedPieces(g.flipped ? "b" : "w").length - 6}
+                    </span>
                   )}
                 </div>
 
                 {/* Material advantage */}
                 {materialAdvantage !== 0 && (
-                  <div className={`text-sm font-bold font-['Montserrat'] ${
-                    materialAdvantage > 0 ? 'text-[#81b64c]' : 'text-red-400'
-                  }`}>
-                    {materialAdvantage > 0 ? '+' : ''}{materialAdvantage}
+                  <div
+                    className={`text-sm font-bold font-['Montserrat'] ${
+                      materialAdvantage > 0 ? "text-[#81b64c]" : "text-red-400"
+                    }`}
+                  >
+                    {materialAdvantage > 0 ? "+" : ""}
+                    {materialAdvantage}
                   </div>
                 )}
 
                 {/* Turn indicator */}
-                {g.turn === (g.flipped ? 'b' : 'w') && !isOver && (
+                {g.turn === (g.flipped ? "b" : "w") && !isOver && (
                   <div className="w-3 h-3 bg-[#81b64c] rounded-full animate-pulse"></div>
                 )}
               </div>
@@ -223,9 +256,19 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
               board={g.board}
               flipped={g.flipped}
               isSelected={g.isSelected}
-              isLegalDest={settings.getSetting("game", "showLegalMoves") ? g.isLegalDest : () => false}
-              isLastMove={settings.getSetting("game", "showLastMove") ? g.isLastMove : () => false}
-              isInCheck={g.status === 'check' && g.turn === (g.flipped ? 'b' : 'w')}
+              isLegalDest={
+                settings.getSetting("game", "showLegalMoves")
+                  ? g.isLegalDest
+                  : () => false
+              }
+              isLastMove={
+                settings.getSetting("game", "showLastMove")
+                  ? g.isLastMove
+                  : () => false
+              }
+              isInCheck={
+                g.status === "check" && g.turn === (g.flipped ? "b" : "w")
+              }
               onSquareClick={g.handleSquareClick}
             />
 
@@ -249,9 +292,13 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
                   {bottomPlayer.avatar}
                 </div>
                 <div>
-                  <div className="font-medium text-[#e0e0e0] font-['Inter']">{bottomPlayer.name}</div>
+                  <div className="font-medium text-[#e0e0e0] font-['Inter']">
+                    {bottomPlayer.name}
+                  </div>
                   {bottomPlayer.rating && (
-                    <div className="text-sm text-[#7a7a7a] font-['Inter']">Rating: {bottomPlayer.rating}</div>
+                    <div className="text-sm text-[#7a7a7a] font-['Inter']">
+                      Rating: {bottomPlayer.rating}
+                    </div>
                   )}
                 </div>
               </div>
@@ -259,25 +306,34 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
               <div className="flex items-center space-x-4">
                 {/* Captured pieces */}
                 <div className="flex space-x-1">
-                  {getCapturedPieces(g.flipped ? 'w' : 'b').slice(0, 6).map((piece, i) => (
-                    <span key={i} className="text-lg opacity-75">{piece}</span>
-                  ))}
-                  {getCapturedPieces(g.flipped ? 'w' : 'b').length > 6 && (
-                    <span className="text-sm text-[#7a7a7a]">+{getCapturedPieces(g.flipped ? 'w' : 'b').length - 6}</span>
+                  {getCapturedPieces(g.flipped ? "w" : "b")
+                    .slice(0, 6)
+                    .map((piece, i) => (
+                      <span key={i} className="text-lg opacity-75">
+                        {piece}
+                      </span>
+                    ))}
+                  {getCapturedPieces(g.flipped ? "w" : "b").length > 6 && (
+                    <span className="text-sm text-[#7a7a7a]">
+                      +{getCapturedPieces(g.flipped ? "w" : "b").length - 6}
+                    </span>
                   )}
                 </div>
 
                 {/* Material advantage */}
                 {materialAdvantage !== 0 && (
-                  <div className={`text-sm font-bold font-['Montserrat'] ${
-                    materialAdvantage < 0 ? 'text-[#81b64c]' : 'text-red-400'
-                  }`}>
-                    {materialAdvantage < 0 ? '+' : ''}{-materialAdvantage}
+                  <div
+                    className={`text-sm font-bold font-['Montserrat'] ${
+                      materialAdvantage < 0 ? "text-[#81b64c]" : "text-red-400"
+                    }`}
+                  >
+                    {materialAdvantage < 0 ? "+" : ""}
+                    {-materialAdvantage}
                   </div>
                 )}
 
                 {/* Turn indicator */}
-                {g.turn === (g.flipped ? 'w' : 'b') && !isOver && (
+                {g.turn === (g.flipped ? "w" : "b") && !isOver && (
                   <div className="w-3 h-3 bg-[#81b64c] rounded-full animate-pulse"></div>
                 )}
               </div>
@@ -289,17 +345,15 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
         <div className="w-80 space-y-6">
           {/* Clocks */}
           <div className="bg-[#1a1a1a] rounded-lg p-6 border border-[#2a2a2a]">
-            <ChessClock
-              clock={g.clock}
-              status={g.status}
-              flipped={g.flipped}
-            />
+            <ChessClock clock={g.clock} status={g.status} flipped={g.flipped} />
           </div>
 
           {/* Move History */}
           <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] overflow-hidden">
             <div className="p-4 border-b border-[#2a2a2a]">
-              <h3 className="font-bold text-[#e0e0e0] font-['Montserrat']">Moves</h3>
+              <h3 className="font-bold text-[#e0e0e0] font-['Montserrat']">
+                Moves
+              </h3>
             </div>
             <div className="p-4 max-h-80 overflow-y-auto scrollbar-thin">
               <div className="space-y-2 font-['JetBrains Mono'] text-sm">
@@ -307,20 +361,28 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
                   <div
                     key={index}
                     className={`flex items-center space-x-3 p-2 rounded ${
-                      move.isLatest ? 'bg-[#81b64c]/10 border border-[#81b64c]/30' : 'hover:bg-[#2a2a2a]'
+                      move.isLatest
+                        ? "bg-[#81b64c]/10 border border-[#81b64c]/30"
+                        : "hover:bg-[#2a2a2a]"
                     } transition-colors`}
                   >
                     <span className="text-[#7a7a7a] w-6">{move.number}.</span>
-                    <span className={`flex-1 ${move.white === '-' ? 'text-[#7a7a7a]' : 'text-[#e0e0e0]'}`}>
+                    <span
+                      className={`flex-1 ${move.white === "-" ? "text-[#7a7a7a]" : "text-[#e0e0e0]"}`}
+                    >
                       {move.white}
                     </span>
-                    <span className={`flex-1 ${move.black === '' ? 'text-[#7a7a7a]' : 'text-[#e0e0e0]'}`}>
+                    <span
+                      className={`flex-1 ${move.black === "" ? "text-[#7a7a7a]" : "text-[#e0e0e0]"}`}
+                    >
                       {move.black}
                     </span>
                   </div>
                 ))}
                 {moves.length === 0 && (
-                  <div className="text-[#7a7a7a] text-center py-4">No moves yet</div>
+                  <div className="text-[#7a7a7a] text-center py-4">
+                    No moves yet
+                  </div>
                 )}
               </div>
             </div>
@@ -345,13 +407,22 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
                 </button>
 
                 <div className="flex space-x-2">
-                  <button className="flex-1 py-2 px-3 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#7a7a7a] rounded-lg transition-colors text-sm font-['Inter']">
+                  <button
+                    onClick={g.resignGame}
+                    className="flex-1 py-2 px-3 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#e0e0e0] rounded-lg transition-colors text-sm font-['Inter']"
+                  >
                     Resign
                   </button>
-                  <button className="flex-1 py-2 px-3 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#7a7a7a] rounded-lg transition-colors text-sm font-['Inter']">
+                  <button
+                    onClick={g.drawGame}
+                    className="flex-1 py-2 px-3 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#e0e0e0] rounded-lg transition-colors text-sm font-['Inter']"
+                  >
                     Draw
                   </button>
-                  <button className="flex-1 py-2 px-3 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#7a7a7a] rounded-lg transition-colors text-sm font-['Inter']">
+                  <button
+                    onClick={() => g.setAiEnabled(false)}
+                    className="flex-1 py-2 px-3 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#e0e0e0] rounded-lg transition-colors text-sm font-['Inter']"
+                  >
                     Analyze
                   </button>
                 </div>
@@ -365,7 +436,9 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
       <div className="fixed bottom-0 left-0 right-0 bg-[#1a1a1a] border-t border-[#2a2a2a] p-4 md:hidden">
         <div className="flex items-center justify-center space-x-6">
           <button
-            onClick={() => setCurrentMoveIndex(Math.max(-1, currentMoveIndex - 1))}
+            onClick={() =>
+              setCurrentMoveIndex(Math.max(-1, currentMoveIndex - 1))
+            }
             disabled={!isAnalysisMode || currentMoveIndex <= -1}
             className="p-2 text-[#7a7a7a] hover:text-[#e0e0e0] disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -387,8 +460,14 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
           </button>
 
           <button
-            onClick={() => setCurrentMoveIndex(Math.min(g.history.length - 1, currentMoveIndex + 1))}
-            disabled={!isAnalysisMode || currentMoveIndex >= g.history.length - 1}
+            onClick={() =>
+              setCurrentMoveIndex(
+                Math.min(g.history.length - 1, currentMoveIndex + 1),
+              )
+            }
+            disabled={
+              !isAnalysisMode || currentMoveIndex >= g.history.length - 1
+            }
             className="p-2 text-[#7a7a7a] hover:text-[#e0e0e0] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             →
@@ -429,6 +508,28 @@ export default function GameScreen({ onBack, initialAiEnabled = false, timeContr
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="max-w-md w-full mx-4">
+            <SettingsPanel
+              onClose={() => setShowSettings(false)}
+              aiEnabled={g.aiEnabled}
+              setAiEnabled={g.setAiEnabled}
+              aiColor={g.aiColor}
+              setAiColor={g.setAiColor}
+              aiDifficulty={g.aiDifficulty}
+              setAiDifficulty={g.setAiDifficulty}
+              soundEnabled={g.soundEnabled}
+              setSoundEnabled={g.setSoundEnabled}
+              timeControlIdx={g.timeControlIdx}
+              setTimeControlIdx={g.setTimeControlIdx}
+              onReset={g.resetGame}
+            />
           </div>
         </div>
       )}

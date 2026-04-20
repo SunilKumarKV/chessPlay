@@ -484,7 +484,25 @@ export function useChessGame({
   }, [clock]);
 
   /* ====================================================
-     17️⃣ BOARD HELPERS
+     17️⃣ RESIGN GAME
+     ================================================= */
+
+  const resignGame = useCallback(() => {
+    // For now, just reset the game. In a real implementation, you'd record the resignation
+    resetGame();
+  }, [resetGame]);
+
+  /* ====================================================
+     18️⃣ DRAW GAME
+     ================================================= */
+
+  const drawGame = useCallback(() => {
+    // For now, just reset the game. In a real implementation, you'd offer/accept draw
+    resetGame();
+  }, [resetGame]);
+
+  /* ====================================================
+     19️⃣ BOARD HELPERS
      Used by BoardSquare component
      ================================================= */
 
@@ -523,6 +541,8 @@ export function useChessGame({
     handlePromotion,
 
     resetGame,
+    resignGame,
+    drawGame,
     handleExportPGN,
 
     toggleFlip: () => setFlipped((f) => !f),

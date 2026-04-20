@@ -37,6 +37,17 @@ export default function Settings({ user, onBack }) {
     setHasChanges(hasAnyChanges);
   }, [settings.changes]);
 
+  if (settings.loading) {
+    return (
+      <div className="min-h-screen bg-[#0e0e0e] text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#81b64c] mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading settings...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0e0e0e] text-white font-['Inter']">
       {/* Header */}
@@ -59,17 +70,23 @@ export default function Settings({ user, onBack }) {
         <div className="space-y-6">
           {/* Tab Navigation */}
           <TabBar
-            tabs={tabs.map(tab => ({ id: tab.id, label: tab.label }))}
+            tabs={tabs.map((tab) => ({ id: tab.id, label: tab.label }))}
             activeTab={activeTab}
             onTabChange={setActiveTab}
           />
 
           {/* Content Area */}
           <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-6">
-            {activeTab === "account" && <AccountTab user={user} settings={settings} />}
-            {activeTab === "appearance" && <AppearanceTab settings={settings} />}
+            {activeTab === "account" && (
+              <AccountTab user={user} settings={settings} />
+            )}
+            {activeTab === "appearance" && (
+              <AppearanceTab settings={settings} />
+            )}
             {activeTab === "game" && <GameTab settings={settings} />}
-            {activeTab === "notifications" && <NotificationsTab settings={settings} />}
+            {activeTab === "notifications" && (
+              <NotificationsTab settings={settings} />
+            )}
             {activeTab === "privacy" && <PrivacyTab settings={settings} />}
           </div>
         </div>
@@ -98,6 +115,17 @@ function AccountTab({ user, settings }) {
   const [avatarPreview, setAvatarPreview] = useState(null);
   const fileInputRef = useRef(null);
 
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#81b64c] mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading user data...</p>
+        </div>
+      </div>
+    );
+  }
+
   const handleAvatarChange = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -112,7 +140,9 @@ function AccountTab({ user, settings }) {
     <div className="space-y-6">
       {/* Profile Section */}
       <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-6">
-        <h2 className="text-xl font-semibold mb-6 text-white">Profile Information</h2>
+        <h2 className="text-xl font-semibold mb-6 text-white">
+          Profile Information
+        </h2>
 
         <div className="flex items-start space-x-6">
           {/* Avatar Upload */}
@@ -153,8 +183,10 @@ function AccountTab({ user, settings }) {
               </label>
               <input
                 type="text"
-                value={settings.account.username || user?.username || ""}
-                onChange={(e) => settings.updateAccount("username", e.target.value)}
+                value={settings?.account?.username || user?.username || ""}
+                onChange={(e) =>
+                  settings?.updateAccount?.("username", e.target.value)
+                }
                 className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#81b64c] transition-colors"
                 placeholder="Enter username"
               />
@@ -166,8 +198,10 @@ function AccountTab({ user, settings }) {
               </label>
               <input
                 type="email"
-                value={settings.account.email || user?.email || ""}
-                onChange={(e) => settings.updateAccount("email", e.target.value)}
+                value={settings?.account?.email || user?.email || ""}
+                onChange={(e) =>
+                  settings?.updateAccount?.("email", e.target.value)
+                }
                 className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#81b64c] transition-colors"
                 placeholder="Enter email"
               />
@@ -178,8 +212,10 @@ function AccountTab({ user, settings }) {
                 Bio
               </label>
               <textarea
-                value={settings.account.bio || ""}
-                onChange={(e) => settings.updateAccount("bio", e.target.value)}
+                value={settings?.account?.bio || ""}
+                onChange={(e) =>
+                  settings?.updateAccount?.("bio", e.target.value)
+                }
                 rows={3}
                 className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#81b64c] transition-colors resize-none"
                 placeholder="Tell us about yourself..."
@@ -196,7 +232,9 @@ function AccountTab({ user, settings }) {
           className="flex items-center justify-between w-full text-left"
         >
           <h2 className="text-xl font-semibold text-white">Change Password</h2>
-          <span className="text-gray-400">{showPasswordChange ? "−" : "+"}</span>
+          <span className="text-gray-400">
+            {showPasswordChange ? "−" : "+"}
+          </span>
         </button>
 
         {showPasswordChange && (
@@ -245,7 +283,8 @@ function AccountTab({ user, settings }) {
       <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-4 text-red-400">Danger Zone</h2>
         <p className="text-gray-300 mb-4">
-          Once you delete your account, there is no going back. Please be certain.
+          Once you delete your account, there is no going back. Please be
+          certain.
         </p>
         <button className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors">
           Delete Account
@@ -257,6 +296,16 @@ function AccountTab({ user, settings }) {
 
 // Appearance Tab Component
 function AppearanceTab({ settings }) {
+  if (!settings?.appearance) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#81b64c] mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading appearance settings...</p>
+        </div>
+      </div>
+    );
+  }
   const boardThemes = [
     { id: "classic", name: "Classic", colors: ["#f0d9b5", "#b58863"] },
     { id: "green", name: "Green", colors: ["#81b64c", "#59923b"] },
@@ -360,12 +409,16 @@ function AppearanceTab({ settings }) {
             min="12"
             max="20"
             value={settings.appearance.fontSize}
-            onChange={(e) => settings.updateAppearance("fontSize", parseInt(e.target.value))}
+            onChange={(e) =>
+              settings.updateAppearance("fontSize", parseInt(e.target.value))
+            }
             className="w-full h-2 bg-[#2a2a2a] rounded-lg appearance-none cursor-pointer slider"
           />
           <div className="flex justify-between text-sm text-gray-400">
             <span>Small (12px)</span>
-            <span className="font-medium text-white">{settings.appearance.fontSize}px</span>
+            <span className="font-medium text-white">
+              {settings.appearance.fontSize}px
+            </span>
             <span>Large (20px)</span>
           </div>
         </div>
@@ -376,6 +429,16 @@ function AppearanceTab({ settings }) {
 
 // Game Tab Component
 function GameTab({ settings }) {
+  if (!settings?.game) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#81b64c] mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading game settings...</p>
+        </div>
+      </div>
+    );
+  }
   const timeControls = [
     { id: 0, label: "1+0 Bullet", icon: "⚡" },
     { id: 1, label: "2+1 Bullet", icon: "⚡" },
@@ -386,13 +449,23 @@ function GameTab({ settings }) {
     { id: 6, label: "30+0 Classical", icon: "👑" },
   ];
 
-  const difficultyLabels = ["Beginner", "Easy", "Medium", "Hard", "Expert", "Master", "Grandmaster"];
+  const difficultyLabels = [
+    "Beginner",
+    "Easy",
+    "Medium",
+    "Hard",
+    "Expert",
+    "Master",
+    "Grandmaster",
+  ];
 
   return (
     <div className="space-y-6">
       {/* Game Preferences */}
       <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-6">
-        <h2 className="text-xl font-semibold mb-6 text-white">Game Preferences</h2>
+        <h2 className="text-xl font-semibold mb-6 text-white">
+          Game Preferences
+        </h2>
         <div className="space-y-4">
           {[
             { key: "showLegalMoves", label: "Show legal move hints" },
@@ -401,17 +474,24 @@ function GameTab({ settings }) {
             { key: "autoPromote", label: "Auto-promote to queen" },
             { key: "confirmMove", label: "Confirm move before submit" },
           ].map((setting) => (
-            <div key={setting.key} className="flex items-center justify-between">
+            <div
+              key={setting.key}
+              className="flex items-center justify-between"
+            >
               <span className="text-gray-300">{setting.label}</span>
               <button
-                onClick={() => settings.updateGame(setting.key, !settings.game[setting.key])}
+                onClick={() =>
+                  settings.updateGame(setting.key, !settings.game[setting.key])
+                }
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   settings.game[setting.key] ? "bg-[#81b64c]" : "bg-[#2a2a2a]"
                 }`}
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    settings.game[setting.key] ? "translate-x-6" : "translate-x-1"
+                    settings.game[setting.key]
+                      ? "translate-x-6"
+                      : "translate-x-1"
                   }`}
                 />
               </button>
@@ -422,12 +502,16 @@ function GameTab({ settings }) {
 
       {/* Default Time Control */}
       <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-6">
-        <h2 className="text-xl font-semibold mb-6 text-white">Default Time Control</h2>
+        <h2 className="text-xl font-semibold mb-6 text-white">
+          Default Time Control
+        </h2>
         <div className="grid grid-cols-2 gap-3">
           {timeControls.map((control) => (
             <button
               key={control.id}
-              onClick={() => settings.updateGame("defaultTimeControl", control.id)}
+              onClick={() =>
+                settings.updateGame("defaultTimeControl", control.id)
+              }
               className={`flex items-center space-x-3 px-4 py-3 rounded-lg border transition-colors ${
                 settings.game.defaultTimeControl === control.id
                   ? "border-[#81b64c] bg-[#81b64c]/10 text-[#81b64c]"
@@ -450,7 +534,9 @@ function GameTab({ settings }) {
             min="0"
             max="6"
             value={settings.game.aiDifficulty}
-            onChange={(e) => settings.updateGame("aiDifficulty", parseInt(e.target.value))}
+            onChange={(e) =>
+              settings.updateGame("aiDifficulty", parseInt(e.target.value))
+            }
             className="w-full h-2 bg-[#2a2a2a] rounded-lg appearance-none cursor-pointer slider"
           />
           <div className="flex justify-between text-sm">
@@ -481,17 +567,29 @@ function NotificationsTab({ settings }) {
             { key: "tournamentUpdates", label: "Tournament updates" },
             { key: "achievementAlerts", label: "Achievement alerts" },
           ].map((setting) => (
-            <div key={setting.key} className="flex items-center justify-between">
+            <div
+              key={setting.key}
+              className="flex items-center justify-between"
+            >
               <span className="text-gray-300">{setting.label}</span>
               <button
-                onClick={() => settings.updateNotifications(setting.key, !settings.notifications[setting.key])}
+                onClick={() =>
+                  settings.updateNotifications(
+                    setting.key,
+                    !settings.notifications[setting.key],
+                  )
+                }
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  settings.notifications[setting.key] ? "bg-[#81b64c]" : "bg-[#2a2a2a]"
+                  settings.notifications[setting.key]
+                    ? "bg-[#81b64c]"
+                    : "bg-[#2a2a2a]"
                 }`}
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    settings.notifications[setting.key] ? "translate-x-6" : "translate-x-1"
+                    settings.notifications[setting.key]
+                      ? "translate-x-6"
+                      : "translate-x-1"
                   }`}
                 />
               </button>
@@ -505,10 +603,21 @@ function NotificationsTab({ settings }) {
 
 // Privacy Tab Component
 function PrivacyTab({ settings }) {
+  if (!settings?.privacy) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <div className="text-gray-400">Loading privacy settings...</div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="space-y-6">
       <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-6">
-        <h2 className="text-xl font-semibold mb-6 text-white">Privacy Settings</h2>
+        <h2 className="text-xl font-semibold mb-6 text-white">
+          Privacy Settings
+        </h2>
         <div className="space-y-4">
           {[
             { key: "profileVisibility", label: "Public profile visibility" },
@@ -517,17 +626,29 @@ function PrivacyTab({ settings }) {
             { key: "friendRequests", label: "Allow friend requests" },
             { key: "spectatorMode", label: "Allow spectators in games" },
           ].map((setting) => (
-            <div key={setting.key} className="flex items-center justify-between">
+            <div
+              key={setting.key}
+              className="flex items-center justify-between"
+            >
               <span className="text-gray-300">{setting.label}</span>
               <button
-                onClick={() => settings.updatePrivacy(setting.key, !settings.privacy[setting.key])}
+                onClick={() =>
+                  settings.updatePrivacy(
+                    setting.key,
+                    !settings.privacy[setting.key],
+                  )
+                }
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  settings.privacy[setting.key] ? "bg-[#81b64c]" : "bg-[#2a2a2a]"
+                  settings.privacy[setting.key]
+                    ? "bg-[#81b64c]"
+                    : "bg-[#2a2a2a]"
                 }`}
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    settings.privacy[setting.key] ? "translate-x-6" : "translate-x-1"
+                    settings.privacy[setting.key]
+                      ? "translate-x-6"
+                      : "translate-x-1"
                   }`}
                 />
               </button>

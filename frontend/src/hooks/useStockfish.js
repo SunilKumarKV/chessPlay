@@ -3,9 +3,9 @@ import { useEffect, useRef, useCallback, useState } from "react";
 // Local Stockfish WASM worker bundled with the app
 // Falls back to Lichess CDN if local file is not available
 const STOCKFISH_URLS = [
-  "/stockfish-18-lite.js", // Local bundled version (fastest, no CORS issues)
   "https://unpkg.com/@lichess-org/stockfish-web@latest/dist/stockfish.js",
   "https://cdn.jsdelivr.net/npm/@lichess-org/stockfish-web@latest/dist/stockfish.js",
+  "/stockfish-18-lite.js", // Local bundled version (fastest, no CORS issues)
 ];
 
 export function useStockfish({ enabled, difficulty = 10 }) {
@@ -27,12 +27,17 @@ export function useStockfish({ enabled, difficulty = 10 }) {
 
         for (const url of STOCKFISH_URLS) {
           try {
-            const response = await fetch(url, { method: "HEAD" });
-            if (!response.ok) {
-              console.warn(
-                `Stockfish fetch failed (${response.status}): ${url}`,
-              );
-              continue;
+            // Skip HEAD check for local URLs as they might not be supported by dev server
+            if (!url.startsWith("http")) {
+              // Assume local file exists
+            } else {
+              const response = await fetch(url, { method: "HEAD" });
+              if (!response.ok) {
+                console.warn(
+                  `Stockfish fetch failed (${response.status}): ${url}`,
+                );
+                continue;
+              }
             }
 
             if (url.startsWith("/")) {

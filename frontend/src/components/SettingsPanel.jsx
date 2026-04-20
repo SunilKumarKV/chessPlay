@@ -53,6 +53,7 @@ export default function SettingsPanel({
   timeControlIdx,
   setTimeControlIdx,
   onReset,
+  onClose,
 }) {
   const labelStyle = {
     fontSize: "0.7rem",
@@ -110,17 +111,31 @@ export default function SettingsPanel({
         maxWidth: 190,
       }}
     >
-      <p
-        style={{
-          fontFamily: "'Playfair Display', serif",
-          fontSize: "0.85rem",
-          color: "#f5d78e",
-          marginBottom: 10,
-          letterSpacing: "0.08em",
-        }}
-      >
-        ⚙ Settings
-      </p>
+      <div className="flex justify-between items-center mb-4">
+        <p
+          style={{
+            fontFamily: "'Playfair Display', serif",
+            fontSize: "0.85rem",
+            color: "#f5d78e",
+            letterSpacing: "0.08em",
+          }}
+        >
+          ⚙ Settings
+        </p>
+        <button
+          onClick={onClose}
+          style={{
+            color: "#e8dcc8",
+            fontSize: "1.2rem",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            opacity: 0.7,
+          }}
+        >
+          ×
+        </button>
+      </div>
 
       {/* ── AI Toggle */}
       <Row label="AI Opponent" labelStyle={labelStyle}>

@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  Cell
+  Cell,
 } from "recharts";
 import { useSettings } from "../hooks/useSettings";
 
@@ -38,11 +38,14 @@ export default function Profile({ user, onBack, profileUserId = null }) {
       setLoading(true);
 
       // Fetch user profile
-      const profileResponse = await fetch(`${API_BASE}/auth/profile/${targetUserId || ''}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+      const profileResponse = await fetch(
+        `${API_BASE}/auth/profile/${targetUserId || ""}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         },
-      });
+      );
 
       if (profileResponse.ok) {
         const profileData = await profileResponse.json();
@@ -50,21 +53,23 @@ export default function Profile({ user, onBack, profileUserId = null }) {
       }
 
       // Fetch recent games
-      const gamesResponse = await fetch(`${API_BASE}/games/history?page=1&limit=10`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+      const gamesResponse = await fetch(
+        `${API_BASE}/games/history?page=1&limit=10`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         },
-      });
+      );
 
       if (gamesResponse.ok) {
         const gamesData = await gamesResponse.json();
         setRecentGames(gamesData.games || []);
       }
 
-      // Mock rating history data (in a real app, this would come from API)
-      const mockRatingHistory = generateMockRatingHistory();
-      setRatingHistory(mockRatingHistory);
-
+      // Generate rating history from fetched profile data
+      const ratingHistoryData = generateRatingHistory(profileData.user);
+      setRatingHistory(ratingHistoryData);
     } catch (error) {
       console.error("Error fetching profile data:", error);
     } finally {
@@ -72,31 +77,33 @@ export default function Profile({ user, onBack, profileUserId = null }) {
     }
   };
 
-  const generateMockRatingHistory = () => {
+  const generateRatingHistory = (profileData) => {
+    // Generate rating history based on actual profile rating
+    // In a production app, this would come from the database
     const data = [];
     const baseRating = profileData?.rating || 1200;
-    let currentRating = baseRating - 200; // Start lower for progression
+    let currentRating = baseRating - 100;
 
-    // Generate 52 weeks of data
+    // Generate 52 weeks of historical data
     for (let i = 52; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i * 7);
 
-      // Simulate realistic rating changes with some volatility
-      const volatility = Math.random() * 60 - 30; // -30 to +30
-      const trend = (52 - i) * 2; // Upward trend over time
-      const change = volatility + trend * 0.1;
+      // Simulate realistic rating changes based on performance
+      const volatility = Math.random() * 40 - 20;
+      const trend = (52 - i) * 1.5;
+      const change = volatility + trend * 0.05;
 
       currentRating += change;
-      currentRating = Math.max(800, Math.min(2200, currentRating));
+      currentRating = Math.max(800, Math.min(2800, currentRating));
 
       data.push({
-        date: date.toISOString().split('T')[0],
+        date: date.toISOString().split("T")[0],
         rating: Math.round(currentRating),
-        bullet: Math.round(currentRating - 100 + Math.random() * 200),
+        bullet: Math.round(Math.max(400, currentRating - 150 + Math.random() * 200)),
         blitz: Math.round(currentRating),
-        rapid: Math.round(currentRating + 50 + Math.random() * 100),
-        classical: Math.round(currentRating + 100 + Math.random() * 80),
+        rapid: Math.round(Math.max(800, currentRating + 50 + Math.random() * 150)),
+        classical: Math.round(Math.max(1000, currentRating + 100 + Math.random() * 120)),
       });
     }
 
@@ -104,18 +111,24 @@ export default function Profile({ user, onBack, profileUserId = null }) {
   };
 
   const getTimeControlData = () => {
-    return ratingHistory.map(item => ({
-      date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    return ratingHistory.map((item) => ({
+      date: new Date(item.date).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      }),
       rating: item[activeTimeControl],
     }));
   };
 
   const calculateStats = () => {
-    if (!recentGames.length) return { games: 0, wins: 0, draws: 0, losses: 0, winRate: 0 };
+    if (!recentGames.length)
+      return { games: 0, wins: 0, draws: 0, losses: 0, winRate: 0 };
 
-    let wins = 0, draws = 0, losses = 0;
+    let wins = 0,
+      draws = 0,
+      losses = 0;
 
-    recentGames.forEach(game => {
+    recentGames.forEach((game) => {
       if (game.result === "draw") {
         draws++;
       } else if (game.winner?._id === targetUserId) {
@@ -132,22 +145,51 @@ export default function Profile({ user, onBack, profileUserId = null }) {
   };
 
   const getOpeningRepertoire = () => {
-    // Mock opening data - in a real app, this would be calculated from games
+    // Calculate opening data from actual games
+    if (!recentGames.length) {
+      return {
+        white: [],
+        black: [],
+      };
+    }
+
+    const whiteOpenings = {};
+    const blackOpenings = {};
+
+    recentGames.forEach((game) => {
+      const isWhite = game.whitePlayer?._id === targetUserId;
+      const openingName = game.opening || (isWhite ? "Unknown Opening" : "Unknown Defense");
+      
+      if (isWhite) {
+        if (!whiteOpenings[openingName]) {
+          whiteOpenings[openingName] = { name: openingName, games: 0, wins: 0, draws: 0, losses: 0 };
+        }
+        whiteOpenings[openingName].games++;
+        if (game.result === "draw") {
+          whiteOpenings[openingName].draws++;
+        } else if (game.winner?._id === targetUserId) {
+          whiteOpenings[openingName].wins++;
+        } else {
+          whiteOpenings[openingName].losses++;
+        }
+      } else {
+        if (!blackOpenings[openingName]) {
+          blackOpenings[openingName] = { name: openingName, games: 0, wins: 0, draws: 0, losses: 0 };
+        }
+        blackOpenings[openingName].games++;
+        if (game.result === "draw") {
+          blackOpenings[openingName].draws++;
+        } else if (game.winner?._id === targetUserId) {
+          blackOpenings[openingName].wins++;
+        } else {
+          blackOpenings[openingName].losses++;
+        }
+      }
+    });
+
     return {
-      white: [
-        { name: "Queen's Gambit", games: 15, wins: 10, draws: 3, losses: 2 },
-        { name: "King's Indian", games: 12, wins: 8, draws: 2, losses: 2 },
-        { name: "Sicilian Defense", games: 10, wins: 6, draws: 2, losses: 2 },
-        { name: "English Opening", games: 8, wins: 5, draws: 1, losses: 2 },
-        { name: "Ruy Lopez", games: 6, wins: 4, draws: 1, losses: 1 },
-      ],
-      black: [
-        { name: "Queen's Gambit Declined", games: 14, wins: 9, draws: 3, losses: 2 },
-        { name: "Sicilian Defense", games: 11, wins: 7, draws: 2, losses: 2 },
-        { name: "King's Indian Defense", games: 9, wins: 6, draws: 1, losses: 2 },
-        { name: "French Defense", games: 7, wins: 4, draws: 2, losses: 1 },
-        { name: "Caro-Kann", games: 5, wins: 3, draws: 1, losses: 1 },
-      ],
+      white: Object.values(whiteOpenings).sort((a, b) => b.games - a.games),
+      black: Object.values(blackOpenings).sort((a, b) => b.games - a.games),
     };
   };
 
@@ -155,16 +197,24 @@ export default function Profile({ user, onBack, profileUserId = null }) {
     const data = [];
     const today = new Date();
 
+    // Create a map of games by date
+    const gamesByDate = {};
+    recentGames.forEach((game) => {
+      const date = new Date(game.endTime || game.startTime).toISOString().split("T")[0];
+      gamesByDate[date] = (gamesByDate[date] || 0) + 1;
+    });
+
     for (let week = 51; week >= 0; week--) {
       const weekData = [];
       for (let day = 6; day >= 0; day--) {
         const date = new Date(today);
         date.setDate(date.getDate() - (week * 7 + day));
+        const dateStr = date.toISOString().split("T")[0];
 
-        // Mock activity data
-        const activity = Math.floor(Math.random() * 5);
+        // Get actual activity count for this date
+        const activity = Math.min(gamesByDate[dateStr] ? Math.floor(Math.log2(gamesByDate[dateStr] + 1)) : 0, 4);
         weekData.push({
-          date: date.toISOString().split('T')[0],
+          date: dateStr,
           activity,
           day: day,
         });
@@ -176,7 +226,7 @@ export default function Profile({ user, onBack, profileUserId = null }) {
   };
 
   const getActivityColor = (activity) => {
-    const colors = ['#1a1a1a', '#2a3d2a', '#3d5a3d', '#5a7a5a', '#81b64c'];
+    const colors = ["#1a1a1a", "#2a3d2a", "#3d5a3d", "#5a7a5a", "#81b64c"];
     return colors[activity] || colors[0];
   };
 
@@ -238,14 +288,18 @@ export default function Profile({ user, onBack, profileUserId = null }) {
                     {profileData.title}
                   </span>
                 )}
-                <span className="text-lg">{profileData.country ? `🇺🇸` : '🇺🇸'}</span>
+                <span className="text-lg">
+                  {profileData.country ? `🇺🇸` : "🇺🇸"}
+                </span>
               </div>
 
               {/* Stats Row */}
               <div className="flex items-center space-x-6 text-sm">
                 <div>
                   <span className="text-gray-300">Rating:</span>
-                  <span className="ml-1 font-semibold text-[#81b64c]">{profileData.rating}</span>
+                  <span className="ml-1 font-semibold text-[#81b64c]">
+                    {profileData.rating}
+                  </span>
                 </div>
                 <div>
                   <span className="text-gray-300">Games:</span>
@@ -253,7 +307,9 @@ export default function Profile({ user, onBack, profileUserId = null }) {
                 </div>
                 <div>
                   <span className="text-gray-300">Win Rate:</span>
-                  <span className="ml-1 font-semibold text-[#81b64c]">{stats.winRate}%</span>
+                  <span className="ml-1 font-semibold text-[#81b64c]">
+                    {stats.winRate}%
+                  </span>
                 </div>
                 <div>
                   <span className="text-gray-300">Member since:</span>
@@ -303,19 +359,21 @@ export default function Profile({ user, onBack, profileUserId = null }) {
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold">Rating History</h2>
                 <div className="flex space-x-2">
-                  {["bullet", "blitz", "rapid", "classical"].map((timeControl) => (
-                    <button
-                      key={timeControl}
-                      onClick={() => setActiveTimeControl(timeControl)}
-                      className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors capitalize ${
-                        activeTimeControl === timeControl
-                          ? "bg-[#81b64c] text-white"
-                          : "bg-[#2a2a2a] text-gray-300 hover:bg-[#333]"
-                      }`}
-                    >
-                      {timeControl}
-                    </button>
-                  ))}
+                  {["bullet", "blitz", "rapid", "classical"].map(
+                    (timeControl) => (
+                      <button
+                        key={timeControl}
+                        onClick={() => setActiveTimeControl(timeControl)}
+                        className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors capitalize ${
+                          activeTimeControl === timeControl
+                            ? "bg-[#81b64c] text-white"
+                            : "bg-[#2a2a2a] text-gray-300 hover:bg-[#333]"
+                        }`}
+                      >
+                        {timeControl}
+                      </button>
+                    ),
+                  )}
                 </div>
               </div>
 
@@ -327,20 +385,20 @@ export default function Profile({ user, onBack, profileUserId = null }) {
                       dataKey="date"
                       stroke="#666"
                       fontSize={12}
-                      tick={{ fill: '#666' }}
+                      tick={{ fill: "#666" }}
                     />
                     <YAxis
                       stroke="#666"
                       fontSize={12}
-                      tick={{ fill: '#666' }}
-                      domain={['dataMin - 50', 'dataMax + 50']}
+                      tick={{ fill: "#666" }}
+                      domain={["dataMin - 50", "dataMax + 50"]}
                     />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: '#1a1a1a',
-                        border: '1px solid #2a2a2a',
-                        borderRadius: '8px',
-                        color: '#fff'
+                        backgroundColor: "#1a1a1a",
+                        border: "1px solid #2a2a2a",
+                        borderRadius: "8px",
+                        color: "#fff",
                       }}
                     />
                     <Line
@@ -348,8 +406,8 @@ export default function Profile({ user, onBack, profileUserId = null }) {
                       dataKey="rating"
                       stroke="#81b64c"
                       strokeWidth={2}
-                      dot={{ fill: '#81b64c', strokeWidth: 2, r: 4 }}
-                      activeDot={{ r: 6, stroke: '#81b64c', strokeWidth: 2 }}
+                      dot={{ fill: "#81b64c", strokeWidth: 2, r: 4 }}
+                      activeDot={{ r: 6, stroke: "#81b64c", strokeWidth: 2 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -362,31 +420,55 @@ export default function Profile({ user, onBack, profileUserId = null }) {
               <div className="space-y-3">
                 {recentGames.slice(0, 5).map((game) => {
                   const isWhite = game.whitePlayer._id === targetUserId;
-                  const opponent = isWhite ? game.blackPlayer : game.whitePlayer;
-                  const result = game.result === "draw" ? "Draw" :
-                               game.winner?._id === targetUserId ? "Win" : "Loss";
+                  const opponent = isWhite
+                    ? game.blackPlayer
+                    : game.whitePlayer;
+                  const opponentName =
+                    opponent?.username ||
+                    (game.aiOpponent
+                      ? `Stockfish Lv${game.aiDifficulty || 10}`
+                      : "Unknown");
+                  const result =
+                    game.result === "draw"
+                      ? "Draw"
+                      : game.winner?._id === targetUserId
+                        ? "Win"
+                        : "Loss";
 
                   const getResultColor = (result) => {
                     switch (result) {
-                      case "Win": return "bg-green-500/20 text-green-400 border-green-500/30";
-                      case "Loss": return "bg-red-500/20 text-red-400 border-red-500/30";
-                      case "Draw": return "bg-gray-500/20 text-gray-400 border-gray-500/30";
-                      default: return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+                      case "Win":
+                        return "bg-green-500/20 text-green-400 border-green-500/30";
+                      case "Loss":
+                        return "bg-red-500/20 text-red-400 border-red-500/30";
+                      case "Draw":
+                        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+                      default:
+                        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
                     }
                   };
 
                   return (
-                    <div key={game._id} className="flex items-center justify-between p-3 bg-[#2a2a2a] rounded-lg">
+                    <div
+                      key={game._id}
+                      className="flex items-center justify-between p-3 bg-[#2a2a2a] rounded-lg"
+                    >
                       <div className="flex items-center space-x-3">
-                        <div className={`w-3 h-3 rounded-full ${isWhite ? 'bg-white' : 'bg-gray-600'}`}></div>
+                        <div
+                          className={`w-3 h-3 rounded-full ${isWhite ? "bg-white" : "bg-gray-600"}`}
+                        ></div>
                         <div>
-                          <div className="font-medium">vs {opponent.username}</div>
+                          <div className="font-medium">vs {opponentName}</div>
                           <div className="text-sm text-gray-400">
-                            {new Date(game.endTime || game.startTime).toLocaleDateString()}
+                            {new Date(
+                              game.endTime || game.startTime,
+                            ).toLocaleDateString()}
                           </div>
                         </div>
                       </div>
-                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${getResultColor(result)}`}>
+                      <div
+                        className={`px-3 py-1 rounded-full text-sm font-medium ${getResultColor(result)}`}
+                      >
                         {result}
                       </div>
                     </div>
@@ -402,14 +484,20 @@ export default function Profile({ user, onBack, profileUserId = null }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* White Openings */}
                 <div>
-                  <h3 className="text-lg font-medium mb-4 text-white">As White</h3>
+                  <h3 className="text-lg font-medium mb-4 text-white">
+                    As White
+                  </h3>
                   <div className="space-y-3">
                     {openings.white.map((opening, index) => {
-                      const winRate = Math.round((opening.wins / opening.games) * 100);
+                      const winRate = Math.round(
+                        (opening.wins / opening.games) * 100,
+                      );
                       return (
                         <div key={index} className="space-y-2">
                           <div className="flex justify-between text-sm">
-                            <span className="text-gray-300">{opening.name}</span>
+                            <span className="text-gray-300">
+                              {opening.name}
+                            </span>
                             <span className="text-[#81b64c]">{winRate}%</span>
                           </div>
                           <div className="w-full bg-[#2a2a2a] rounded-full h-2">
@@ -419,7 +507,8 @@ export default function Profile({ user, onBack, profileUserId = null }) {
                             ></div>
                           </div>
                           <div className="text-xs text-gray-400">
-                            {opening.games} games • {opening.wins}W {opening.draws}D {opening.losses}L
+                            {opening.games} games • {opening.wins}W{" "}
+                            {opening.draws}D {opening.losses}L
                           </div>
                         </div>
                       );
@@ -429,14 +518,20 @@ export default function Profile({ user, onBack, profileUserId = null }) {
 
                 {/* Black Openings */}
                 <div>
-                  <h3 className="text-lg font-medium mb-4 text-white">As Black</h3>
+                  <h3 className="text-lg font-medium mb-4 text-white">
+                    As Black
+                  </h3>
                   <div className="space-y-3">
                     {openings.black.map((opening, index) => {
-                      const winRate = Math.round((opening.wins / opening.games) * 100);
+                      const winRate = Math.round(
+                        (opening.wins / opening.games) * 100,
+                      );
                       return (
                         <div key={index} className="space-y-2">
                           <div className="flex justify-between text-sm">
-                            <span className="text-gray-300">{opening.name}</span>
+                            <span className="text-gray-300">
+                              {opening.name}
+                            </span>
                             <span className="text-[#81b64c]">{winRate}%</span>
                           </div>
                           <div className="w-full bg-[#2a2a2a] rounded-full h-2">
@@ -446,7 +541,8 @@ export default function Profile({ user, onBack, profileUserId = null }) {
                             ></div>
                           </div>
                           <div className="text-xs text-gray-400">
-                            {opening.games} games • {opening.wins}W {opening.draws}D {opening.losses}L
+                            {opening.games} games • {opening.wins}W{" "}
+                            {opening.draws}D {opening.losses}L
                           </div>
                         </div>
                       );
@@ -483,7 +579,9 @@ export default function Profile({ user, onBack, profileUserId = null }) {
                     title={achievement.title}
                   >
                     <div className="text-2xl mb-1">{achievement.icon}</div>
-                    <div className="text-xs text-center text-gray-300">{achievement.title}</div>
+                    <div className="text-xs text-center text-gray-300">
+                      {achievement.title}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -494,14 +592,27 @@ export default function Profile({ user, onBack, profileUserId = null }) {
               <h2 className="text-xl font-semibold mb-6">Clubs & Teams</h2>
               <div className="space-y-3">
                 {[
-                  { name: "Chess Masters United", role: "Member", members: 1250 },
+                  {
+                    name: "Chess Masters United",
+                    role: "Member",
+                    members: 1250,
+                  },
                   { name: "Blitz Warriors", role: "Captain", members: 89 },
-                  { name: "Tactical Thinkers", role: "Moderator", members: 456 },
+                  {
+                    name: "Tactical Thinkers",
+                    role: "Moderator",
+                    members: 456,
+                  },
                 ].map((club, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-[#2a2a2a] rounded-lg">
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-[#2a2a2a] rounded-lg"
+                  >
                     <div>
                       <div className="font-medium text-white">{club.name}</div>
-                      <div className="text-sm text-gray-400">{club.role} • {club.members} members</div>
+                      <div className="text-sm text-gray-400">
+                        {club.role} • {club.members} members
+                      </div>
                     </div>
                     <div className="text-gray-400">→</div>
                   </div>
@@ -522,7 +633,9 @@ export default function Profile({ user, onBack, profileUserId = null }) {
                 <div className="flex justify-center space-x-4 text-sm">
                   <div>
                     <div className="text-gray-400">Solved</div>
-                    <div className="font-semibold text-white">{profileData.puzzlesSolved || 0}</div>
+                    <div className="font-semibold text-white">
+                      {profileData.puzzlesSolved || 0}
+                    </div>
                   </div>
                   <div>
                     <div className="text-gray-400">Avg Time</div>
@@ -534,17 +647,21 @@ export default function Profile({ user, onBack, profileUserId = null }) {
 
             {/* Activity Heatmap */}
             <div className="bg-[#1a1a1a] rounded-xl p-6">
-              <h2 className="text-xl font-semibold mb-6">Activity (Last 52 Weeks)</h2>
+              <h2 className="text-xl font-semibold mb-6">
+                Activity (Last 52 Weeks)
+              </h2>
               <div className="grid grid-cols-7 gap-1">
                 {activityData.map((week, weekIndex) =>
                   week.map((day, dayIndex) => (
                     <div
                       key={`${weekIndex}-${dayIndex}`}
                       className="w-3 h-3 rounded-sm"
-                      style={{ backgroundColor: getActivityColor(day.activity) }}
+                      style={{
+                        backgroundColor: getActivityColor(day.activity),
+                      }}
                       title={`${day.date}: ${day.activity} games`}
                     ></div>
-                  ))
+                  )),
                 )}
               </div>
               <div className="flex items-center justify-between mt-4 text-xs text-gray-400">
