@@ -1,4 +1,5 @@
-import React from 'react';
+import React from "react";
+import { useTheme } from "../../hooks/useTheme";
 
 // Game Card - Clickable row with opponent info, result pill, time, moves
 export const GameCard = ({
@@ -8,31 +9,50 @@ export const GameCard = ({
   moves,
   date,
   onClick,
-  className = '',
+  className = "",
   ...props
 }) => {
+  const { theme } = useTheme();
   const getResultColor = (result) => {
     switch (result) {
-      case 'win': return 'bg-green-600';
-      case 'loss': return 'bg-red-600';
-      case 'draw': return 'bg-yellow-600';
-      default: return 'bg-[#2a2a2a]';
+      case "win":
+        return "bg-green-600";
+      case "loss":
+        return "bg-red-600";
+      case "draw":
+        return "bg-yellow-600";
+      default:
+        return "bg-[#2a2a2a]";
     }
   };
 
   const getResultText = (result) => {
     switch (result) {
-      case 'win': return 'Won';
-      case 'loss': return 'Lost';
-      case 'draw': return 'Draw';
-      default: return 'Unknown';
+      case "win":
+        return "Won";
+      case "loss":
+        return "Lost";
+      case "draw":
+        return "Draw";
+      default:
+        return "Unknown";
     }
   };
 
   return (
     <div
       onClick={onClick}
-      className={`bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-4 hover:bg-[#2a2a2a] transition-colors cursor-pointer ${className}`}
+      className={`border rounded-lg p-4 transition-colors cursor-pointer ${className}`}
+      style={{
+        backgroundColor: theme.bg.secondary,
+        borderColor: theme.border.primary,
+      }}
+      onMouseEnter={(e) =>
+        (e.currentTarget.style.backgroundColor = theme.hover)
+      }
+      onMouseLeave={(e) =>
+        (e.currentTarget.style.backgroundColor = theme.bg.secondary)
+      }
       {...props}
     >
       <div className="flex items-center justify-between">
@@ -41,13 +61,30 @@ export const GameCard = ({
             {opponent?.charAt(0).toUpperCase()}
           </div>
           <div>
-            <p className="font-medium text-[#e0e0e0] font-['Inter']">{opponent}</p>
-            <p className="text-sm text-[#7a7a7a] font-['Inter']">{timeControl} • {moves} moves</p>
+            <p
+              className="font-medium font-['Inter']"
+              style={{ color: theme.text.primary }}
+            >
+              {opponent}
+            </p>
+            <p
+              className="text-sm font-['Inter']"
+              style={{ color: theme.text.tertiary }}
+            >
+              {timeControl} • {moves} moves
+            </p>
           </div>
         </div>
         <div className="flex items-center space-x-3">
-          <span className="text-sm text-[#7a7a7a] font-['Inter']">{date}</span>
-          <span className={`px-2 py-1 rounded-full text-xs font-semibold text-white ${getResultColor(result)}`}>
+          <span
+            className="text-sm font-['Inter']"
+            style={{ color: theme.text.tertiary }}
+          >
+            {date}
+          </span>
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-semibold text-white ${getResultColor(result)}`}
+          >
             {getResultText(result)}
           </span>
         </div>
@@ -62,37 +99,61 @@ export const StatCard = ({
   value,
   label,
   delta,
-  deltaType = 'neutral', // 'positive', 'negative', 'neutral'
-  className = '',
+  deltaType = "neutral", // 'positive', 'negative', 'neutral'
+  className = "",
   ...props
 }) => {
+  const { theme } = useTheme();
   const getDeltaColor = (type) => {
     switch (type) {
-      case 'positive': return 'text-green-500';
-      case 'negative': return 'text-red-500';
-      default: return 'text-[#7a7a7a]';
+      case "positive":
+        return theme.success;
+      case "negative":
+        return theme.error;
+      default:
+        return theme.text.tertiary;
     }
   };
 
   const getDeltaIcon = (type) => {
     switch (type) {
-      case 'positive': return '↗️';
-      case 'negative': return '↘️';
-      default: return '';
+      case "positive":
+        return "↗️";
+      case "negative":
+        return "↘️";
+      default:
+        return "";
     }
   };
 
   return (
     <div
-      className={`bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-6 ${className}`}
+      className={`border rounded-lg p-6 ${className}`}
+      style={{
+        backgroundColor: theme.bg.secondary,
+        borderColor: theme.border.primary,
+      }}
       {...props}
     >
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-2xl font-bold text-[#e0e0e0] font-['Montserrat']">{value}</p>
-          <p className="text-sm text-[#7a7a7a] font-['Inter']">{label}</p>
+          <p
+            className="text-2xl font-bold font-['Montserrat']"
+            style={{ color: theme.text.primary }}
+          >
+            {value}
+          </p>
+          <p
+            className="text-sm font-['Inter']"
+            style={{ color: theme.text.tertiary }}
+          >
+            {label}
+          </p>
           {delta && (
-            <p className={`text-sm font-medium ${getDeltaColor(deltaType)} font-['Inter']`}>
+            <p
+              className={`text-sm font-medium font-['Inter']`}
+              style={{ color: getDeltaColor(deltaType) }}
+            >
               {getDeltaIcon(deltaType)} {delta}
             </p>
           )}
@@ -109,7 +170,7 @@ export const PlayerCard = ({
   name,
   rating,
   isOnline = false,
-  className = '',
+  className = "",
   ...props
 }) => {
   return (
@@ -126,8 +187,12 @@ export const PlayerCard = ({
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-[#e0e0e0] truncate font-['Inter']">{name}</p>
-        <p className="text-sm text-[#7a7a7a] font-['Inter']">Rating: {rating}</p>
+        <p className="font-medium text-[#e0e0e0] truncate font-['Inter']">
+          {name}
+        </p>
+        <p className="text-sm text-[#7a7a7a] font-['Inter']">
+          Rating: {rating}
+        </p>
       </div>
     </div>
   );

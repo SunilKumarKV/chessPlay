@@ -24,10 +24,15 @@ const io = socketIo(server, {
       // Allow localhost and local network IPs
       const allowedOrigins = [
         "http://localhost:5173",
+        "http://localhost:5174",
         "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
         /^http:\/\/192\.168\.\d+\.\d+:5173$/,
+        /^http:\/\/192\.168\.\d+\.\d+:5174$/,
         /^http:\/\/10\.\d+\.\d+\.\d+:5173$/,
+        /^http:\/\/10\.\d+\.\d+\.\d+:5174$/,
         /^http:\/\/172\.\d+\.\d+\.\d+:5173$/,
+        /^http:\/\/172\.\d+\.\d+\.\d+:5174$/,
       ];
 
       const isAllowed = allowedOrigins.some((pattern) => {

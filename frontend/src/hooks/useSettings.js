@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const API_BASE = "http://localhost:3001/api";
+const API_BASE = `${import.meta.env.VITE_BACKEND_URL || "http://localhost:3001"}/api`;
 
 // Default settings
 const DEFAULT_SETTINGS = {
@@ -50,10 +50,14 @@ export function useSettings() {
 
   // Load settings from localStorage and API
   useEffect(() => {
-    loadSettings();
+    let isMounted = true;
+    loadSettings(isMounted);
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const loadSettings = async () => {
+  const loadSettings = async (isMounted = true) => {
     try {
       // Load from localStorage first
       const stored = localStorage.getItem("userSettings");
@@ -109,7 +113,7 @@ export function useSettings() {
   // Update changes tracker
   useEffect(() => {
     const newChanges = {};
-    Object.keys(settings).forEach(section => {
+    Object.keys(settings).forEach((section) => {
       if (hasChangesInSection(section, settings, originalSettings)) {
         newChanges[section] = true;
       }
@@ -119,37 +123,37 @@ export function useSettings() {
 
   // Update methods for each section
   const updateAccount = useCallback((key, value) => {
-    setSettings(prev => ({
+    setSettings((prev) => ({
       ...prev,
-      account: { ...prev.account, [key]: value }
+      account: { ...prev.account, [key]: value },
     }));
   }, []);
 
   const updateAppearance = useCallback((key, value) => {
-    setSettings(prev => ({
+    setSettings((prev) => ({
       ...prev,
-      appearance: { ...prev.appearance, [key]: value }
+      appearance: { ...prev.appearance, [key]: value },
     }));
   }, []);
 
   const updateGame = useCallback((key, value) => {
-    setSettings(prev => ({
+    setSettings((prev) => ({
       ...prev,
-      game: { ...prev.game, [key]: value }
+      game: { ...prev.game, [key]: value },
     }));
   }, []);
 
   const updateNotifications = useCallback((key, value) => {
-    setSettings(prev => ({
+    setSettings((prev) => ({
       ...prev,
-      notifications: { ...prev.notifications, [key]: value }
+      notifications: { ...prev.notifications, [key]: value },
     }));
   }, []);
 
   const updatePrivacy = useCallback((key, value) => {
-    setSettings(prev => ({
+    setSettings((prev) => ({
       ...prev,
-      privacy: { ...prev.privacy, [key]: value }
+      privacy: { ...prev.privacy, [key]: value },
     }));
   }, []);
 
@@ -203,30 +207,36 @@ export function useSettings() {
   }, [originalSettings]);
 
   // Get specific setting value
-  const getSetting = useCallback((section, key) => {
-    return settings[section]?.[key];
-  }, [settings]);
+  const getSetting = useCallback(
+    (section, key) => {
+      return settings[section]?.[key];
+    },
+    [settings],
+  );
 
   // Generic update method
-  const updateSetting = useCallback(async (section, key, value) => {
-    setSettings(prev => ({
-      ...prev,
-      [section]: { ...prev[section], [key]: value }
-    }));
+  const updateSetting = useCallback(
+    async (section, key, value) => {
+      setSettings((prev) => ({
+        ...prev,
+        [section]: { ...prev[section], [key]: value },
+      }));
 
-    // Auto-save certain settings immediately
-    if (section === "appearance" && key === "theme") {
-      try {
-        const updatedSettings = {
-          ...settings,
-          [section]: { ...settings[section], [key]: value }
-        };
-        localStorage.setItem("userSettings", JSON.stringify(updatedSettings));
-      } catch (error) {
-        console.error("Failed to auto-save theme setting:", error);
+      // Auto-save certain settings immediately
+      if (section === "appearance" && key === "theme") {
+        try {
+          const updatedSettings = {
+            ...settings,
+            [section]: { ...settings[section], [key]: value },
+          };
+          localStorage.setItem("userSettings", JSON.stringify(updatedSettings));
+        } catch (error) {
+          console.error("Failed to auto-save theme setting:", error);
+        }
       }
-    }
-  }, [settings]);
+    },
+    [settings],
+  );
 
   return {
     settings,

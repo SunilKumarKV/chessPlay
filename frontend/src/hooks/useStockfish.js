@@ -1,162 +1,224 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 
-// Local Stockfish WASM worker bundled with the app
-// Falls back to Lichess CDN if local file is not available
-const STOCKFISH_URLS = [
-  "https://unpkg.com/@lichess-org/stockfish-web@latest/dist/stockfish.js",
-  "https://cdn.jsdelivr.net/npm/@lichess-org/stockfish-web@latest/dist/stockfish.js",
-  "/stockfish-18-lite.js", // Local bundled version (fastest, no CORS issues)
-];
+// ELO-based difficulty mapping
+const DIFFICULTY_ELO_MAP = {
+  0: 200, // Beginner
+  1: 300,
+  2: 400,
+  3: 500,
+  4: 600,
+  5: 700, // Casual
+  6: 800,
+  7: 900,
+  8: 1000,
+  9: 1100,
+  10: 1200, // Intermediate
+  11: 1300,
+  12: 1400,
+  13: 1500,
+  14: 1600,
+  15: 1700, // Advanced
+  16: 1800,
+  17: 1900,
+  18: 2000,
+  19: 2100,
+  20: 2200, // Master
+};
 
-export function useStockfish({ enabled, difficulty = 10 }) {
+// Convert difficulty (0-20) to Stockfish skill level (0-20)
+const difficultyToSkill = (difficulty) => Math.min(20, Math.max(0, difficulty));
+
+// Convert difficulty to thinking time (in milliseconds)
+const difficultyToTime = (difficulty) => {
+  // Base time in milliseconds
+  const baseTimes = {
+    0: 100, // Very fast for beginners
+    5: 500, // Moderate
+    10: 1000, // Standard
+    15: 2000, // Advanced
+    20: 5000, // Master level
+  };
+
+  const keys = Object.keys(baseTimes)
+    .map(Number)
+    .sort((a, b) => a - b);
+  const key = keys.reduce((prev, k) => (difficulty >= k ? k : prev), 0);
+  return baseTimes[key];
+};
+
+// Convert difficulty to search depth
+const difficultyToDepth = (difficulty) => {
+  if (difficulty <= 5) return 3; // Shallow search
+  if (difficulty <= 10) return 6; // Moderate depth
+  if (difficulty <= 15) return 10; // Deep search
+  return 15; // Very deep for masters
+};
+
+export function useStockfish({ enabled = true, onMove } = {}) {
   const workerRef = useRef(null);
-  const resolveRef = useRef(null); // resolves the current bestmove promise
+  const movePromiseRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [thinking, setThinking] = useState(false);
+  const [evaluation, setEvaluation] = useState(0);
+  const [bestMove, setBestMove] = useState(null);
 
-  // ── Boot the worker once
+  const sendCommand = useCallback((command) => {
+    if (workerRef.current && command) {
+      workerRef.current.postMessage(command);
+    }
+  }, []);
+
+  // Initialize Stockfish
   useEffect(() => {
     if (!enabled) return;
 
-    let isSubscribed = true;
-    let blobUrl = null;
+    setReady(false);
+    setThinking(false);
 
-    const createWorker = async () => {
-      try {
-        let worker = null;
+    const worker = new Worker("/workers/stockfish-worker.js");
+    workerRef.current = worker;
 
-        for (const url of STOCKFISH_URLS) {
-          try {
-            // Skip HEAD check for local URLs as they might not be supported by dev server
-            if (!url.startsWith("http")) {
-              // Assume local file exists
-            } else {
-              const response = await fetch(url, { method: "HEAD" });
-              if (!response.ok) {
-                console.warn(
-                  `Stockfish fetch failed (${response.status}): ${url}`,
-                );
-                continue;
-              }
-            }
+    worker.onmessage = (event) => {
+      const msg = typeof event.data === "string" ? event.data.trim() : "";
 
-            if (url.startsWith("/")) {
-              // Local asset: instantiate worker directly so relative WASM fetch resolves correctly.
-              worker = new Worker(url);
-              console.log(`✓ Created Stockfish worker from local URL: ${url}`);
-            } else {
-              // Remote asset: import script inside a worker blob.
-              const importBlob = new Blob([`importScripts("${url}");`], {
-                type: "application/javascript",
-              });
-              blobUrl = URL.createObjectURL(importBlob);
-              worker = new Worker(blobUrl);
-              console.log(
-                `✓ Created Stockfish worker via importScripts: ${url}`,
-              );
-            }
+      if (!msg) return;
 
-            if (worker) {
-              workerRef.current = worker;
-              break;
-            }
-          } catch (err) {
-            console.warn(
-              `Stockfish worker init error for ${url}:`,
-              err.message,
-            );
-            continue;
-          }
+      // Engine ready
+      if (msg === "uciok") {
+        setReady(true);
+        // Set up engine with default options
+        sendCommand("setoption name Skill Level value 10");
+        sendCommand("setoption name Threads value 1");
+        sendCommand("setoption name Hash value 32");
+        sendCommand("isready");
+      }
+
+      // Engine ready for commands
+      else if (msg === "readyok") {
+        // Engine is ready
+      }
+
+      // Best move found
+      else if (msg.startsWith("bestmove")) {
+        setThinking(false);
+        const match = msg.match(/^bestmove\s+([a-h][1-8][a-h][1-8][qrbn]?)/i);
+        const move = match ? match[1] : null;
+        setBestMove(move);
+
+        if (movePromiseRef.current) {
+          clearTimeout(movePromiseRef.current.timeoutId);
+          movePromiseRef.current.resolve(move);
+          movePromiseRef.current = null;
         }
 
-        if (!worker) {
-          throw new Error(
-            "Failed to load Stockfish from any source. Check that /stockfish-18-lite.js exists or internet connection.",
-          );
+        // Call the callback if provided
+        if (onMove && move) {
+          onMove(move);
         }
+      }
 
-        if (!isSubscribed) return;
-
-        worker.onmessage = (e) => {
-          const line =
-            typeof e.data === "string" ? e.data : (e.data?.toString?.() ?? "");
-
-          if (line === "uciok") {
-            worker.postMessage("isready");
-            return;
-          }
-          if (line === "readyok") {
-            setReady(true);
-            return;
-          }
-
-          if (line.startsWith("bestmove") && resolveRef.current) {
-            const parts = line.split(" ");
-            const move = parts[1] && parts[1] !== "(none)" ? parts[1] : null;
-            setThinking(false);
-            resolveRef.current(move);
-            resolveRef.current = null;
-          }
-        };
-
-        worker.onerror = (err) => {
-          console.error("Stockfish worker error:", err);
-          setThinking(false);
-          if (resolveRef.current) {
-            resolveRef.current(null);
-            resolveRef.current = null;
-          }
-        };
-
-        worker.postMessage("uci");
-      } catch (error) {
-        console.error("Failed to load Stockfish engine:", error);
+      // Evaluation info
+      else if (msg.includes("info") && msg.includes("score")) {
+        const scoreMatch = msg.match(/score\s+cp\s+(-?\d+)/);
+        if (scoreMatch) {
+          const score = parseInt(scoreMatch[1], 10) / 100; // Convert centipawns to pawns
+          setEvaluation(score);
+        }
       }
     };
 
-    createWorker();
+    worker.onerror = (error) => {
+      console.error("[Stockfish] Worker error:", error);
+    };
+
+    // Initialize UCI protocol
+    sendCommand("uci");
 
     return () => {
-      isSubscribed = false;
-      if (workerRef.current) {
-        workerRef.current.terminate();
-        workerRef.current = null;
-      }
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
-      setReady(false);
+      worker.terminate();
     };
-  }, [enabled]);
+  }, [enabled, sendCommand, onMove]);
 
-  // ── Set skill level whenever difficulty changes (0–20)
-  useEffect(() => {
-    if (!workerRef.current || !ready) return;
-    const level = Math.max(0, Math.min(20, difficulty));
-    workerRef.current.postMessage(`setoption name Skill Level value ${level}`);
-  }, [ready, difficulty]);
-
-  /**
-   * Ask Stockfish for the best move given a FEN string.
-   * @param {string} fen   - current board in FEN notation
-   * @param {number} ms    - think time in milliseconds
-   * @returns {Promise<string|null>}  UCI move string e.g. "e2e4" or null
-   */
+  // Get best move with configurable difficulty
   const getBestMove = useCallback(
-    (fen, ms = 1000) => {
-      return new Promise((resolve) => {
-        if (!workerRef.current || !ready) {
-          resolve(null);
-          return;
-        }
-        resolveRef.current = resolve;
+    (fen, difficulty = 10, timeout = 5000) => {
+      if (!ready) return Promise.reject(new Error("Engine not ready"));
+
+      return new Promise((resolve, reject) => {
         setThinking(true);
-        workerRef.current.postMessage(`position fen ${fen}`);
-        workerRef.current.postMessage(`go movetime ${ms}`);
+        setEvaluation(0);
+        setBestMove(null);
+
+        // Clear any existing promise
+        if (movePromiseRef.current) {
+          clearTimeout(movePromiseRef.current.timeoutId);
+          movePromiseRef.current.reject(new Error("Cancelled"));
+        }
+
+        // Set position
+        sendCommand(`position fen ${fen}`);
+
+        // Set skill level based on difficulty
+        const skillLevel = difficultyToSkill(difficulty);
+        sendCommand(`setoption name Skill Level value ${skillLevel}`);
+
+        // Set thinking time limit
+        const timeLimit = difficultyToTime(difficulty);
+        const depth = difficultyToDepth(difficulty);
+
+        // Start search
+        sendCommand(`go depth ${depth} movetime ${timeLimit}`);
+
+        // Set up timeout
+        const timeoutId = setTimeout(() => {
+          if (movePromiseRef.current) {
+            movePromiseRef.current.reject(new Error("Timeout"));
+            movePromiseRef.current = null;
+            setThinking(false);
+          }
+        }, timeout);
+
+        movePromiseRef.current = { resolve, reject, timeoutId };
       });
     },
-    [ready],
+    [ready, sendCommand],
   );
 
-  return { ready, thinking, getBestMove };
+  // Get evaluation for current position
+  const getEvaluation = useCallback(
+    (fen, depth = 10) => {
+      if (!ready) return Promise.reject(new Error("Engine not ready"));
+
+      return new Promise((resolve) => {
+        sendCommand(`position fen ${fen}`);
+        sendCommand(`go depth ${depth}`);
+
+        // Return current evaluation after a short delay
+        setTimeout(() => {
+          resolve(evaluation);
+        }, 100);
+      });
+    },
+    [ready, sendCommand, evaluation],
+  );
+
+  // Stop current analysis
+  const stop = useCallback(() => {
+    sendCommand("stop");
+    setThinking(false);
+    if (movePromiseRef.current) {
+      movePromiseRef.current.reject(new Error("Stopped"));
+      movePromiseRef.current = null;
+    }
+  }, [sendCommand]);
+
+  return {
+    ready,
+    thinking,
+    evaluation,
+    bestMove,
+    getBestMove,
+    getEvaluation,
+    stop,
+  };
 }

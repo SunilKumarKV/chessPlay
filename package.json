@@ -18,5 +18,8 @@
   "workspaces": [
     "frontend",
     "backend"
-  ]
+  ],
+  "dependencies": {
+    "stockfish.js": "^10.0.2"
+  }
 }

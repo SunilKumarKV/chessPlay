@@ -1,0 +1,117 @@
+import { useState } from "react";
+import Chess from "../features/chess/pages/ChessPage";
+import MultiplayerChess from "../features/chess/components/MultiplayerChess";
+import Leaderboard from "../pages/LeaderboardPage";
+import GameHistory from "../pages/GameHistoryPage";
+import LandingPage from "../pages/LandingPage";
+import Dashboard from "../pages/DashboardPage";
+import Settings from "../pages/SettingsPage";
+import Profile from "../pages/ProfilePage";
+import DashboardLayout from "../layouts/DashboardLayout";
+
+export default function App() {
+  // Initialize user from localStorage
+  const [user, setUser] = useState(() => {
+    const token = localStorage.getItem("token");
+    const storedUser = localStorage.getItem("user");
+    if (token && storedUser) {
+      try {
+        return JSON.parse(storedUser);
+      } catch {
+        // Invalid stored data, clear it
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        return null;
+      }
+    }
+    return null;
+  });
+  const [currentPage, setCurrentPage] = useState("dashboard");
+
+  const handleLogin = (userData) => {
+    setUser(userData);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setUser(null);
+    setCurrentPage("dashboard");
+  };
+
+  if (!user) {
+    return <LandingPage onLogin={handleLogin} />;
+  }
+
+  const handleStartGame = (gameType, timeControl) => {
+    if (gameType === "ai") {
+      setCurrentPage("ai");
+    } else if (gameType === "multi") {
+      setCurrentPage("multi");
+    }
+    // Store time control for later use
+    localStorage.setItem("selectedTimeControl", timeControl);
+  };
+
+  const renderContent = () => {
+    switch (currentPage) {
+      case "dashboard":
+        return (
+          <Dashboard
+            user={user}
+            onStartGame={handleStartGame}
+            onNavigate={setCurrentPage}
+            onAuthError={handleLogout}
+          />
+        );
+      case "ai": {
+        const selectedTimeControl =
+          localStorage.getItem("selectedTimeControl") || "3+0";
+        return (
+          <Chess
+            onBack={() => setCurrentPage("dashboard")}
+            initialAiEnabled
+            timeControl={selectedTimeControl}
+          />
+        );
+      }
+      case "multi":
+        return <MultiplayerChess onBack={() => setCurrentPage("dashboard")} />;
+      case "history":
+        return <GameHistory onBack={() => setCurrentPage("dashboard")} />;
+      case "leaderboard":
+        return <Leaderboard onBack={() => setCurrentPage("dashboard")} />;
+      case "profile":
+        return (
+          <Profile user={user} onBack={() => setCurrentPage("dashboard")} />
+        );
+      case "settings":
+        return (
+          <Settings user={user} onBack={() => setCurrentPage("dashboard")} />
+        );
+      default:
+        return (
+          <div className="p-8">
+            <div className="bg-[#1a1a1a] rounded-lg p-8 border border-[#2a2a2a] text-center">
+              <h2 className="text-2xl font-bold text-[#e0e0e0] mb-4 font-['Montserrat']">
+                Coming Soon
+              </h2>
+              <p className="text-[#7a7a7a] font-['Inter']">
+                This feature is under development.
+              </p>
+            </div>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <DashboardLayout
+      activePage={currentPage}
+      onNavigate={setCurrentPage}
+      onLogout={handleLogout}
+    >
+      {renderContent()}
+    </DashboardLayout>
+  );
+}
