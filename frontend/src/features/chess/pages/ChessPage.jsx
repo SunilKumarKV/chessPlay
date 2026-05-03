@@ -2,19 +2,12 @@ import React, { useState, useEffect } from "react";
 import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 import {
   resetGame,
-  setAiEnabled,
-  setAiColor,
-  setAiDifficulty,
-  setFlipped,
-  setTimeControl,
-  startGame,
   makeMove,
 } from "../../../store/slices/chessGameSlice";
 import Board from "../components/Board";
 import ChessClock from "../components/ChessClock";
 import PlayerInfo from "../components/PlayerInfo";
 import MoveHistory from "../components/MoveHistory";
-import SettingsPanel from "../components/SettingsPanel";
 import ChessSettingsModal from "../../../components/ChessSettingsModal";
 import EvaluationBar from "../../../components/EvaluationBar";
 import { useStockfish } from "../hooks/useStockfish";
@@ -114,21 +107,6 @@ export default function Chess() {
     dispatch(resetGame());
     if (settings.playSounds) {
       soundManager.playGameStart();
-    }
-  };
-
-  const handleSettingsChange = (newSettings) => {
-    if (newSettings.aiEnabled !== undefined) {
-      dispatch(setAiEnabled(newSettings.aiEnabled));
-    }
-    if (newSettings.aiColor !== undefined) {
-      dispatch(setAiColor(newSettings.aiColor));
-    }
-    if (newSettings.aiDifficulty !== undefined) {
-      dispatch(setAiDifficulty(newSettings.aiDifficulty));
-    }
-    if (newSettings.flipped !== undefined) {
-      dispatch(setFlipped(newSettings.flipped));
     }
   };
 

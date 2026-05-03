@@ -48,24 +48,15 @@ export function useSettings() {
   const [changes, setChanges] = useState({});
   const [loading, setLoading] = useState(true);
 
-  // Load settings from localStorage and API
-  useEffect(() => {
-    let isMounted = true;
-    loadSettings(isMounted);
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const loadSettings = async (isMounted = true) => {
+  const loadSettings = useCallback(async () => {
     try {
       // Load from localStorage first
       const stored = localStorage.getItem("userSettings");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setSettings({ ...DEFAULT_SETTINGS, ...parsed });
-        setOriginalSettings({ ...DEFAULT_SETTINGS, ...parsed });
-      }
+      const localSettings = stored
+        ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) }
+        : DEFAULT_SETTINGS;
+      setSettings(localSettings);
+      setOriginalSettings(localSettings);
 
       // Try to load from API (user profile data)
       const token = localStorage.getItem("token");
@@ -79,9 +70,9 @@ export function useSettings() {
 
           // Merge user data with settings
           const updatedSettings = {
-            ...settings,
+            ...localSettings,
             account: {
-              ...settings.account,
+              ...localSettings.account,
               username: userData.username || "",
               email: userData.email || "",
               bio: userData.bio || "",
@@ -98,7 +89,12 @@ export function useSettings() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Load settings from localStorage and API
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   // Deep compare function to detect changes
   const hasChangesInSection = useCallback((section, current, original) => {

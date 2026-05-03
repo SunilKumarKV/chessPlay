@@ -144,7 +144,6 @@ export default function Settings({ user, onBack }) {
 // Account Tab Component
 function AccountTab({ user, settings, theme }) {
   const [showPasswordChange, setShowPasswordChange] = useState(false);
-  const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -162,7 +161,6 @@ function AccountTab({ user, settings, theme }) {
   const handleAvatarChange = (event) => {
     const file = event.target.files[0];
     if (file) {
-      setAvatarFile(file);
       const reader = new FileReader();
       reader.onload = (e) => setAvatarPreview(e.target.result);
       reader.readAsDataURL(file);

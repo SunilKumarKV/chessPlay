@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useChessGame } from "../hooks/useChessGame";
 import { useSettings } from "../../hooks/useSettings";
+import { useCurrentUser } from "../../../hooks/useCurrentUser";
 import Board from "./Board";
 import AIThinkingIndicator from "./AIThinkingIndicator";
 import SettingsPanel from "./SettingsPanel";
-import { MobileGameDrawer, ClockBar } from "./MobileGameDrawer";
+import { ClockBar } from "./MobileGameDrawer";
+import ErrorBoundary from "../../../components/ErrorBoundary";
 
 // High-quality SVG URLs for authentic Chess.com / Lichess feel
 const PIECE_IMAGES = {
@@ -22,12 +24,32 @@ const PIECE_IMAGES = {
   bK: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bK.svg",
 };
 
+const DRAW_STATUSES = new Set([
+  "draw",
+  "draw-50move",
+  "draw-repetition",
+  "stalemate",
+]);
+
+function getGameOverMessage(status, turn) {
+  if (status === "checkmate") {
+    return `${turn === "w" ? "Black" : "White"} wins by checkmate!`;
+  }
+
+  if (status === "draw-50move") return "Draw by 50-move rule!";
+  if (status === "draw-repetition") return "Draw by threefold repetition!";
+  return "Stalemate - Draw!";
+}
+
 export default function GameScreen({
   onBack,
   initialAiEnabled = false,
   timeControl = "3+0",
 }) {
   const settings = useSettings();
+  const { user } = useCurrentUser();
+  const currentUsername = user?.username || "You";
+  const currentRating = user?.rating;
 
   // Map time control string to index
   const timeControlMap = {
@@ -54,9 +76,8 @@ export default function GameScreen({
 
   const [showSettings, setShowSettings] = useState(false);
   const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
-  const [showMoveDrawer, setShowMoveDrawer] = useState(false);
 
-  const isOver = g.status === "checkmate" || g.status === "stalemate";
+  const isOver = g.status === "checkmate" || DRAW_STATUSES.has(g.status);
   const isAnalysisMode = !g.aiEnabled && g.history.length > 0;
 
   // Calculate material advantage
@@ -90,8 +111,8 @@ export default function GameScreen({
         };
       } else {
         return {
-          name: "You",
-          rating: 1200, // This should come from user state
+          name: currentUsername,
+          rating: currentRating,
           avatar: "👤",
           isAI: false,
         };
@@ -99,8 +120,8 @@ export default function GameScreen({
     } else {
       // Multiplayer - this would need to be updated for real multiplayer
       return {
-        name: color === "w" ? "White" : "Black",
-        rating: 1200,
+        name: color === "w" ? currentUsername : "Black",
+        rating: color === "w" ? currentRating : null,
         avatar: color === "w" ? "👤" : "👤",
         isAI: false,
       };
@@ -230,7 +251,7 @@ export default function GameScreen({
                     <span className="font-bold text-[#e0e0e0] text-sm">
                       {topPlayer.name}
                     </span>
-                    {topPlayer.rating && (
+                    {topPlayer.rating != null && (
                       <span className="text-[#7a7a7a] text-xs">
                         ({topPlayer.rating})
                       </span>
@@ -267,27 +288,29 @@ export default function GameScreen({
 
             {/* Board */}
             <div className="relative my-1">
-              <Board
-                board={g.board}
-                flipped={g.flipped}
-                isSelected={g.isSelected}
-                isLegalDest={
-                  settings.getSetting("game", "showLegalMoves")
-                    ? g.isLegalDest
-                    : () => false
-                }
-                isLastMove={
-                  settings.getSetting("game", "showLastMove")
-                    ? g.isLastMove
-                    : () => false
-                }
-                isInCheck={
-                  g.status === "check" && g.turn === (g.flipped ? "b" : "w")
-                }
-                onSquareClick={g.handleSquareClick}
-                promotion={g.promotion}
-                handlePromotion={g.handlePromotion}
-              />
+              <ErrorBoundary>
+                <Board
+                  board={g.board}
+                  flipped={g.flipped}
+                  isSelected={g.isSelected}
+                  isLegalDest={
+                    settings.getSetting("game", "showLegalMoves")
+                      ? g.isLegalDest
+                      : () => false
+                  }
+                  isLastMove={
+                    settings.getSetting("game", "showLastMove")
+                      ? g.isLastMove
+                      : () => false
+                  }
+                  isInCheck={
+                    g.status === "check" && g.turn === (g.flipped ? "b" : "w")
+                  }
+                  onSquareClick={g.handleSquareClick}
+                  promotion={g.promotion}
+                  handlePromotion={g.handlePromotion}
+                />
+              </ErrorBoundary>
 
               {/* AI Thinking Indicator */}
               {g.aiEnabled && (
@@ -312,7 +335,7 @@ export default function GameScreen({
                     <span className="font-bold text-[#e0e0e0] text-sm">
                       {bottomPlayer.name}
                     </span>
-                    {bottomPlayer.rating && (
+                    {bottomPlayer.rating != null && (
                       <span className="text-[#7a7a7a] text-xs">
                         ({bottomPlayer.rating})
                       </span>
@@ -390,6 +413,17 @@ export default function GameScreen({
               </div>
             </div>
           </div>
+
+          {g.currentOpening && (
+            <div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a]">
+              <div className="text-[#7a7a7a] text-xs uppercase tracking-wide font-['Inter'] mb-1">
+                Opening
+              </div>
+              <div className="text-[#e0e0e0] text-sm font-semibold font-['Montserrat']">
+                {g.currentOpening.name}
+              </div>
+            </div>
+          )}
 
           {/* Game Controls */}
           <div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a] space-y-3">
@@ -487,9 +521,7 @@ export default function GameScreen({
                 {g.status === "checkmate" ? "♛" : "½"}
               </div>
               <h2 className="text-2xl font-bold text-[#e0e0e0] mb-4 font-['Montserrat']">
-                {g.status === "checkmate"
-                  ? `${g.turn === "w" ? "Black" : "White"} wins by checkmate!`
-                  : "Stalemate - Draw!"}
+                {getGameOverMessage(g.status, g.turn)}
               </h2>
               <div className="flex space-x-3">
                 <button

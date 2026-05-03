@@ -52,7 +52,7 @@ function ClockFace({ color, label, clock, gameOver }) {
   );
 }
 
-export default function ChessClock({ time, active, color, gameOver }) {
+export default function ChessClock({ time, active, gameOver }) {
   if (time === null || time === undefined) return null;
 
   const formatTime = (seconds) => {

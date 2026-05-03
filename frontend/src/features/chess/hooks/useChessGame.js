@@ -8,6 +8,37 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 function toSquareName([row, col]) {
   return `${String.fromCharCode(97 + col)}${8 - row}`;
 }
+
+function getPositionKey(board, turn, castling, enPassant) {
+  return boardToFen(board, turn, castling, enPassant, 0, 1)
+    .split(" ")
+    .slice(0, 4)
+    .join(" ");
+}
+
+function hasThreefoldRepetition(positionHistory) {
+  const counts = new Map();
+  return positionHistory.some((position) => {
+    const nextCount = (counts.get(position) || 0) + 1;
+    counts.set(position, nextCount);
+    return nextCount >= 3;
+  });
+}
+
+const DRAW_STATUSES = new Set([
+  "draw",
+  "draw-50move",
+  "draw-repetition",
+  "stalemate",
+]);
+
+function isDrawStatus(status) {
+  return DRAW_STATUSES.has(status);
+}
+
+function isPlayableStatus(status) {
+  return status === "playing" || status === "check";
+}
 /* =====================
    BOARD UTILITY FUNCTIONS
    ==================== */
@@ -24,6 +55,7 @@ import { applyMove } from "../utils/applyMove";
 
 import { boardToFen, uciToMove } from "../utils/fen";
 import { exportPGN, downloadPGN } from "../utils/pgn";
+import { detectOpening } from "../utils/openings";
 
 import { useStockfish } from "./useStockfish";
 import { useChessClock, TIME_CONTROLS } from "./useChessClock";
@@ -34,6 +66,8 @@ export function useChessGame({
   initialAiColor = "b",
   initialAiDifficulty = 10,
   initialTimeControlIdx = 7,
+  socket = null,
+  playerColor = null,
 } = {}) {
   /* =====================
      1️⃣ CORE BOARD STATE
@@ -48,6 +82,10 @@ export function useChessGame({
 
   // used for FEN generation
   const [fullmove, setFullmove] = useState(1);
+  const [halfmoveClock, setHalfmoveClock] = useState(0);
+  const [positionHistory, setPositionHistory] = useState(() => [
+    getPositionKey(INITIAL_BOARD, "w", INITIAL_CASTLING, null),
+  ]);
 
   /* =================================
      2️⃣ USER INTERACTION STATE
@@ -68,6 +106,8 @@ export function useChessGame({
   const [capturedW, setCapturedW] = useState([]);
   const [capturedB, setCapturedB] = useState([]);
   const [hasRecordedGame, setHasRecordedGame] = useState(false);
+  const [terminalStatus, setTerminalStatus] = useState(null);
+  const [drawOffered, setDrawOffered] = useState(false);
 
   /* ========================================
      4️⃣ UI STATE
@@ -118,10 +158,65 @@ export function useChessGame({
 
   const sound = useSoundEffects({ enabled: soundEnabled });
 
-  const status = useMemo(() => {
+  const boardStatus = useMemo(() => {
     if (clock.flagged) return "checkmate";
+    if (halfmoveClock >= 100) return "draw-50move";
+    if (hasThreefoldRepetition(positionHistory)) return "draw-repetition";
     return getGameStatus(board, turn, enPassant, castling);
-  }, [board, turn, enPassant, castling, clock.flagged]);
+  }, [
+    board,
+    turn,
+    enPassant,
+    castling,
+    clock.flagged,
+    halfmoveClock,
+    positionHistory,
+  ]);
+  const status = terminalStatus || boardStatus;
+  const currentOpening = useMemo(() => detectOpening(history), [history]);
+
+  const getPlayerColor = useCallback(() => {
+    if (playerColor) return playerColor;
+    if (aiEnabled) return aiColor === "w" ? "b" : "w";
+    return turn;
+  }, [aiEnabled, aiColor, playerColor, turn]);
+
+  const recordGameResult = useCallback(
+    async (result, winnerColor = null) => {
+      const token = localStorage.getItem("token");
+      if (!token) return false;
+
+      const currentPlayerColor = getPlayerColor();
+      const payload = {
+        moves: history.map((move) => ({
+          from: toSquareName(move.from),
+          to: toSquareName(move.to),
+          piece: move.piece,
+          promotion: move.promotion,
+          timestamp: move.timestamp,
+        })),
+        aiOpponent: aiEnabled,
+        aiDifficulty: aiEnabled ? aiDifficulty : 0,
+        playerColor: currentPlayerColor,
+        result,
+        winnerColor,
+        duration: null,
+      };
+
+      await fetch(`${BACKEND_URL}/api/games/record`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      setHasRecordedGame(true);
+      return true;
+    },
+    [aiDifficulty, aiEnabled, getPlayerColor, history],
+  );
 
   /* =================================================
      9️⃣ GAME STATUS CHECKER
@@ -129,13 +224,15 @@ export function useChessGame({
      ================================================= */
 
   useEffect(() => {
-    if (status === "checkmate") {
+    if (status === "resigned") {
+      clock.pause();
+    } else if (isDrawStatus(status)) {
+      sound.stalemate();
+      clock.pause();
+    } else if (status === "checkmate") {
       sound.gameEnd(
         clock.flagged ? clock.flagged === aiColor : turn !== aiColor,
       );
-      clock.pause();
-    } else if (status === "stalemate") {
-      sound.stalemate();
       clock.pause();
     } else if (status === "check") {
       sound.check();
@@ -147,7 +244,7 @@ export function useChessGame({
       return;
     }
 
-    if (status === "playing") {
+    if (isPlayableStatus(status)) {
       setHasRecordedGame(false);
       return;
     }
@@ -156,45 +253,15 @@ export function useChessGame({
 
     const recordCompletedAIGame = async () => {
       try {
-        const token = localStorage.getItem("token");
-        if (!token) return;
-
-        const userColor = aiColor === "w" ? "b" : "w";
         const winnerColor =
           status === "checkmate" ? (turn === "w" ? "b" : "w") : null;
-        const gameResult =
-          status === "checkmate"
-            ? winnerColor === "w"
-              ? "white"
-              : "black"
-            : "draw";
+        const gameResult = isDrawStatus(status)
+          ? "draw"
+          : winnerColor === "w"
+            ? "white"
+            : "black";
 
-        const payload = {
-          moves: history.map((move) => ({
-            from: toSquareName(move.from),
-            to: toSquareName(move.to),
-            piece: move.piece,
-            promotion: move.promotion,
-            timestamp: move.timestamp,
-          })),
-          aiOpponent: true,
-          aiDifficulty,
-          playerColor: userColor,
-          result: gameResult,
-          winnerColor: winnerColor === null ? null : winnerColor,
-          duration: null,
-        };
-
-        await fetch(`${BACKEND_URL}/api/games/record`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
-
-        setHasRecordedGame(true);
+        await recordGameResult(gameResult, winnerColor);
       } catch (error) {
         console.error("Failed to record completed AI game:", error);
       }
@@ -209,6 +276,7 @@ export function useChessGame({
     aiColor,
     turn,
     aiDifficulty,
+    recordGameResult,
   ]);
 
   /* ====================================================
@@ -232,7 +300,7 @@ export function useChessGame({
     if (!aiEnabled) return;
     if (!sfReady) return;
     if (turn !== aiColor) return;
-    if (status !== "playing" && status !== "check") return;
+    if (!isPlayableStatus(status)) return;
 
     // Prevent concurrent AI moves
     if (aiThinking.current) return;
@@ -240,7 +308,14 @@ export function useChessGame({
     aiThinking.current = true;
 
     // Generate FEN string for current position
-    const fen = boardToFen(board, turn, castling, enPassant, 0, fullmove);
+    const fen = boardToFen(
+      board,
+      turn,
+      castling,
+      enPassant,
+      halfmoveClock,
+      fullmove,
+    );
 
     // Calculate thinking time based on difficulty
     // Easy (3) → ~555ms, Medium (6) → ~810ms, Hard (10) → ~1150ms
@@ -293,6 +368,7 @@ export function useChessGame({
     getBestMove,
     castling,
     enPassant,
+    halfmoveClock,
     fullmove,
     aiDifficulty,
   ]);
@@ -338,6 +414,11 @@ export function useChessGame({
       setCastling(newCastling);
       setTurn((t) => opponent(t));
       setLastMove({ from, to });
+      setHalfmoveClock((n) => (type === "P" || isCapture ? 0 : n + 1));
+      setPositionHistory((positions) => [
+        ...positions,
+        getPositionKey(newBoard, opponent(color), newCastling, newEnPassant),
+      ]);
 
       setSelected(null);
       setLegalMoves([]);
@@ -397,7 +478,7 @@ export function useChessGame({
       if (aiEnabled && turn === aiColor) return;
 
       // Prevent moves after game ends
-      if (status === "checkmate" || status === "stalemate") return;
+      if (!isPlayableStatus(status)) return;
 
       const clickedPiece = board[row][col];
 
@@ -491,7 +572,7 @@ export function useChessGame({
           ? turn === "w"
             ? "0-1"
             : "1-0"
-          : status === "stalemate"
+          : isDrawStatus(status)
             ? "1/2-1/2"
             : "*",
     };
@@ -519,8 +600,15 @@ export function useChessGame({
     setHistory([]);
     setCapturedW([]);
     setCapturedB([]);
+    setHasRecordedGame(false);
+    setTerminalStatus(null);
+    setDrawOffered(false);
 
     setFullmove(1);
+    setHalfmoveClock(0);
+    setPositionHistory([
+      getPositionKey(INITIAL_BOARD, "w", INITIAL_CASTLING, null),
+    ]);
 
     clock.reset();
 
@@ -536,18 +624,83 @@ export function useChessGame({
      ================================================= */
 
   const resignGame = useCallback(() => {
-    // For now, just reset the game. In a real implementation, you'd record the resignation
-    resetGame();
-  }, [resetGame]);
+    const resignedColor = getPlayerColor();
+    const winnerColor = opponent(resignedColor);
+    const result = winnerColor === "w" ? "white" : "black";
+
+    const finishResignation = async () => {
+      try {
+        setTerminalStatus("resigned");
+        clock.pause();
+        await recordGameResult(result, winnerColor);
+      } catch (error) {
+        console.error("Failed to record resignation:", error);
+      } finally {
+        resetGame();
+      }
+    };
+
+    finishResignation();
+  }, [clock, getPlayerColor, recordGameResult, resetGame]);
 
   /* ====================================================
      18️⃣ DRAW GAME
      ================================================= */
 
-  const drawGame = useCallback(() => {
-    // For now, just reset the game. In a real implementation, you'd offer/accept draw
-    resetGame();
-  }, [resetGame]);
+  const acceptDraw = useCallback(async () => {
+    try {
+      setTerminalStatus("draw");
+      setDrawOffered(false);
+      clock.pause();
+      await recordGameResult("draw", null);
+    } catch (error) {
+      console.error("Failed to record accepted draw:", error);
+    } finally {
+      resetGame();
+    }
+  }, [clock, recordGameResult, resetGame]);
+
+  const offerDraw = useCallback(() => {
+    setDrawOffered(true);
+
+    if (socket) {
+      socket.emit("drawOffer", { fromColor: getPlayerColor() });
+      return;
+    }
+
+    if (window.confirm("Accept draw offer?")) {
+      acceptDraw();
+    }
+  }, [acceptDraw, getPlayerColor, socket]);
+
+  const drawGame = offerDraw;
+
+  useEffect(() => {
+    if (!socket) return undefined;
+
+    const handleDrawOffer = () => {
+      setDrawOffered(true);
+      const accepted = window.confirm("Your opponent offered a draw. Accept?");
+      if (accepted) {
+        socket.emit("drawAccepted");
+        acceptDraw();
+      } else {
+        setDrawOffered(false);
+      }
+    };
+
+    const handleDrawAccepted = () => {
+      acceptDraw();
+    };
+
+    socket.on("drawOffer", handleDrawOffer);
+    socket.on("drawAccepted", handleDrawAccepted);
+
+    return () => {
+      socket.off("drawOffer", handleDrawOffer);
+      socket.off("drawAccepted", handleDrawAccepted);
+    };
+  }, [acceptDraw, socket]);
 
   /* ====================================================
      19️⃣ BOARD HELPERS
@@ -576,8 +729,10 @@ export function useChessGame({
     flipped,
 
     history,
+    currentOpening,
     capturedW,
     capturedB,
+    drawOffered,
 
     promotion,
 
@@ -591,6 +746,7 @@ export function useChessGame({
     resetGame,
     resignGame,
     drawGame,
+    offerDraw,
     handleExportPGN,
 
     toggleFlip: () => setFlipped((f) => !f),

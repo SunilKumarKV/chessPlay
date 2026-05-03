@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -11,7 +11,6 @@ import {
   Bar,
   Cell,
 } from "recharts";
-import { useSettings } from "../hooks/useSettings";
 
 const API_BASE = `${import.meta.env.VITE_BACKEND_URL || "http://localhost:3001"}/api`;
 
@@ -19,26 +18,22 @@ export default function Profile({
   user,
   onBack,
   profileUserId = null,
-  onNavigate,
 }) {
   const [profileData, setProfileData] = useState(null);
   const [ratingHistory, setRatingHistory] = useState([]);
   const [recentGames, setRecentGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTimeControl, setActiveTimeControl] = useState("blitz");
-  const settings = useSettings();
 
   // Use current user if no specific profile user ID provided
   const targetUserId = profileUserId || user?.id;
   const isOwnProfile = !profileUserId || profileUserId === user?.id;
 
-  useEffect(() => {
-    if (targetUserId) {
-      fetchProfileData();
+  const fetchProfileData = useCallback(async () => {
+    if (!targetUserId) {
+      setLoading(false);
+      return;
     }
-  }, [targetUserId]);
-
-  const fetchProfileData = async () => {
     try {
       setLoading(true);
 
@@ -85,7 +80,11 @@ export default function Profile({
     } finally {
       setLoading(false);
     }
-  };
+  }, [targetUserId]);
+
+  useEffect(() => {
+    fetchProfileData();
+  }, [fetchProfileData]);
 
   const generateRatingHistory = (profileData) => {
     // Generate rating history based on actual profile rating

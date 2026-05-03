@@ -8,6 +8,7 @@ import Dashboard from "../pages/DashboardPage";
 import Settings from "../pages/SettingsPage";
 import Profile from "../pages/ProfilePage";
 import DashboardLayout from "../layouts/DashboardLayout";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 export default function App() {
   // Initialize user from localStorage
@@ -40,7 +41,11 @@ export default function App() {
   };
 
   if (!user) {
-    return <LandingPage onLogin={handleLogin} />;
+    return (
+      <ErrorBoundary>
+        <LandingPage onLogin={handleLogin} />
+      </ErrorBoundary>
+    );
   }
 
   const handleStartGame = (gameType, timeControl) => {
@@ -106,12 +111,14 @@ export default function App() {
   };
 
   return (
-    <DashboardLayout
-      activePage={currentPage}
-      onNavigate={setCurrentPage}
-      onLogout={handleLogout}
-    >
-      {renderContent()}
-    </DashboardLayout>
+    <ErrorBoundary>
+      <DashboardLayout
+        activePage={currentPage}
+        onNavigate={setCurrentPage}
+        onLogout={handleLogout}
+      >
+        {renderContent()}
+      </DashboardLayout>
+    </ErrorBoundary>
   );
 }

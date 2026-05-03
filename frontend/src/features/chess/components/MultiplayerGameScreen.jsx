@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { useMultiplayerChess } from "../hooks/useMultiplayerChess";
 import { useChessClock, TIME_CONTROLS } from "../hooks/useChessClock";
+import { useCurrentUser } from "../../../hooks/useCurrentUser";
 import { getLegalMoves } from "../utils/moveValidation";
 import Board from "./Board";
 import ChatBox from "./ChatBox";
+import ErrorBoundary from "../../../components/ErrorBoundary";
 
 // High-quality SVG URLs for authentic Chess.com / Lichess feel
 const PIECE_IMAGES = {
@@ -21,9 +22,24 @@ const PIECE_IMAGES = {
   bK: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bK.svg",
 };
 
+const DRAW_STATUSES = new Set([
+  "draw",
+  "draw-50move",
+  "draw-repetition",
+  "stalemate",
+]);
+
+function getStatusLabel(status, isMyTurn) {
+  if (status === "checkmate") return "Checkmate";
+  if (status === "draw-50move") return "50-move draw";
+  if (status === "draw-repetition") return "Repetition draw";
+  if (DRAW_STATUSES.has(status)) return "Draw";
+  if (status === "check") return "Check";
+  return isMyTurn ? "Your turn" : "Opponent's turn";
+}
+
 export default function MultiplayerGameScreen({
   onBack,
-  serverUrl,
   timeControlIdx,
   playerName,
   roomId,
@@ -35,8 +51,12 @@ export default function MultiplayerGameScreen({
   leaveRoom,
   chatMessages,
   sendMessage,
+  drawOffered,
+  offerDraw,
   isConnected,
   error,
+  isSpectating = false,
+  spectatorCount = 0,
 }) {
   const [selected, setSelected] = useState(null);
   const [legalMoves, setLegalMoves] = useState([]);
@@ -49,29 +69,32 @@ export default function MultiplayerGameScreen({
     enabled: timeControl.initial !== null,
   });
 
-  const storedUser = localStorage.getItem("user");
-  const currentUser = storedUser ? JSON.parse(storedUser).username : "";
+  const { user } = useCurrentUser();
+  const currentUser = user?.username || "";
+  const currentRating = user?.rating;
 
   const prevTurnRef = useRef(gameState?.turn);
+  const currentTurn = gameState?.turn;
+
+  const { reset: resetClock, switchClock } = clock;
 
   useEffect(() => {
-    if (gameState) {
-      clock.reset();
-      prevTurnRef.current = gameState.turn;
-    }
-  }, [gameState?.roomId, timeControlIdx]);
+    resetClock();
+    prevTurnRef.current = currentTurn;
+    // Reset only when a new room/time control starts, not after every turn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetClock, roomId, timeControlIdx]);
 
   useEffect(() => {
-    if (!gameState) return;
+    if (!currentTurn) return;
     const previousTurn = prevTurnRef.current;
-    const currentTurn = gameState.turn;
 
     if (previousTurn && previousTurn !== currentTurn) {
-      clock.switchClock(previousTurn);
+      switchClock(previousTurn);
     }
 
     prevTurnRef.current = currentTurn;
-  }, [gameState?.turn]);
+  }, [currentTurn, switchClock]);
 
   // Handle square click for multiplayer
   const handleSquareClick = (row, col) => {
@@ -91,7 +114,12 @@ export default function MultiplayerGameScreen({
           const isPromotion = isPawn && (row === 0 || row === 7);
 
           if (isPromotion) {
-            setPendingMove({ fromRow: selRow, fromCol: selCol, toRow: row, toCol: col });
+            setPendingMove({
+              fromRow: selRow,
+              fromCol: selCol,
+              toRow: row,
+              toCol: col,
+            });
           } else {
             makeMove(selRow, selCol, row, col);
             setSelected(null);
@@ -122,14 +150,29 @@ export default function MultiplayerGameScreen({
   const topPlayerColor = playerColor === "w" ? "b" : "w";
   const bottomPlayerColor = playerColor || "w";
 
+  const whiteName = gameState?.players?.w?.name || "Player 1";
+  const blackName = gameState?.players?.b?.name || "Player 2";
+  const topName = isSpectating
+    ? flipped
+      ? whiteName
+      : blackName
+    : opponentName || "Opponent";
+  const bottomName = isSpectating
+    ? flipped
+      ? blackName
+      : whiteName
+    : user?.username || playerName || "You";
+
   const topPlayer = {
-    name: opponentName || "Opponent",
+    name: topName,
+    rating: null,
     avatar: "👤",
     color: topPlayerColor,
   };
 
   const bottomPlayer = {
-    name: playerName || "You",
+    name: bottomName,
+    rating: currentRating,
     avatar: "👤",
     color: bottomPlayerColor,
   };
@@ -321,6 +364,11 @@ export default function MultiplayerGameScreen({
                     <span className="font-bold text-[#e0e0e0] text-sm">
                       {topPlayer.name}
                     </span>
+                    {topPlayer.rating != null && (
+                      <span className="text-[#7a7a7a] text-xs">
+                        ({topPlayer.rating})
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center h-4 mt-0.5">
                     {getCapturedPieces(topPlayer.color).map((p, i) => (
@@ -353,18 +401,20 @@ export default function MultiplayerGameScreen({
 
             {/* Board */}
             <div className="relative my-1">
-              <Board
-                board={gameState?.board}
-                flipped={flipped}
-                isSelected={(r, c) =>
-                  selected && selected[0] === r && selected[1] === c
-                }
-                isLegalDest={(r, c) =>
-                  legalMoves.some(([lr, lc]) => lr === r && lc === c)
-                }
-                isLastMove={() => false}
-                onSquareClick={handleSquareClick}
-              />
+              <ErrorBoundary>
+                <Board
+                  board={gameState?.board}
+                  flipped={flipped}
+                  isSelected={(r, c) =>
+                    selected && selected[0] === r && selected[1] === c
+                  }
+                  isLegalDest={(r, c) =>
+                    legalMoves.some(([lr, lc]) => lr === r && lc === c)
+                  }
+                  isLastMove={() => false}
+                  onSquareClick={handleSquareClick}
+                />
+              </ErrorBoundary>
             </div>
 
             {/* Bottom Player Plate */}
@@ -378,6 +428,11 @@ export default function MultiplayerGameScreen({
                     <span className="font-bold text-[#e0e0e0] text-sm">
                       {bottomPlayer.name}
                     </span>
+                    {bottomPlayer.rating != null && (
+                      <span className="text-[#7a7a7a] text-xs">
+                        ({bottomPlayer.rating})
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center h-4 mt-0.5">
                     {getCapturedPieces(bottomPlayer.color).map((p, i) => (
@@ -421,26 +476,41 @@ export default function MultiplayerGameScreen({
               </span>
               <span
                 className={`px-2 py-1 rounded text-xs font-medium ${
-                  isMyTurn
+                  isSpectating
+                    ? "bg-cyan-500/20 text-cyan-300"
+                    : isMyTurn
                     ? "bg-[#81b64c]/20 text-[#81b64c]"
                     : "bg-gray-500/20 text-gray-400"
                 }`}
               >
-                {gameState?.status === "checkmate"
-                  ? "Checkmate"
-                  : gameState?.status === "stalemate"
-                    ? "Stalemate"
-                    : gameState?.status === "check"
-                      ? "Check"
-                      : isMyTurn
-                        ? "Your turn"
-                        : "Opponent's turn"}
+                {isSpectating
+                  ? "Spectating"
+                  : getStatusLabel(gameState?.status, isMyTurn)}
               </span>
             </div>
+            {isSpectating && (
+              <div className="text-cyan-300 text-xs bg-cyan-500/10 p-2 rounded">
+                Spectators: {spectatorCount}
+              </div>
+            )}
             {error && (
               <div className="text-red-400 text-xs bg-red-500/10 p-2 rounded">
                 {error}
               </div>
+            )}
+            {drawOffered && (
+              <div className="text-[#81b64c] text-xs bg-[#81b64c]/10 p-2 rounded">
+                Draw offer pending
+              </div>
+            )}
+            {!isSpectating && (
+              <button
+                onClick={offerDraw}
+                disabled={drawOffered || DRAW_STATUSES.has(gameState?.status)}
+                className="w-full py-2 bg-[#2a2a2a] hover:bg-[#3a3a3a] disabled:opacity-50 disabled:cursor-not-allowed text-[#e0e0e0] rounded-lg text-sm transition-colors font-['Inter']"
+              >
+                Offer Draw
+              </button>
             )}
             <button
               onClick={leaveRoom}

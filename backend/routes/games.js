@@ -2,6 +2,10 @@ const express = require("express");
 const Game = require("../models/Game");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
+const {
+  updatePlayerStats,
+  updatePlayerStatsVsAi,
+} = require("../utils/elo");
 
 const router = express.Router();
 
@@ -55,7 +59,7 @@ router.post("/record", auth, async (req, res) => {
       duration,
     } = req.body;
 
-    if (!Array.isArray(moves) || moves.length === 0) {
+    if (!Array.isArray(moves)) {
       return res.status(400).json({ message: "Moves are required" });
     }
 
@@ -85,6 +89,26 @@ router.post("/record", auth, async (req, res) => {
 
     const game = new Game(gameData);
     await game.save();
+
+    if (result !== "draw") {
+      const humanWon = winnerColor === playerColor;
+
+      if (aiOpponent) {
+        await updatePlayerStatsVsAi(
+          req.user.userId,
+          humanWon,
+          aiDifficulty,
+        );
+      } else if (game.winner) {
+        const winnerId = game.winner;
+        const loserId =
+          String(winnerId) === String(game.whitePlayer)
+            ? game.blackPlayer
+            : game.whitePlayer;
+
+        await updatePlayerStats(winnerId, loserId);
+      }
+    }
 
     res.status(201).json({ game });
   } catch (error) {

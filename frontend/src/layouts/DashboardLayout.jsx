@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Sidebar from "../features/dashboard/components/Sidebar";
 import Topbar from "../features/dashboard/components/Topbar";
 import { useTheme } from "../hooks/useTheme";
@@ -10,20 +10,19 @@ export default function DashboardLayout({
   onNavigate,
   onLogout,
 }) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [user, setUser] = useState(null);
-  const { theme, isDark } = useTheme();
-
-  // Fetch user data for Sidebar/Topbar display
-  useEffect(() => {
+  const initialUser = (() => {
     try {
       const storedUser = localStorage.getItem("user");
-      if (storedUser) setUser(JSON.parse(storedUser));
+      return storedUser ? JSON.parse(storedUser) : null;
     } catch (e) {
       console.error("Could not parse user", e);
+      return null;
     }
-  }, []);
+  })();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [user] = useState(initialUser);
+  const { theme } = useTheme();
 
   return (
     <div

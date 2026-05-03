@@ -1,4 +1,5 @@
-import React, { createContext, useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { ThemeContext } from "./ThemeContextObject";
 
 // Theme color definitions
 const THEMES = {
@@ -85,8 +86,6 @@ const THEMES = {
     disabled: "#d0d0d0",
   },
 };
-
-export const ThemeContext = createContext();
 
 export function ThemeProvider({ children }) {
   const [isDark, setIsDark] = useState(() => {

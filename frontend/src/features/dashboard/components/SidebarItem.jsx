@@ -8,7 +8,7 @@ export default function SidebarItem({
   isCollapsed,
   onClick,
 }) {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
 
   return (
     <button

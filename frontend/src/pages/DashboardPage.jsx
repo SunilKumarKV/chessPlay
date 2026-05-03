@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { StatCard, GameCard } from "../components/ui";
 import { apiClient } from "../services/apiClient";
 import { useTheme } from "../hooks/useTheme";
@@ -16,21 +16,7 @@ export default function Dashboard({
   const [selectedTimeControl, setSelectedTimeControl] = useState("3+0");
   const [loading, setLoading] = useState(true);
 
-  if (!user) {
-    return (
-      <div
-        className="flex-1 flex items-center justify-center h-full min-h-[50vh] w-full"
-        style={{ backgroundColor: theme.bg.primary, color: theme.text.primary }}
-      >
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#81b64c] mx-auto mb-4"></div>
-          <p style={{ color: theme.text.secondary }}>Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const fetchWithAuth = async (url) => {
+  const fetchWithAuth = useCallback(async (url) => {
     try {
       return await apiClient(url);
     } catch (error) {
@@ -39,7 +25,7 @@ export default function Dashboard({
       }
       throw error;
     }
-  };
+  }, [onAuthError]);
 
   const timeControls = [
     { id: "1+0", label: "1+0 Bullet", icon: "⚡" },
@@ -49,11 +35,11 @@ export default function Dashboard({
     { id: "30+0", label: "30+0 Classical", icon: "👑" },
   ];
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     try {
       const statsData = await fetchWithAuth("/api/auth/profile");
       setStats(statsData.user || null);
@@ -77,7 +63,25 @@ export default function Dashboard({
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchWithAuth, user]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  if (!user) {
+    return (
+      <div
+        className="flex-1 flex items-center justify-center h-full min-h-[50vh] w-full"
+        style={{ backgroundColor: theme.bg.primary, color: theme.text.primary }}
+      >
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#81b64c] mx-auto mb-4"></div>
+          <p style={{ color: theme.text.secondary }}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleQuickPlay = () => {
     onStartGame("ai", selectedTimeControl);

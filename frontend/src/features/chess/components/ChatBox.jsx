@@ -1,8 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 
+const MAX_MESSAGE_LENGTH = 200;
+
 export default function ChatBox({ messages, onSend, currentUser }) {
   const [text, setText] = useState("");
   const bottomRef = useRef(null);
+  const trimmedText = text.trim();
+  const isTooLong = text.length > MAX_MESSAGE_LENGTH;
+  const canSend = Boolean(trimmedText) && !isTooLong;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -10,8 +15,8 @@ export default function ChatBox({ messages, onSend, currentUser }) {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    if (!text.trim()) return;
-    onSend(text.trim());
+    if (!canSend) return;
+    onSend(trimmedText);
     setText("");
   };
 
@@ -47,20 +52,30 @@ export default function ChatBox({ messages, onSend, currentUser }) {
         <div ref={bottomRef} />
       </div>
 
-      <form className="flex gap-2 mt-auto" onSubmit={handleSubmit}>
-        <input
-          type="text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Type a message..."
-          className="flex-1 rounded-full px-4 py-2 bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none"
-        />
-        <button
-          type="submit"
-          className="rounded-full bg-yellow-400 px-4 py-2 text-black font-semibold"
+      <form className="flex flex-col gap-1 mt-auto" onSubmit={handleSubmit}>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Type a message..."
+            className={`flex-1 rounded-full px-4 py-2 bg-white/10 border text-white placeholder-white/50 focus:outline-none ${
+              isTooLong ? "border-red-400" : "border-white/20"
+            }`}
+          />
+          <button
+            type="submit"
+            disabled={!canSend}
+            className="rounded-full bg-yellow-400 px-4 py-2 text-black font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Send
+          </button>
+        </div>
+        <div
+          className={`text-xs text-right ${isTooLong ? "text-red-400" : "text-white/60"}`}
         >
-          Send
-        </button>
+          {text.length}/{MAX_MESSAGE_LENGTH}
+        </div>
       </form>
     </div>
   );

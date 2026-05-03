@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMultiplayerChess } from "../hooks/useMultiplayerChess";
 import { TIME_CONTROLS } from "../hooks/useChessClock";
+import { useCurrentUser } from "../../../hooks/useCurrentUser";
 import MultiplayerGameScreen from "./MultiplayerGameScreen";
 import GoldButton from "../../../components/GoldButton";
 
 export default function MultiplayerChess({ onBack }) {
+  const { user } = useCurrentUser();
   const [playerName, setPlayerName] = useState("");
   const [joinRoomId, setJoinRoomId] = useState("");
   const [serverUrl, setServerUrl] = useState(
@@ -22,16 +24,33 @@ export default function MultiplayerChess({ onBack }) {
     isMyTurn,
     createRoom,
     joinRoom,
+    spectateRoom,
     makeMove,
     leaveRoom,
     chatMessages,
     sendMessage,
+    drawOffered,
+    offerDraw,
+    isSearching,
+    queueSize,
+    joinQueue,
+    leaveQueue,
+    rooms,
+    isSpectating,
+    spectatorCount,
+    getRooms,
   } = useMultiplayerChess(serverUrl);
 
-  const storedUser = localStorage.getItem("user");
-  const currentUser = storedUser ? JSON.parse(storedUser).username : "";
-
+  const displayName = playerName.trim() || user?.username || "Player";
   const showRoomSetup = !gameState;
+
+  useEffect(() => {
+    if (!isConnected || gameState) return;
+
+    getRooms();
+    const interval = setInterval(getRooms, 4000);
+    return () => clearInterval(interval);
+  }, [getRooms, isConnected, gameState]);
 
   // If not connected to game, show room setup
   if (showRoomSetup && !gameState) {
@@ -64,6 +83,42 @@ export default function MultiplayerChess({ onBack }) {
           </div>
 
           <div className="space-y-8">
+            {/* Quick Match */}
+            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+              <h3 className="text-lg font-semibold mb-4 text-green-400">
+                Quick Match
+              </h3>
+              <div className="space-y-4">
+                <p className="text-sm text-gray-400">
+                  Find a public match near your rating without sharing a room code.
+                </p>
+                {isSearching ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-center gap-3 rounded-lg bg-gray-700 px-4 py-3">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-green-400 border-t-transparent" />
+                      <span className="text-sm text-gray-200">
+                        Searching... {queueSize} players waiting
+                      </span>
+                    </div>
+                    <button
+                      onClick={leaveQueue}
+                      className="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                    >
+                      Cancel Search
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => joinQueue(displayName)}
+                    disabled={!isConnected}
+                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Quick Match
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* Server Connection */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <h3 className="text-lg font-semibold mb-4 text-blue-400">
@@ -205,6 +260,64 @@ export default function MultiplayerChess({ onBack }) {
                 </button>
               </div>
             </div>
+
+            {/* Public Rooms */}
+            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-cyan-400">
+                  Public Rooms
+                </h3>
+                <button
+                  onClick={getRooms}
+                  disabled={!isConnected}
+                  className="text-xs px-3 py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 rounded-md transition-colors"
+                >
+                  Refresh
+                </button>
+              </div>
+              {rooms.length === 0 ? (
+                <p className="text-sm text-gray-400">No active rooms yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {rooms.map((room) => {
+                    const actionLabel = room.isFull ? "Watch" : "Join";
+                    const actionClass = room.isFull
+                      ? "bg-cyan-600 hover:bg-cyan-700"
+                      : "bg-yellow-600 hover:bg-yellow-700";
+
+                    return (
+                      <div
+                        key={room.id}
+                        className="flex items-center justify-between bg-gray-700/60 rounded-lg px-3 py-2"
+                      >
+                        <div className="text-sm">
+                          <div className="font-semibold text-white">
+                            {room.id}
+                          </div>
+                          <div className="text-gray-300 text-xs">
+                            {room.players.w} vs {room.players.b}
+                          </div>
+                          <div className="text-gray-400 text-xs">
+                            Spectators: {room.spectatorCount || 0}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() =>
+                            room.isFull
+                              ? spectateRoom(room.id)
+                              : joinRoom(room.id, displayName)
+                          }
+                          disabled={!isConnected}
+                          className={`text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors disabled:bg-gray-600 ${actionClass}`}
+                        >
+                          {actionLabel}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </main>
       </div>
@@ -216,7 +329,6 @@ export default function MultiplayerChess({ onBack }) {
     return (
       <MultiplayerGameScreen
         onBack={onBack}
-        serverUrl={serverUrl}
         timeControlIdx={timeControlIdx}
         playerName={playerName}
         roomId={roomId}
@@ -228,8 +340,12 @@ export default function MultiplayerChess({ onBack }) {
         leaveRoom={leaveRoom}
         chatMessages={chatMessages}
         sendMessage={sendMessage}
+        drawOffered={drawOffered}
+        offerDraw={offerDraw}
         isConnected={isConnected}
         error={error}
+        isSpectating={isSpectating}
+        spectatorCount={spectatorCount}
       />
     );
   }

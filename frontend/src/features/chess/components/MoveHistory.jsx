@@ -1,8 +1,4 @@
-function toSquareName([row, col]) {
-  return String.fromCharCode(97 + col) + (8 - row);
-}
-
-export default function MoveHistory({ movePairs, currentMove, pieceNotation }) {
+export default function MoveHistory({ movePairs }) {
   return (
     <div className="scrollbar-thin overflow-y-auto" style={{ maxHeight: 200 }}>
       {movePairs.length === 0 ? (

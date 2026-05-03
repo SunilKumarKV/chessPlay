@@ -251,6 +251,64 @@ function toAlgebraic(row, col) {
   return String.fromCharCode(97 + col) + (8 - row);
 }
 
+function castlingToFen(castling) {
+  let rights = "";
+  if (castling?.w?.kingSide) rights += "K";
+  if (castling?.w?.queenSide) rights += "Q";
+  if (castling?.b?.kingSide) rights += "k";
+  if (castling?.b?.queenSide) rights += "q";
+  return rights || "-";
+}
+
+function boardToFenPlacement(board) {
+  return board
+    .map((row) => {
+      let rank = "";
+      let empty = 0;
+
+      for (const piece of row) {
+        if (!piece) {
+          empty++;
+          continue;
+        }
+
+        if (empty) {
+          rank += empty;
+          empty = 0;
+        }
+
+        const color = colorOf(piece);
+        const type = typeOf(piece);
+        rank += color === "w" ? type : type.toLowerCase();
+      }
+
+      return rank + (empty || "");
+    })
+    .join("/");
+}
+
+function getPositionKey(gameState) {
+  const enPassant = gameState.enPassant
+    ? toAlgebraic(gameState.enPassant[0], gameState.enPassant[1])
+    : "-";
+
+  return [
+    boardToFenPlacement(gameState.board),
+    gameState.turn,
+    castlingToFen(gameState.castling),
+    enPassant,
+  ].join(" ");
+}
+
+function hasThreefoldRepetition(positionHistory = []) {
+  const counts = new Map();
+  return positionHistory.some((position) => {
+    const nextCount = (counts.get(position) || 0) + 1;
+    counts.set(position, nextCount);
+    return nextCount >= 3;
+  });
+}
+
 function applyMove(gameState, fromRow, fromCol, toRow, toCol, promotionPiece = "Q") {
   const board = gameState.board;
   const piece = board[fromRow][fromCol];
@@ -351,6 +409,16 @@ function applyMove(gameState, fromRow, fromCol, toRow, toCol, promotionPiece = "
       : null;
 
   gameState.turn = opponent(color);
+  gameState.halfmoveClock =
+    type === "P" || capturedPiece ? 0 : (gameState.halfmoveClock || 0) + 1;
+  gameState.positionHistory = gameState.positionHistory || [];
+  gameState.positionHistory.push(getPositionKey(gameState));
+
+  if (gameState.halfmoveClock >= 100) {
+    gameState.status = "draw-50move";
+  } else if (hasThreefoldRepetition(gameState.positionHistory)) {
+    gameState.status = "draw-repetition";
+  }
 
   const moveText = `${piece}@${toAlgebraic(fromRow, fromCol)}→${toAlgebraic(
     toRow,
@@ -375,6 +443,7 @@ module.exports = {
   typeOf,
   opponent,
   cloneBoard,
+  getPositionKey,
   isValidMove,
   applyMove,
 };

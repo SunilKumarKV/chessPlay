@@ -60,7 +60,7 @@ export const saveSettings = () => {
     const settings = store.getState().chessSettings;
 
     // Remove computed properties before saving
-    const { animationDuration, ...settingsToSave } = settings;
+    const { animationDuration: _animationDuration, ...settingsToSave } = settings;
 
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settingsToSave));
   } catch (error) {

@@ -18,9 +18,6 @@ export function useStockfish({ enabled = true } = {}) {
   useEffect(() => {
     if (!enabled) return;
 
-    setReady(false);
-    setThinking(false);
-
     const worker = new Worker("/workers/stockfish-worker.js");
     workerRef.current = worker;
 

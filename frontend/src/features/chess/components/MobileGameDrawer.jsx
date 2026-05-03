@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 
 export const MobileGameDrawer = ({ isOpen, onClose, title, children }) => {
   const [isDragging, setIsDragging] = useState(false);
