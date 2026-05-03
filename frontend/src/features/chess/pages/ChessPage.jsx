@@ -8,6 +8,7 @@ import {
   setFlipped,
   setTimeControl,
   startGame,
+  makeMove,
 } from "../../../store/slices/chessGameSlice";
 import Board from "../components/Board";
 import ChessClock from "../components/ChessClock";
@@ -16,7 +17,7 @@ import MoveHistory from "../components/MoveHistory";
 import SettingsPanel from "../components/SettingsPanel";
 import ChessSettingsModal from "../../../components/ChessSettingsModal";
 import EvaluationBar from "../../../components/EvaluationBar";
-import { useStockfish } from "../../../hooks/useStockfish";
+import { useStockfish } from "../hooks/useStockfish";
 import { soundManager } from "../../../utils/sounds/soundManager";
 import { loadSettings } from "../../../utils/settingsPersistence";
 
@@ -28,39 +29,10 @@ export default function Chess() {
   const [activeTab, setActiveTab] = useState("moves");
   const [showSettings, setShowSettings] = useState(false);
 
-  // Initialize Stockfish
+  // Initialize Stockfish using the canonical { enabled } interface.
+  // AI move triggering is handled in the useEffect below via getBestMove.
   const stockfish = useStockfish({
     enabled: gameState.aiEnabled,
-    onMove: (bestMove) => {
-      if (
-        bestMove &&
-        gameState.aiEnabled &&
-        gameState.game.turn() === gameState.aiColor
-      ) {
-        try {
-          const move = gameState.game.move(bestMove);
-          if (move) {
-            dispatch(
-              makeMove({
-                from: move.from,
-                to: move.to,
-                promotion: move.promotion,
-              }),
-            );
-
-            if (settings.playSounds) {
-              if (move.captured) {
-                soundManager.playCapture();
-              } else {
-                soundManager.playMove();
-              }
-            }
-          }
-        } catch (error) {
-          console.error("AI move failed:", error);
-        }
-      }
-    },
   });
 
   // Load settings on mount
@@ -76,25 +48,52 @@ export default function Chess() {
     soundManager.setVolume(settings.soundVolume);
   }, [settings.playSounds, settings.soundTheme, settings.soundVolume]);
 
-  // Handle AI moves
+  // Handle AI moves: when it's the AI's turn, request a move from Stockfish
   useEffect(() => {
     if (
-      gameState.aiEnabled &&
-      gameState.game.turn() === gameState.aiColor &&
-      !gameState.isGameOver &&
-      !gameState.aiThinking
+      !gameState.aiEnabled ||
+      !stockfish.ready ||
+      gameState.isGameOver ||
+      gameState.game.turn() !== gameState.aiColor
     ) {
-      // Get best move from Stockfish
-      stockfish.getBestMove(gameState.fen, gameState.aiDifficulty);
+      return;
     }
-  }, [
-    gameState.fen,
-    gameState.aiEnabled,
-    gameState.aiColor,
-    gameState.isGameOver,
-    gameState.aiDifficulty,
-    stockfish,
-  ]);
+
+    const thinkingTime = 300 + gameState.aiDifficulty * 85;
+
+    stockfish
+      .getBestMove(gameState.fen, { movetime: thinkingTime })
+      .then((uci) => {
+        if (!uci) return;
+        const from = uci.slice(0, 2);
+        const to = uci.slice(2, 4);
+        const promotion = uci[4] || undefined;
+
+        try {
+          // Validate the move against chess.js before dispatching
+          const testGame = gameState.game;
+          const move = testGame.move({ from, to, promotion });
+          if (move) {
+            dispatch(makeMove({ from, to, promotion }));
+
+            if (settings.playSounds) {
+              if (move.captured) {
+                soundManager.playCapture();
+              } else {
+                soundManager.playMove();
+              }
+            }
+          }
+        } catch (error) {
+          console.error("AI move failed:", error);
+        }
+      })
+      .catch((err) => {
+        // Timeout or cancellation — not a fatal error
+        console.warn("Stockfish getBestMove:", err.message);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState.fen, gameState.aiEnabled, stockfish.ready]);
 
   // Helper to pair moves for the history list (e.g., 1. e4 e5)
   const movePairs = [];
@@ -119,7 +118,6 @@ export default function Chess() {
   };
 
   const handleSettingsChange = (newSettings) => {
-    // Update game settings that affect gameplay
     if (newSettings.aiEnabled !== undefined) {
       dispatch(setAiEnabled(newSettings.aiEnabled));
     }
@@ -177,7 +175,7 @@ export default function Chess() {
           {settings.showEvaluationBar && (
             <div className="absolute -right-12 top-0 h-full">
               <EvaluationBar
-                evaluation={stockfish.evaluation}
+                evaluation={0}
                 isThinking={stockfish.thinking}
               />
             </div>
@@ -218,7 +216,7 @@ export default function Chess() {
                       ? "Draw"
                       : "Game Over"}
               </span>
-            ) : gameState.aiThinking ? (
+            ) : stockfish.thinking ? (
               <span className="text-blue-400">AI thinking...</span>
             ) : (
               <span>
