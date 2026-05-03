@@ -24,39 +24,46 @@ const app = express();
 const server = http.createServer(app);
 
 // Configure CORS for the frontend
-const io = socketIo(server, {
-  cors: {
-    origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+  /^http:\/\/192\.168\.\d+\.\d+:5173$/,
+  /^http:\/\/192\.168\.\d+\.\d+:5174$/,
+  /^http:\/\/10\.\d+\.\d+\.\d+:5173$/,
+  /^http:\/\/10\.\d+\.\d+\.\d+:5174$/,
+  /^http:\/\/172\.\d+\.\d+\.\d+:5173$/,
+  /^http:\/\/172\.\d+\.\d+\.\d+:5174$/,
+];
 
-      // Allow localhost and local network IPs
-      const allowedOrigins = [
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        /^http:\/\/192\.168\.\d+\.\d+:5173$/,
-        /^http:\/\/192\.168\.\d+\.\d+:5174$/,
-        /^http:\/\/10\.\d+\.\d+\.\d+:5173$/,
-        /^http:\/\/10\.\d+\.\d+\.\d+:5174$/,
-        /^http:\/\/172\.\d+\.\d+\.\d+:5173$/,
-        /^http:\/\/172\.\d+\.\d+\.\d+:5174$/,
-      ];
+// Add production frontend URL if provided
+if (process.env.VITE_FRONTEND_URL) {
+  allowedOrigins.push(process.env.VITE_FRONTEND_URL);
+}
 
-      const isAllowed = allowedOrigins.some((pattern) => {
-        if (typeof pattern === "string") return pattern === origin;
-        return pattern.test(origin);
-      });
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
 
-      if (isAllowed) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    methods: ["GET", "POST"],
+    const isAllowed = allowedOrigins.some((pattern) => {
+      if (typeof pattern === "string") return pattern === origin;
+      return pattern.test(origin);
+    });
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
   },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true,
+};
+
+const io = socketIo(server, {
+  cors: corsOptions,
 });
 
 // Socket authentication middleware
@@ -84,7 +91,7 @@ io.use(async (socket, next) => {
 const rooms = new Map();
 const players = new Map(); // socket.id -> { roomId, color, playerName }
 
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Connect to MongoDB
