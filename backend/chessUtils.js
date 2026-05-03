@@ -251,7 +251,7 @@ function toAlgebraic(row, col) {
   return String.fromCharCode(97 + col) + (8 - row);
 }
 
-function applyMove(gameState, fromRow, fromCol, toRow, toCol) {
+function applyMove(gameState, fromRow, fromCol, toRow, toCol, promotionPiece = "Q") {
   const board = gameState.board;
   const piece = board[fromRow][fromCol];
   const type = typeOf(piece);
@@ -288,8 +288,9 @@ function applyMove(gameState, fromRow, fromCol, toRow, toCol) {
   // Pawn promotion
   let promotionLabel = null;
   if (type === "P" && (toRow === 0 || toRow === 7)) {
-    board[toRow][toCol] = color + "Q";
-    promotionLabel = "=Q";
+    const promo = (promotionPiece || "Q").toUpperCase();
+    board[toRow][toCol] = color + promo;
+    promotionLabel = "=" + promo;
   }
 
   // Update captured arrays

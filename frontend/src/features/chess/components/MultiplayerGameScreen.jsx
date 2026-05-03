@@ -40,6 +40,7 @@ export default function MultiplayerGameScreen({
 }) {
   const [selected, setSelected] = useState(null);
   const [legalMoves, setLegalMoves] = useState([]);
+  const [pendingMove, setPendingMove] = useState(null); // { fromRow, fromCol, toRow, toCol }
 
   const timeControl = TIME_CONTROLS[timeControlIdx];
   const clock = useChessClock({
@@ -85,9 +86,17 @@ export default function MultiplayerGameScreen({
       } else {
         const isLegalMove = legalMoves.some(([r, c]) => r === row && c === col);
         if (isLegalMove) {
-          makeMove(selRow, selCol, row, col);
-          setSelected(null);
-          setLegalMoves([]);
+          const piece = gameState.board[selRow][selCol];
+          const isPawn = piece && piece[1] === "P";
+          const isPromotion = isPawn && (row === 0 || row === 7);
+
+          if (isPromotion) {
+            setPendingMove({ fromRow: selRow, fromCol: selCol, toRow: row, toCol: col });
+          } else {
+            makeMove(selRow, selCol, row, col);
+            setSelected(null);
+            setLegalMoves([]);
+          }
         }
       }
       return;
@@ -190,8 +199,63 @@ export default function MultiplayerGameScreen({
   const materialAdvantage = calculateMaterialAdvantage();
   const moves = formatMoves(gameState?.moveHistory || []);
 
+  const handlePromotionSelect = (pieceType) => {
+    if (pendingMove) {
+      makeMove(
+        pendingMove.fromRow,
+        pendingMove.fromCol,
+        pendingMove.toRow,
+        pendingMove.toCol,
+        pieceType,
+      );
+      setPendingMove(null);
+      setSelected(null);
+      setLegalMoves([]);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0e0e0e] text-[#e0e0e0] font-['Inter'] flex flex-col">
+      {/* Promotion Modal */}
+      {pendingMove && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#1a1a1a] p-6 rounded-xl border border-[#2a2a2a] shadow-2xl max-w-sm w-full">
+            <h3 className="text-lg font-bold text-center mb-6 text-[#e0e0e0]">
+              Choose Promotion Piece
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              {["Q", "R", "B", "N"].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => handlePromotionSelect(type)}
+                  className="flex flex-col items-center justify-center p-4 bg-[#2a2a2a] hover:bg-[#3a3a3a] rounded-lg transition-all group"
+                >
+                  <img
+                    src={PIECE_IMAGES[playerColor + type]}
+                    alt={type}
+                    className="w-16 h-16 mb-2 group-hover:scale-110 transition-transform"
+                  />
+                  <span className="text-xs font-bold text-[#7a7a7a] group-hover:text-[#e0e0e0]">
+                    {type === "Q"
+                      ? "Queen"
+                      : type === "R"
+                        ? "Rook"
+                        : type === "B"
+                          ? "Bishop"
+                          : "Knight"}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setPendingMove(null)}
+              className="w-full mt-6 py-2 text-sm text-[#7a7a7a] hover:text-[#e0e0e0] transition-colors"
+            >
+              Cancel Move
+            </button>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <header className="bg-[#1a1a1a] border-b border-[#2a2a2a] px-4 md:px-6 py-3 md:py-4">
         <div className="flex items-center justify-between">

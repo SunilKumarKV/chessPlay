@@ -304,7 +304,7 @@ io.on("connection", (socket) => {
   // Handle move
   socket.on("makeMove", async (data) => {
     try {
-      const { fromRow, fromCol, toRow, toCol } = data;
+      const { fromRow, fromCol, toRow, toCol, promotion } = data;
       const player = players.get(socket.id);
 
       if (!player) {
@@ -334,7 +334,7 @@ io.on("connection", (socket) => {
 
       // Apply move with full rule support
       const color = player.color;
-      applyMove(gameState, fromRow, fromCol, toRow, toCol);
+      applyMove(gameState, fromRow, fromCol, toRow, toCol, promotion);
 
       // Record move in database
       const piece = gameState.board[toRow][toCol];
