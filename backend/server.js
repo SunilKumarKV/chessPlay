@@ -1,4 +1,13 @@
 require("dotenv").config();
+
+// Validate environment variables
+const DEFAULT_JWT_SECRET = "your-super-secret-jwt-key-change-this-in-production";
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET === DEFAULT_JWT_SECRET) {
+  console.error("FATAL ERROR: JWT_SECRET is not set or is using the default value.");
+  console.error("Please set a secure JWT_SECRET in your environment variables.");
+  process.exit(1);
+}
+
 const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
