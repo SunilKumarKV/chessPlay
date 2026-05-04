@@ -23,7 +23,6 @@ dist-ssr
 .env
 .env.local
 .env.production
-.env.example
 
 # Backend Env
 backend/.env
