@@ -52,11 +52,15 @@ export default function MultiplayerGameScreen({
   chatMessages,
   sendMessage,
   drawOffered,
+  drawOfferedBy,
   offerDraw,
+  acceptDraw,
+  declineDraw,
   isConnected,
   error,
   isSpectating = false,
   spectatorCount = 0,
+  resign,
 }) {
   const [selected, setSelected] = useState(null);
   const [legalMoves, setLegalMoves] = useState([]);
@@ -498,9 +502,30 @@ export default function MultiplayerGameScreen({
                 {error}
               </div>
             )}
-            {drawOffered && (
+            {drawOffered && drawOfferedBy !== playerColor && (
+              <div className="space-y-2 bg-[#1f3b2a] border border-[#81b64c]/20 p-3 rounded">
+                <div className="text-[#81b64c] text-sm font-semibold">
+                  Opponent offers a draw
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={acceptDraw}
+                    className="flex-1 py-2 bg-[#81b64c] hover:bg-[#6ba03d] text-[#0e0e0e] rounded-lg text-sm font-semibold transition-colors"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    onClick={declineDraw}
+                    className="flex-1 py-2 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#e0e0e0] rounded-lg text-sm transition-colors"
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            )}
+            {drawOffered && drawOfferedBy === playerColor && (
               <div className="text-[#81b64c] text-xs bg-[#81b64c]/10 p-2 rounded">
-                Draw offer pending
+                Draw offer sent
               </div>
             )}
             {!isSpectating && (
@@ -512,12 +537,21 @@ export default function MultiplayerGameScreen({
                 Offer Draw
               </button>
             )}
-            <button
-              onClick={leaveRoom}
-              className="w-full py-2 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#e0e0e0] rounded-lg text-sm transition-colors font-['Inter']"
-            >
-              Leave Room
-            </button>
+            {!isSpectating && gameState && ["playing", "check"].includes(gameState.status) ? (
+              <button
+                onClick={resign}
+                className="w-full py-2 bg-[#b12f2f] hover:bg-[#992828] text-white rounded-lg text-sm transition-colors font-['Inter']"
+              >
+                Resign
+              </button>
+            ) : (
+              <button
+                onClick={leaveRoom}
+                className="w-full py-2 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#e0e0e0] rounded-lg text-sm transition-colors font-['Inter']"
+              >
+                Leave Room
+              </button>
+            )}
           </div>
 
           {/* Move History */}

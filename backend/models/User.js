@@ -67,6 +67,14 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  gamesLost: {
+    type: Number,
+    default: 0,
+  },
+  gamesDrawn: {
+    type: Number,
+    default: 0,
+  },
   rating: {
     type: Number,
     default: 1200,

@@ -1,4 +1,3 @@
-import { Chess } from "chess.js";
 import openings from "../constants/openings.json";
 import { toAlgebraic } from "./boardUtils";
 
@@ -28,43 +27,14 @@ const OPENINGS_BY_LENGTH = openings
   .filter((opening) => opening.moves.length > 0)
   .sort((a, b) => b.moves.length - a.moves.length);
 
-function historyToSanMoves(moveHistory) {
-  const chess = new Chess();
-  const moves = [];
-
-  for (const move of moveHistory) {
-    if (!move?.from || !move?.to) return moves;
-
-    let result = null;
-    try {
-      result = chess.move(
-        {
-          from: toAlgebraic(...move.from),
-          to: toAlgebraic(...move.to),
-          promotion: move.promotion?.toLowerCase(),
-        },
-        { strict: false },
-      );
-    } catch {
-      return moves;
-    }
-
-    if (!result) return moves;
-    moves.push(normalizeSan(result.san));
-  }
-
-  return moves;
-}
-
-export function detectOpening(moveHistory) {
-  const playedMoves = historyToSanMoves(moveHistory);
-  if (playedMoves.length === 0) return null;
+export function detectOpening(sanMoves) {
+  if (!Array.isArray(sanMoves) || sanMoves.length === 0) return null;
 
   return (
     OPENINGS_BY_LENGTH.find(
       (opening) =>
-        opening.moves.length <= playedMoves.length &&
-        opening.moves.every((move, index) => move === playedMoves[index]),
+        opening.moves.length <= sanMoves.length &&
+        opening.moves.every((move, index) => move === sanMoves[index]),
     ) || null
   );
 }

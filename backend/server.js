@@ -173,24 +173,15 @@ app.use("/api/games", gameRoutes);
 
 // Basic health check
 app.get("/health", (req, res) => {
-  const os = require("os");
-  const interfaces = os.networkInterfaces();
-  let localIP = "localhost";
-  for (const name of Object.keys(interfaces)) {
-    for (const iface of interfaces[name]) {
-      if (iface.family === "IPv4" && !iface.internal) {
-        localIP = iface.address;
-        break;
-      }
-    }
-    if (localIP !== "localhost") break;
+  const secret = req.headers["x-health-secret"];
+  if (process.env.HEALTH_SECRET && secret !== process.env.HEALTH_SECRET) {
+    return res.status(401).json({ status: "unauthorized" });
   }
+
   res.json({
     status: "ok",
     rooms: rooms.size,
     players: players.size,
-    localIP,
-    port: PORT,
   });
 });
 
@@ -273,7 +264,11 @@ function removeFromQueue(socketId) {
 }
 
 function broadcastQueueUpdate() {
-  io.emit("queueUpdate", { queueSize: matchmakingQueue.length });
+  const size = matchmakingQueue.length;
+  for (const entry of matchmakingQueue) {
+    const socket = io.sockets.sockets.get(entry.socketId);
+    socket?.emit("queueUpdate", { queueSize: size });
+  }
 }
 
 function getRatingRange(rating) {
@@ -428,8 +423,6 @@ async function createMatchRoom(playerA, playerB) {
 
   return roomId;
 }
-
-setInterval(broadcastQueueUpdate, 5000);
 
 async function awardAbandonmentWin(roomId, abandonedColor) {
   const roomData = rooms.get(roomId);
@@ -860,6 +853,14 @@ io.on("connection", (socket) => {
     });
   });
 
+  onSafe("drawDeclined", () => {
+    const player = players.get(socket.id);
+    if (!player) {
+      return;
+    }
+    socket.to(player.roomId).emit("drawDeclined");
+  });
+
   onSafe("drawAccepted", async () => {
     try {
       const player = players.get(socket.id);
@@ -881,6 +882,25 @@ io.on("connection", (socket) => {
         endTime: new Date(),
       });
 
+      try {
+        const whiteUserId = roomData.players.w.userId;
+        const blackUserId = roomData.players.b.userId;
+
+        if (whiteUserId) {
+          await User.findByIdAndUpdate(whiteUserId, {
+            $inc: { gamesPlayed: 1, gamesDrawn: 1 },
+          });
+        }
+
+        if (blackUserId) {
+          await User.findByIdAndUpdate(blackUserId, {
+            $inc: { gamesPlayed: 1, gamesDrawn: 1 },
+          });
+        }
+      } catch (statsError) {
+        console.error("Draw stats update error:", statsError);
+      }
+
       io.to(player.roomId).emit("drawAccepted", {
         gameState: roomData,
       });
@@ -888,6 +908,43 @@ io.on("connection", (socket) => {
       console.error("Accept draw error:", error);
       socket.emit("serverError", { message: "Failed to accept draw" });
     }
+  });
+
+  onSafe("resign", async () => {
+    const player = players.get(socket.id);
+    if (!player) {
+      socket.emit("serverError", { message: "Not in a room" });
+      return;
+    }
+
+    const roomData = rooms.get(player.roomId);
+    if (!roomData || !isPlayableStatus(roomData.status)) {
+      return;
+    }
+
+    const winnerColor = opponent(player.color);
+    const winnerSlot = roomData.players[winnerColor];
+    roomData.status = "resigned";
+
+    try {
+      await Game.findByIdAndUpdate(roomData.gameId, {
+        result: winnerColor === "w" ? "white" : "black",
+        winner: winnerSlot?.userId || null,
+        endTime: new Date(),
+      });
+
+      if (winnerSlot?.userId) {
+        await updatePlayerStats(winnerSlot.userId, player.userId);
+      }
+    } catch (error) {
+      console.error("Resignation update error:", error);
+    }
+
+    io.to(player.roomId).emit("playerResigned", {
+      color: player.color,
+      winnerColor,
+      gameState: roomData,
+    });
   });
 
   const cleanupPlayer = async (socket, notify = true) => {
@@ -898,11 +955,44 @@ io.on("connection", (socket) => {
     if (roomData) {
       const gameState = roomData;
       clearReconnectTimer(player.roomId, player.color);
-      gameState.players[player.color].id = null;
-      gameState.players[player.color].userId = null;
-      gameState.players[player.color].disconnected = false;
-      gameState.players[player.color].name =
-        player.color === "w" ? "Player 1" : "Player 2";
+
+      const leavingColor = player.color;
+      const opponentColor = opponent(leavingColor);
+      const leavingSlot = gameState.players[leavingColor];
+      const opponentSlot = gameState.players[opponentColor];
+      const leavingUserId = leavingSlot.userId;
+      const opponentUserId = opponentSlot?.userId;
+
+      leavingSlot.id = null;
+      leavingSlot.disconnected = false;
+      leavingSlot.name = leavingColor === "w" ? "Player 1" : "Player 2";
+
+      if (
+        opponentUserId &&
+        isPlayableStatus(gameState.status)
+      ) {
+        gameState.status = "abandoned";
+
+        try {
+          await Game.findByIdAndUpdate(roomData.gameId, {
+            result: opponentColor === "w" ? "white" : "black",
+            winner: opponentUserId,
+            endTime: new Date(),
+          });
+
+          await updatePlayerStats(opponentUserId, leavingUserId);
+        } catch (error) {
+          console.error("Abandonment save error:", error);
+        }
+
+        io.to(player.roomId).emit("playerAbandoned", {
+          winnerColor: opponentColor,
+          gameState,
+        });
+
+        players.delete(socket.id);
+        return;
+      }
 
       // If both players are gone, save the game as ended
       if (!gameState.players.w.userId && !gameState.players.b.userId) {

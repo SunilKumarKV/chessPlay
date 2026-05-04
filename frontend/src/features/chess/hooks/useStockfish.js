@@ -18,7 +18,16 @@ export function useStockfish({ enabled = true } = {}) {
   useEffect(() => {
     if (!enabled) return;
 
-    const worker = new Worker("/workers/stockfish-worker.js");
+    const workerPath = `${import.meta.env.BASE_URL}workers/stockfish-worker.js`;
+    let worker;
+
+    try {
+      worker = new Worker(workerPath);
+    } catch (error) {
+      console.error("[Stockfish] Failed to create worker:", error, workerPath);
+      return;
+    }
+
     workerRef.current = worker;
 
     worker.onmessage = (event) => {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { notifyUserChanged } from "../hooks/useCurrentUser";
 import Chess from "../features/chess/pages/ChessPage";
 import MultiplayerChess from "../features/chess/components/MultiplayerChess";
 import Leaderboard from "../pages/LeaderboardPage";
@@ -31,6 +32,7 @@ export default function App() {
 
   const handleLogin = (userData) => {
     setUser(userData);
+    notifyUserChanged();
   };
 
   const handleLogout = () => {
@@ -38,6 +40,7 @@ export default function App() {
     localStorage.removeItem("user");
     setUser(null);
     setCurrentPage("dashboard");
+    notifyUserChanged();
   };
 
   if (!user) {

@@ -1,6 +1,30 @@
 # ChessPlay ♛
 
+**Version 1.1.0**
+
 A beautiful, modern chess game built with React and Node.js, featuring both single-player AI mode and real-time multiplayer functionality.
+
+## Release Notes
+
+### v1.1.0
+
+- Fixed: morgan and helmet missing from package.json (server crash on install)
+- Fixed: Multiplayer promotion piece silently dropped
+- Fixed: Backend castling through check allowed illegally
+- Fixed: Leaving mid-game did not award win to opponent
+- Fixed: resignGame/acceptDraw reset board before end screen shown
+- Fixed: Duplicate useStockfish file removed
+- Fixed: drawAccepted did not update gamesPlayed
+- Fixed: useCurrentUser did not sync on same-tab login/logout
+- Fixed: window.confirm replaced with in-game draw offer UI
+- Fixed: positionHistory unbounded memory growth
+- Added: gamesLost and gamesDrawn fields on User model
+- Added: Resign socket event for multiplayer
+- Added: Health endpoint protection
+- Added: Queue broadcast only to queued players
+- Added: Incremental opening detection (O(n) → O(1) per move)
+- Added: Password change endpoint
+- Added: Opening name in PGN export
 
 ## Features
 

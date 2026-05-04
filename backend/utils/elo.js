@@ -20,6 +20,7 @@ async function updatePlayerStats(winnerId, loserId) {
       const loser = await User.findById(loserId);
       if (loser) {
         loser.gamesPlayed += 1;
+        loser.gamesLost += 1;
 
         const expectedWinner = expectedScore(winner.rating, loser.rating);
         const expectedLoser = expectedScore(loser.rating, winner.rating);
@@ -37,7 +38,7 @@ async function updatePlayerStats(winnerId, loserId) {
   }
 }
 
-async function updatePlayerStatsVsAi(userId, userWon, aiDifficulty) {
+async function updatePlayerStatsVsAi(userId, userWon, aiDifficulty, isDraw = false) {
   try {
     const user = await User.findById(userId);
     if (!user) return;
@@ -46,10 +47,15 @@ async function updatePlayerStatsVsAi(userId, userWon, aiDifficulty) {
     const expectedUser = expectedScore(user.rating, aiRating);
 
     user.gamesPlayed += 1;
-    if (userWon) {
+    if (isDraw) {
+      user.gamesDrawn += 1;
+    } else if (userWon) {
       user.gamesWon += 1;
+      user.rating = computeRating(user.rating, expectedUser, 1);
+    } else {
+      user.gamesLost += 1;
+      user.rating = computeRating(user.rating, expectedUser, 0);
     }
-    user.rating = computeRating(user.rating, expectedUser, userWon ? 1 : 0);
 
     await user.save();
   } catch (error) {

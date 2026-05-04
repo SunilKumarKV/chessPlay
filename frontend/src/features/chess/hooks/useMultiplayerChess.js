@@ -37,6 +37,7 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
     localStorage.getItem("token") ? null : "Authentication required",
   );
   const [drawOffered, setDrawOffered] = useState(false);
+  const [drawOfferedBy, setDrawOfferedBy] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
   const [queueSize, setQueueSize] = useState(0);
   const [rooms, setRooms] = useState([]);
@@ -222,6 +223,7 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
       setGameState(data.gameState);
       setIsMyTurn(data.gameState.turn === playerColorRef.current);
       setDrawOffered(false);
+      setDrawOfferedBy(null);
 
       const lastMove =
         data.gameState.moveHistory &&
@@ -246,6 +248,19 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
       }
     });
 
+    newSocket.on("playerResigned", (data) => {
+      setGameState(data.gameState);
+      setIsMyTurn(false);
+      setDrawOffered(false);
+      setDrawOfferedBy(null);
+      if (data.winnerColor === playerColorRef.current) {
+        soundRef.current.gameEnd(true);
+      } else {
+        soundRef.current.gameEnd(false);
+      }
+      forgetRoom();
+    });
+
     newSocket.on("playerLeft", (data) => {
       setOpponentName(null);
       setError(`${data.name} left the game`);
@@ -262,6 +277,7 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
       setGameState(data.gameState);
       setIsMyTurn(false);
       setDrawOffered(false);
+      setDrawOfferedBy(null);
       forgetRoom();
       setError(
         data.winnerColor === playerColorRef.current
@@ -271,21 +287,22 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
       soundRef.current.gameEnd(data.winnerColor === playerColorRef.current);
     });
 
-    newSocket.on("drawOffer", () => {
+    newSocket.on("drawOffer", (data) => {
       setDrawOffered(true);
-      const accepted = window.confirm("Your opponent offered a draw. Accept?");
-      if (accepted) {
-        newSocket.emit("drawAccepted");
-      } else {
-        setDrawOffered(false);
-      }
+      setDrawOfferedBy(data?.fromColor || null);
     });
 
     newSocket.on("drawAccepted", (data) => {
       setGameState(data.gameState);
       setDrawOffered(false);
+      setDrawOfferedBy(null);
       setIsMyTurn(false);
       soundRef.current.stalemate();
+    });
+
+    newSocket.on("drawDeclined", () => {
+      setDrawOffered(false);
+      setDrawOfferedBy(null);
     });
 
     newSocket.on("serverError", (data) => {
@@ -359,9 +376,15 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
 
   // Make a move
   const makeMove = useCallback(
-    (fromRow, fromCol, toRow, toCol) => {
+    (fromRow, fromCol, toRow, toCol, promotion = null) => {
       if (socketRef.current && isConnected && isMyTurn) {
-        socketRef.current.emit("makeMove", { fromRow, fromCol, toRow, toCol });
+        socketRef.current.emit("makeMove", {
+          fromRow,
+          fromCol,
+          toRow,
+          toCol,
+          promotion,
+        });
       }
     },
     [isConnected, isMyTurn],
@@ -376,9 +399,32 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
     [isConnected],
   );
 
+  const acceptDraw = useCallback(() => {
+    if (socketRef.current && isConnected && roomId) {
+      socketRef.current.emit("drawAccepted");
+    }
+    setDrawOffered(false);
+    setDrawOfferedBy(null);
+  }, [isConnected, roomId]);
+
+  const declineDraw = useCallback(() => {
+    if (socketRef.current && isConnected && roomId) {
+      socketRef.current.emit("drawDeclined");
+    }
+    setDrawOffered(false);
+    setDrawOfferedBy(null);
+  }, [isConnected, roomId]);
+
+  const resign = useCallback(() => {
+    if (socketRef.current && isConnected && roomIdRef.current) {
+      socketRef.current.emit("resign");
+    }
+  }, [isConnected]);
+
   const offerDraw = useCallback(() => {
     if (socketRef.current && isConnected && roomId) {
       setDrawOffered(true);
+      setDrawOfferedBy(playerColorRef.current);
       socketRef.current.emit("drawOffer", { fromColor: playerColorRef.current });
     }
   }, [isConnected, roomId]);
@@ -440,6 +486,7 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
     opponentName,
     isMyTurn,
     drawOffered,
+    drawOfferedBy,
     isSearching,
     queueSize,
     rooms,
@@ -456,6 +503,9 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
     chatMessages,
     sendMessage,
     offerDraw,
+    acceptDraw,
+    declineDraw,
+    resign,
     joinQueue,
     leaveQueue,
   };

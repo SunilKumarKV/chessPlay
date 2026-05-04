@@ -43,7 +43,7 @@ function isPlayableStatus(status) {
    BOARD UTILITY FUNCTIONS
    ==================== */
 
-import { colorOf, typeOf, opponent, buildMoveLabel } from "../utils/boardUtils";
+import { colorOf, typeOf, opponent, buildMoveLabel, toAlgebraic } from "../utils/boardUtils";
 
 import { getLegalMoves, getGameStatus } from "../utils/moveValidation";
 
@@ -55,7 +55,8 @@ import { applyMove } from "../utils/applyMove";
 
 import { boardToFen, uciToMove } from "../utils/fen";
 import { exportPGN, downloadPGN } from "../utils/pgn";
-import { detectOpening } from "../utils/openings";
+import { Chess } from "chess.js";
+import { detectOpening, normalizeSan } from "../utils/openings";
 
 import { useStockfish } from "./useStockfish";
 import { useChessClock, TIME_CONTROLS } from "./useChessClock";
@@ -83,9 +84,12 @@ export function useChessGame({
   // used for FEN generation
   const [fullmove, setFullmove] = useState(1);
   const [halfmoveClock, setHalfmoveClock] = useState(0);
-  const [positionHistory, setPositionHistory] = useState(() => [
+  const positionHistory = useRef([
     getPositionKey(INITIAL_BOARD, "w", INITIAL_CASTLING, null),
   ]);
+  const [isRepetitionDraw, setIsRepetitionDraw] = useState(false);
+  const chessInstanceRef = useRef(null);
+  const sanHistoryRef = useRef([]);
 
   /* =================================
      2️⃣ USER INTERACTION STATE
@@ -107,7 +111,7 @@ export function useChessGame({
   const [capturedB, setCapturedB] = useState([]);
   const [hasRecordedGame, setHasRecordedGame] = useState(false);
   const [terminalStatus, setTerminalStatus] = useState(null);
-  const [drawOffered, setDrawOffered] = useState(false);
+  const [drawPending, setDrawPending] = useState(false);
 
   /* ========================================
      4️⃣ UI STATE
@@ -161,7 +165,7 @@ export function useChessGame({
   const boardStatus = useMemo(() => {
     if (clock.flagged) return "checkmate";
     if (halfmoveClock >= 100) return "draw-50move";
-    if (hasThreefoldRepetition(positionHistory)) return "draw-repetition";
+    if (isRepetitionDraw) return "draw-repetition";
     return getGameStatus(board, turn, enPassant, castling);
   }, [
     board,
@@ -170,10 +174,13 @@ export function useChessGame({
     castling,
     clock.flagged,
     halfmoveClock,
-    positionHistory,
+    isRepetitionDraw,
   ]);
   const status = terminalStatus || boardStatus;
-  const currentOpening = useMemo(() => detectOpening(history), [history]);
+  const currentOpening = useMemo(
+    () => detectOpening(sanHistoryRef.current),
+    [history],
+  );
 
   const getPlayerColor = useCallback(() => {
     if (playerColor) return playerColor;
@@ -415,10 +422,13 @@ export function useChessGame({
       setTurn((t) => opponent(t));
       setLastMove({ from, to });
       setHalfmoveClock((n) => (type === "P" || isCapture ? 0 : n + 1));
-      setPositionHistory((positions) => [
-        ...positions,
+
+      const nextPositionHistory = [
+        ...positionHistory.current,
         getPositionKey(newBoard, opponent(color), newCastling, newEnPassant),
-      ]);
+      ];
+      positionHistory.current = nextPositionHistory;
+      setIsRepetitionDraw(hasThreefoldRepetition(nextPositionHistory));
 
       setSelected(null);
       setLegalMoves([]);
@@ -458,6 +468,28 @@ export function useChessGame({
           timestamp: Date.now(),
         },
       ]);
+
+      if (!chessInstanceRef.current) {
+        chessInstanceRef.current = new Chess();
+      }
+      try {
+        const result = chessInstanceRef.current.move(
+          {
+            from: toAlgebraic(fr, fc),
+            to: toAlgebraic(tr, tc),
+            promotion: promotionPiece?.toLowerCase(),
+          },
+          { strict: false },
+        );
+        if (result) {
+          sanHistoryRef.current = [
+            ...sanHistoryRef.current,
+            normalizeSan(result.san),
+          ];
+        }
+      } catch {
+        // ignore invalid SAN conversion and keep the incremental history intact
+      }
     },
     [board, castling, clock, sound],
   );
@@ -577,8 +609,11 @@ export function useChessGame({
             : "*",
     };
 
-    downloadPGN(exportPGN(history, meta), `chess-${Date.now()}.pgn`);
-  }, [history, status, aiEnabled, aiColor, aiDifficulty, turn]);
+    downloadPGN(
+      exportPGN(history, meta, currentOpening),
+      `chess-${Date.now()}.pgn`,
+    );
+  }, [history, status, aiEnabled, aiColor, aiDifficulty, turn, currentOpening]);
 
   /* ====================================================
      16️⃣ RESET GAME
@@ -602,13 +637,16 @@ export function useChessGame({
     setCapturedB([]);
     setHasRecordedGame(false);
     setTerminalStatus(null);
-    setDrawOffered(false);
+    setDrawPending(false);
+    setIsRepetitionDraw(false);
 
     setFullmove(1);
     setHalfmoveClock(0);
-    setPositionHistory([
+    positionHistory.current = [
       getPositionKey(INITIAL_BOARD, "w", INITIAL_CASTLING, null),
-    ]);
+    ];
+    chessInstanceRef.current = null;
+    sanHistoryRef.current = [];
 
     clock.reset();
 
@@ -635,43 +673,57 @@ export function useChessGame({
         await recordGameResult(result, winnerColor);
       } catch (error) {
         console.error("Failed to record resignation:", error);
-      } finally {
-        resetGame();
       }
     };
 
     finishResignation();
-  }, [clock, getPlayerColor, recordGameResult, resetGame]);
+  }, [clock, getPlayerColor, recordGameResult]);
 
   /* ====================================================
      18️⃣ DRAW GAME
      ================================================= */
 
-  const acceptDraw = useCallback(async () => {
+  const completeDraw = useCallback(async () => {
     try {
+      setDrawPending(false);
       setTerminalStatus("draw");
-      setDrawOffered(false);
       clock.pause();
       await recordGameResult("draw", null);
     } catch (error) {
       console.error("Failed to record accepted draw:", error);
-    } finally {
-      resetGame();
     }
-  }, [clock, recordGameResult, resetGame]);
+  }, [clock, recordGameResult]);
+
+  const acceptDraw = useCallback(() => {
+    if (socket) {
+      socket.emit("drawAccepted");
+      setDrawPending(false);
+      return;
+    }
+
+    completeDraw();
+  }, [completeDraw, socket]);
+
+  const declineDraw = useCallback(() => {
+    if (socket) {
+      socket.emit("drawDeclined");
+    }
+    setDrawPending(false);
+  }, [socket]);
+
+  const confirmReset = useCallback(() => {
+    setTerminalStatus(null);
+    resetGame();
+  }, [resetGame]);
 
   const offerDraw = useCallback(() => {
-    setDrawOffered(true);
+    setDrawPending(true);
 
     if (socket) {
       socket.emit("drawOffer", { fromColor: getPlayerColor() });
       return;
     }
-
-    if (window.confirm("Accept draw offer?")) {
-      acceptDraw();
-    }
-  }, [acceptDraw, getPlayerColor, socket]);
+  }, [getPlayerColor, socket]);
 
   const drawGame = offerDraw;
 
@@ -679,28 +731,27 @@ export function useChessGame({
     if (!socket) return undefined;
 
     const handleDrawOffer = () => {
-      setDrawOffered(true);
-      const accepted = window.confirm("Your opponent offered a draw. Accept?");
-      if (accepted) {
-        socket.emit("drawAccepted");
-        acceptDraw();
-      } else {
-        setDrawOffered(false);
-      }
+      setDrawPending(true);
     };
 
     const handleDrawAccepted = () => {
-      acceptDraw();
+      completeDraw();
+    };
+
+    const handleDrawDeclined = () => {
+      setDrawPending(false);
     };
 
     socket.on("drawOffer", handleDrawOffer);
     socket.on("drawAccepted", handleDrawAccepted);
+    socket.on("drawDeclined", handleDrawDeclined);
 
     return () => {
       socket.off("drawOffer", handleDrawOffer);
       socket.off("drawAccepted", handleDrawAccepted);
+      socket.off("drawDeclined", handleDrawDeclined);
     };
-  }, [acceptDraw, socket]);
+  }, [completeDraw, socket]);
 
   /* ====================================================
      19️⃣ BOARD HELPERS
@@ -732,7 +783,7 @@ export function useChessGame({
     currentOpening,
     capturedW,
     capturedB,
-    drawOffered,
+    drawPending,
 
     promotion,
 
@@ -744,9 +795,13 @@ export function useChessGame({
     handlePromotion,
 
     resetGame,
+    confirmReset,
     resignGame,
     drawGame,
     offerDraw,
+    acceptDraw,
+    declineDraw,
+    drawPending,
     handleExportPGN,
 
     toggleFlip: () => setFlipped((f) => !f),

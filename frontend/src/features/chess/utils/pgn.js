@@ -1,6 +1,6 @@
 import { INITIAL_BOARD, INITIAL_CASTLING } from "../constants/board";
 
-export function exportPGN(history, meta = {}) {
+export function exportPGN(history, meta = {}, opening = null) {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, ".");
   const white = meta.white ?? "Player";
   const black = meta.black ?? "Opponent";
@@ -14,7 +14,16 @@ export function exportPGN(history, meta = {}) {
     `[White "${white}"]`,
     `[Black "${black}"]`,
     `[Result "${result}"]`,
-  ].join("\n");
+  ];
+
+  if (opening?.name) {
+    headers.push(`[Opening "${opening.name}"]`);
+  }
+  if (opening?.eco) {
+    headers.push(`[ECO "${opening.eco}"]`);
+  }
+
+  const headerBlock = headers.join("\n");
 
   const moves = [];
   for (let i = 0; i < history.length; i += 2) {
@@ -24,7 +33,7 @@ export function exportPGN(history, meta = {}) {
     moves.push(black ? `${num}. ${white} ${black}` : `${num}. ${white}`);
   }
 
-  return `${headers}\n\n${moves.join(" ")} ${result}`;
+  return `${headerBlock}\n\n${moves.join(" ")} ${result}`;
 }
 
 export function parsePGN(pgn) {

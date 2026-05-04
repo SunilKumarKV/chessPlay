@@ -27,10 +27,14 @@ export default function MultiplayerChess({ onBack }) {
     spectateRoom,
     makeMove,
     leaveRoom,
+    resign,
     chatMessages,
     sendMessage,
     drawOffered,
+    drawOfferedBy,
     offerDraw,
+    acceptDraw,
+    declineDraw,
     isSearching,
     queueSize,
     joinQueue,
@@ -338,10 +342,14 @@ export default function MultiplayerChess({ onBack }) {
         isMyTurn={isMyTurn}
         makeMove={makeMove}
         leaveRoom={leaveRoom}
+        resign={resign}
         chatMessages={chatMessages}
         sendMessage={sendMessage}
         drawOffered={drawOffered}
+        drawOfferedBy={drawOfferedBy}
         offerDraw={offerDraw}
+        acceptDraw={acceptDraw}
+        declineDraw={declineDraw}
         isConnected={isConnected}
         error={error}
         isSpectating={isSpectating}

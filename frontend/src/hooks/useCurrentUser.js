@@ -20,12 +20,24 @@ export function useCurrentUser() {
       }
     };
 
+    const handleLocalChange = () => {
+      setUser(readStoredUser());
+    };
+
     window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    window.addEventListener("localUserChanged", handleLocalChange);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("localUserChanged", handleLocalChange);
+    };
   }, []);
 
   return {
     user,
     isLoggedIn: Boolean(user),
   };
+}
+
+export function notifyUserChanged() {
+  window.dispatchEvent(new CustomEvent("localUserChanged"));
 }

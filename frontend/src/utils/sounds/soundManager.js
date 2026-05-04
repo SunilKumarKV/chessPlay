@@ -59,6 +59,9 @@ class SoundManager {
       for (const [soundName, filePath] of Object.entries(files)) {
         try {
           const response = await fetch(filePath);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
           const arrayBuffer = await response.arrayBuffer();
           const audioBuffer =
             await this.audioContext.decodeAudioData(arrayBuffer);

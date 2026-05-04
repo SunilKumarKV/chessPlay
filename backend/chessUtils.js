@@ -41,6 +41,28 @@ function hasPiecesInPath(board, fromRow, fromCol, toRow, toCol) {
   return false;
 }
 
+function isSquareAttackedBy(board, row, col, attackerColor) {
+  const pseudoState = {
+    board,
+    turn: attackerColor,
+    enPassant: null,
+    castling: { w: {}, b: {} },
+  };
+
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const piece = board[r][c];
+      if (piece && colorOf(piece) === attackerColor) {
+        if (isValidMove(pseudoState, r, c, row, col, true)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 function isKingInCheckAfterMove(gameState, fromRow, fromCol, toRow, toCol, color) {
   const tempBoard = cloneBoard(gameState.board);
   const piece = tempBoard[fromRow][fromCol];
@@ -214,10 +236,20 @@ function isValidMove(gameState, fromRow, fromCol, toRow, toCol, skipCheckValidat
             } else {
               const rookCol = isKingSide ? 7 : 0;
               const pathCols = isKingSide ? [5, 6] : [1, 2, 3];
+              const passThroughCol = isKingSide ? 5 : 3;
+              const opponentColor = opponent(color);
 
               if (
                 !board[baseRow][rookCol] ||
                 typeOf(board[baseRow][rookCol]) !== "R"
+              ) {
+                isMoveValid = false;
+              } else if (
+                isSquareAttackedBy(board, fromRow, fromCol, opponentColor)
+              ) {
+                isMoveValid = false;
+              } else if (
+                isSquareAttackedBy(board, baseRow, passThroughCol, opponentColor)
               ) {
                 isMoveValid = false;
               } else {

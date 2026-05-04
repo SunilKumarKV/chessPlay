@@ -427,8 +427,29 @@ export default function GameScreen({
 
           {/* Game Controls */}
           <div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a] space-y-3">
+            {g.drawPending && (
+              <div className="space-y-3 bg-[#1f3b2a] border border-[#81b64c]/20 p-3 rounded">
+                <div className="text-[#81b64c] text-sm font-semibold">
+                  Draw offer pending
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={g.acceptDraw}
+                    className="flex-1 py-2 bg-[#81b64c] hover:bg-[#6ba03d] text-[#0e0e0e] rounded-lg text-sm font-semibold transition-colors"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    onClick={g.declineDraw}
+                    className="flex-1 py-2 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#e0e0e0] rounded-lg text-sm transition-colors"
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            )}
             <button
-              onClick={g.resetGame}
+              onClick={g.confirmReset}
               className="w-full py-2 px-4 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#e0e0e0] rounded-lg transition-colors font-['Inter']"
             >
               New Game
@@ -525,7 +546,7 @@ export default function GameScreen({
               </h2>
               <div className="flex space-x-3">
                 <button
-                  onClick={g.resetGame}
+                  onClick={g.confirmReset}
                   className="flex-1 py-3 px-4 bg-[#81b64c] hover:bg-[#6ba03d] text-[#0e0e0e] font-bold rounded-lg transition-colors font-['Montserrat']"
                 >
                   New Game
@@ -558,7 +579,7 @@ export default function GameScreen({
               setSoundEnabled={g.setSoundEnabled}
               timeControlIdx={g.timeControlIdx}
               setTimeControlIdx={g.setTimeControlIdx}
-              onReset={g.resetGame}
+              onReset={g.confirmReset}
             />
           </div>
         </div>

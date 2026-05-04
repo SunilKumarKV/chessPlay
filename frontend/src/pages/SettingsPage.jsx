@@ -145,6 +145,12 @@ export default function Settings({ user, onBack }) {
 function AccountTab({ user, settings, theme }) {
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
   const fileInputRef = useRef(null);
 
   if (!user) {
@@ -164,6 +170,51 @@ function AccountTab({ user, settings, theme }) {
       const reader = new FileReader();
       reader.onload = (e) => setAvatarPreview(e.target.result);
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePasswordUpdate = async () => {
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    if (!currentPassword) {
+      setPasswordError("Current password is required.");
+      return;
+    }
+    if (!newPassword || newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError("New passwords do not match.");
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE}/auth/password`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.message || "Failed to update password.");
+      }
+
+      setPasswordSuccess(data.message || "Password updated successfully.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+    } catch (error) {
+      setPasswordError(error.message || "Failed to update password.");
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -289,6 +340,8 @@ function AccountTab({ user, settings, theme }) {
               </label>
               <input
                 type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
                 className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#81b64c] transition-colors"
                 placeholder="Enter current password"
               />
@@ -300,6 +353,8 @@ function AccountTab({ user, settings, theme }) {
               </label>
               <input
                 type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
                 className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#81b64c] transition-colors"
                 placeholder="Enter new password"
               />
@@ -311,13 +366,30 @@ function AccountTab({ user, settings, theme }) {
               </label>
               <input
                 type="password"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
                 className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#81b64c] transition-colors"
                 placeholder="Confirm new password"
               />
             </div>
 
-            <button className="px-4 py-2 bg-[#81b64c] hover:bg-[#6ba43d] text-white font-medium rounded-lg transition-colors">
-              Update Password
+            {passwordError && (
+              <div className="text-red-400 text-sm">{passwordError}</div>
+            )}
+            {passwordSuccess && (
+              <div className="text-green-400 text-sm">{passwordSuccess}</div>
+            )}
+
+            <button
+              onClick={handlePasswordUpdate}
+              disabled={passwordSaving}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                passwordSaving
+                  ? "bg-gray-600 text-gray-300 cursor-not-allowed"
+                  : "bg-[#81b64c] hover:bg-[#6ba43d] text-white"
+              }`}
+            >
+              {passwordSaving ? "Updating..." : "Update Password"}
             </button>
           </div>
         )}
