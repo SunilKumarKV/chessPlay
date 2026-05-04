@@ -44,6 +44,7 @@ const allowedOrigins = [
   "http://localhost:5174",
   "http://127.0.0.1:5173",
   "http://127.0.0.1:5174",
+  "https://chessplay1.vercel.app",
   /^http:\/\/192\.168\.\d+\.\d+:5173$/,
   /^http:\/\/192\.168\.\d+\.\d+:5174$/,
   /^http:\/\/10\.\d+\.\d+\.\d+:5173$/,
@@ -53,8 +54,8 @@ const allowedOrigins = [
 ];
 
 // Add production frontend URL if provided
-if (process.env.VITE_FRONTEND_URL) {
-  allowedOrigins.push(process.env.VITE_FRONTEND_URL);
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
 }
 
 const corsOptions = {
@@ -70,7 +71,9 @@ const corsOptions = {
     if (isAllowed) {
       callback(null, true);
     } else {
-      callback(new Error("Not allowed by CORS"));
+      // callback(new Error("Not allowed by CORS"));
+      console.log("Blocked by CORS:", origin);
+      callback(null, false);
     }
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
