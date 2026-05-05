@@ -24,6 +24,7 @@ class SoundManager {
 
   // Preload all sound effects
   async preloadSounds() {
+    const baseUrl = import.meta.env.BASE_URL || "/";
     const soundFiles = {
       default: {
         move: "/sounds/default/move.mp3",
@@ -57,18 +58,20 @@ class SoundManager {
     for (const [theme, files] of Object.entries(soundFiles)) {
       this.sounds[theme] = {};
       for (const [soundName, filePath] of Object.entries(files)) {
+        const soundUrl = new URL(filePath, baseUrl).href;
         try {
-          const response = await fetch(filePath);
+          const response = await fetch(soundUrl);
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
           }
           const arrayBuffer = await response.arrayBuffer();
-          const audioBuffer =
-            await this.audioContext.decodeAudioData(arrayBuffer);
+          const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
           this.sounds[theme][soundName] = audioBuffer;
         } catch (error) {
-          console.warn(`Failed to load sound ${theme}/${soundName}:`, error);
-          // Create fallback beep sounds
+          console.debug(
+            `Falling back to generated sound for ${theme}/${soundName} (${soundUrl}):`,
+            error,
+          );
           this.sounds[theme][soundName] = this.createFallbackSound(soundName);
         }
       }
