@@ -1,10 +1,15 @@
 # ChessPlay
 
-**Version 1.0.0**
+**Version v1.1.0-beta**
 
 ChessPlay is a production-focused chess platform built with React, Vite, Node.js, Express, Socket.IO, MongoDB, and Stockfish. It supports Play vs AI, real-time multiplayer, authenticated profiles, friends, notifications, game history, responsive settings, and production smoke checks.
 
-## V1.0.0 Highlights
+## V1.1.0-beta Highlights
+
+- Modern premium dashboard layout with glass panels, responsive right-side control surfaces, and floating quick actions.
+- Premium chess board theme system with Classic, Wooden, Neon Dark, Tournament Green, Minimal Light, Neon Cyberpunk, Marble, Glass Board, and Dark Pro themes.
+- Persistent board theme selection via localStorage and settings integration.
+- Smooth board and piece effects including legal-move glow, last-move trails, coordinate fade, check pulse, capture burst, board shadows, and dynamic lighting.
 
 - Legal chess move handling with check, checkmate, stalemate, castling, en passant, repetition, 50-move draw, and promotion support.
 - Play vs AI with Stockfish worker integration, hints, undo, resign, side selection, and time-control options.
@@ -285,7 +290,7 @@ Server to client:
 
 ## Release Status
 
-V1.0.0 is the first production-ready release candidate. It includes the production blocker fixes for privacy, public data exposure, promotion behavior, settings side effects, viewed-profile history, and repeatable smoke checks.
+v1.1.0-beta is the premium UI/UX beta release. It keeps the V1.0.0 production blocker fixes and adds the first dashboard, board theme, and board animation upgrades.
 
 ## License
 

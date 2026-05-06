@@ -226,7 +226,7 @@ export default function Dashboard({
           <div className="relative z-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-end">
             <div>
               <div className="mb-3 inline-flex rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-[#81b64c]">
-                v1.1.0 beta
+                v1.1.0-beta
               </div>
               <h1 className="font-['Montserrat'] text-3xl font-black tracking-normal text-white md:text-5xl">
                 {displayName}'s Chess Hub
