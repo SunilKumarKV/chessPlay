@@ -1,4 +1,8 @@
 import { store } from "../store";
+import {
+  BOARD_THEME_STORAGE_KEY,
+  normalizeBoardThemeId,
+} from "../features/chess/constants/boardThemes";
 
 // Settings persistence keys
 const SETTINGS_KEY = "chessplay-settings";
@@ -7,7 +11,7 @@ const GAME_STATE_KEY = "chessplay-game-state";
 // Default settings
 const defaultSettings = {
   // Board settings
-  boardTheme: "green",
+  boardTheme: "classic",
   pieceSet: "classic",
   showCoordinates: true,
   pieceNotation: "algebraic", // 'algebraic' | 'figurine'
@@ -67,6 +71,10 @@ export const saveSettings = (settingsOverride = null) => {
     const { animationDuration: _animationDuration, ...settingsToSave } = settings;
 
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settingsToSave));
+    localStorage.setItem(
+      BOARD_THEME_STORAGE_KEY,
+      normalizeBoardThemeId(settings.boardTheme),
+    );
   } catch (error) {
     console.error("Failed to save settings:", error);
   }
@@ -79,8 +87,16 @@ export const loadSettings = () => {
     if (saved) {
       const parsedSettings = JSON.parse(saved);
 
+      const storedBoardTheme = localStorage.getItem(BOARD_THEME_STORAGE_KEY);
+
       // Merge with defaults to handle new settings
-      const mergedSettings = { ...defaultSettings, ...parsedSettings };
+      const mergedSettings = {
+        ...defaultSettings,
+        ...parsedSettings,
+        boardTheme: normalizeBoardThemeId(
+          storedBoardTheme || parsedSettings.boardTheme,
+        ),
+      };
 
       // Convert animation speed to duration
       if (mergedSettings.pieceAnimations) {
@@ -103,9 +119,21 @@ export const loadSettings = () => {
   // Return defaults if nothing saved
   store.dispatch({
     type: "chessSettings/loadSettings",
-    payload: defaultSettings,
+    payload: {
+      ...defaultSettings,
+      boardTheme: normalizeBoardThemeId(
+        localStorage.getItem(BOARD_THEME_STORAGE_KEY) ||
+          defaultSettings.boardTheme,
+      ),
+    },
   });
-  return defaultSettings;
+  return {
+    ...defaultSettings,
+    boardTheme: normalizeBoardThemeId(
+      localStorage.getItem(BOARD_THEME_STORAGE_KEY) ||
+        defaultSettings.boardTheme,
+    ),
+  };
 };
 
 // Save game state (optional, for resuming games)
@@ -145,6 +173,7 @@ export const loadGameState = () => {
 export const clearSavedData = () => {
   localStorage.removeItem(SETTINGS_KEY);
   localStorage.removeItem(GAME_STATE_KEY);
+  localStorage.removeItem(BOARD_THEME_STORAGE_KEY);
 };
 
 // Auto-save settings when they change

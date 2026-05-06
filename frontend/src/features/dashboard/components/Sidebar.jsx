@@ -15,35 +15,15 @@ export default function Sidebar({
 
   const navigationStructure = [
     {
-      category: "Play",
+      category: "ChessPlay",
       items: [
-        { id: "dashboard", label: "Play Online", icon: "⚡" },
-        { id: "ai", label: "Play vs AI", icon: "🤖" },
-        { id: "challenge", label: "Challenge a Friend", icon: "🤝" },
-        { id: "history", label: "Game History", icon: "📜" },
-      ],
-    },
-    {
-      category: "Multiplayer",
-      items: [
-        { id: "multi", label: "Multiplayer", icon: "👥" },
-        { id: "tournament", label: "Tournament", icon: "🏆" },
-      ],
-    },
-    {
-      category: null,
-      items: [
-        { id: "leaderboard", label: "Leaderboard", icon: "🏆" },
-        { id: "puzzles", label: "Puzzles", icon: "🧩" },
-        { id: "learn", label: "Learn", icon: "📚" },
-        { id: "community", label: "Community", icon: "🌍" },
-      ],
-    },
-    {
-      category: "Settings",
-      items: [
-        { id: "settings", label: "Settings", icon: "⚙️" },
-        { id: "profile", label: "Profile", icon: "👤" },
+        { id: "dashboard", label: "Dashboard", icon: "♜" },
+        { id: "ai", label: "Play AI", icon: "♞" },
+        { id: "multi", label: "Play Online", icon: "♟" },
+        { id: "puzzles", label: "Puzzles", icon: "◇" },
+        { id: "analysis", label: "Analysis", icon: "∑" },
+        { id: "leaderboard", label: "Leaderboard", icon: "★" },
+        { id: "settings", label: "Settings", icon: "⚙" },
       ],
     },
   ];
@@ -70,9 +50,10 @@ export default function Sidebar({
       <aside
         className={`fixed md:static inset-y-0 left-0 flex-shrink-0 z-50 shadow-2xl transition-all duration-300 ease-in-out transform ${
           isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-        } ${isCollapsed ? "w-20" : "w-64"} flex flex-col`}
+        } ${isCollapsed ? "w-20" : "w-72"} flex flex-col backdrop-blur-2xl`}
         style={{
-          backgroundColor: theme.bg.overlay,
+          background:
+            "linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(13, 18, 25, 0.98))",
           borderRightColor: theme.border.secondary,
           borderRight: `1px solid ${theme.border.secondary}`,
           color: theme.text.primary,
@@ -118,12 +99,12 @@ export default function Sidebar({
         </div>
 
         {/* Main Navigation Links */}
-        <nav className="flex-1 px-3 py-2 space-y-4 overflow-y-auto custom-scrollbar">
+        <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto custom-scrollbar">
           {navigationStructure.map((section, index) => (
             <div key={index}>
               {section.category && !isCollapsed && (
                 <h3
-                  className="px-4 pt-2 pb-1 text-xs font-bold uppercase tracking-wider"
+                  className="px-4 pt-2 pb-2 text-xs font-bold uppercase tracking-[0.22em]"
                   style={{ color: theme.text.tertiary }}
                 >
                   {section.category}
@@ -157,9 +138,9 @@ export default function Sidebar({
           style={{
             borderTopColor: theme.border.secondary,
             borderTop: `1px solid ${theme.border.secondary}`,
-            backgroundColor: isDark
-              ? "rgba(255, 255, 255, 0.02)"
-              : "rgba(0, 0, 0, 0.02)",
+            background: isDark
+              ? "linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02))"
+              : "linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,.02))",
           }}
         >
           <button

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSettings } from "../hooks/useSettings";
 import { useTheme } from "../hooks/useTheme";
 import { notifyUserChanged } from "../hooks/useCurrentUser";
+import { BOARD_THEME_OPTIONS } from "../features/chess/constants/boardThemes";
 
 const API_BASE = `${import.meta.env.VITE_BACKEND_URL || "http://localhost:3001"}/api`;
 
@@ -22,15 +23,6 @@ const LANGUAGES = [
   { id: "ml", label: "Malayalam" },
   { id: "es", label: "Spanish" },
   { id: "fr", label: "French" },
-];
-
-const BOARD_THEMES = [
-  { id: "classic", label: "Classic", light: "#f0d9b5", dark: "#b58863" },
-  { id: "green", label: "Green", light: "#eeeed2", dark: "#769656" },
-  { id: "blue", label: "Blue", light: "#dee3e6", dark: "#8ca2ad" },
-  { id: "brown", label: "Walnut", light: "#ead7b8", dark: "#946f51" },
-  { id: "grey", label: "Slate", light: "#c8c8c8", dark: "#777777" },
-  { id: "dark", label: "Night", light: "#6b7280", dark: "#262626" },
 ];
 
 const APP_THEMES = [
@@ -520,7 +512,7 @@ function BoardSection({ settings, updateAppearance, theme }) {
     <>
       <Card title="Board Theme" description="Pick the board colors used in chess screens." theme={theme}>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {BOARD_THEMES.map((board) => (
+          {BOARD_THEME_OPTIONS.map((board) => (
             <button
               key={board.id}
               type="button"

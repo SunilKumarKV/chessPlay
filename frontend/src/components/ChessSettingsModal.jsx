@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAppSelector, useAppDispatch } from "../store/hooks";
 import {
+  setBoardTheme,
   setShowCoordinates,
   setPieceNotation,
   setWhiteAlwaysOnBottom,
@@ -18,6 +19,7 @@ import {
 } from "../store/slices/chessSettingsSlice";
 import { soundManager } from "../utils/sounds/soundManager";
 import { saveSettings } from "../utils/settingsPersistence";
+import { BOARD_THEME_OPTIONS } from "../features/chess/constants/boardThemes";
 
 const ChessSettingsModal = ({ isOpen, onClose }) => {
   const dispatch = useAppDispatch();
@@ -115,6 +117,46 @@ const ChessSettingsModal = ({ isOpen, onClose }) => {
                 </h3>
 
                 <div className="space-y-3">
+                  <div>
+                    <label className="mb-2 block text-sm text-[#d9c8a5]">
+                      Board Theme
+                    </label>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      {BOARD_THEME_OPTIONS.map((board) => (
+                        <button
+                          key={board.id}
+                          type="button"
+                          onClick={() => dispatch(setBoardTheme(board.id))}
+                          className={`rounded border p-2 text-left transition-all hover:-translate-y-0.5 ${
+                            settings.boardTheme === board.id
+                              ? "border-[#c9a45c]"
+                              : "border-white/10"
+                          }`}
+                          style={{
+                            background:
+                              settings.boardTheme === board.id
+                                ? "rgba(201,164,92,0.14)"
+                                : "rgba(255,255,255,0.05)",
+                          }}
+                        >
+                          <div className="mb-2 grid h-9 grid-cols-4 overflow-hidden rounded">
+                            {[board.light, board.dark, board.dark, board.light].map(
+                              (color, index) => (
+                                <span
+                                  key={`${board.id}-${index}`}
+                                  style={{ background: color }}
+                                />
+                              ),
+                            )}
+                          </div>
+                          <div className="text-xs font-semibold">
+                            {board.label}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <label className="flex items-center justify-between rounded bg-white/5 px-3 py-2">
                     <span>Show Coordinates</span>
                     <input

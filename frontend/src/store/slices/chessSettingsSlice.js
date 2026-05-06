@@ -1,8 +1,9 @@
 import { createSlice } from "@reduxjs/toolkit";
+import { normalizeBoardThemeId } from "../../features/chess/constants/boardThemes";
 
 const initialState = {
   // Board display
-  boardTheme: "green",
+  boardTheme: "classic",
   pieceSet: "classic",
   showCoordinates: true,
   pieceNotation: "algebraic", // 'algebraic' | 'figurine'
@@ -55,6 +56,10 @@ const chessSettingsSlice = createSlice({
   initialState,
   reducers: {
     // Board display
+    setBoardTheme: (state, action) => {
+      state.boardTheme = normalizeBoardThemeId(action.payload);
+    },
+
     setShowCoordinates: (state, action) => {
       state.showCoordinates = action.payload;
     },
@@ -175,12 +180,20 @@ const chessSettingsSlice = createSlice({
 
     // Bulk settings update
     updateSettings: (state, action) => {
-      return { ...state, ...action.payload };
+      const payload = { ...action.payload };
+      if (payload.boardTheme) {
+        payload.boardTheme = normalizeBoardThemeId(payload.boardTheme);
+      }
+      return { ...state, ...payload };
     },
 
     // Load settings from storage
     loadSettings: (state, action) => {
-      return { ...state, ...action.payload };
+      const payload = { ...action.payload };
+      if (payload.boardTheme) {
+        payload.boardTheme = normalizeBoardThemeId(payload.boardTheme);
+      }
+      return { ...state, ...payload };
     },
 
     // Reset to defaults
@@ -192,6 +205,7 @@ const chessSettingsSlice = createSlice({
 
 export const {
   setShowCoordinates,
+  setBoardTheme,
   setPieceNotation,
   setWhiteAlwaysOnBottom,
   setMoveClassification,

@@ -53,6 +53,139 @@
   filter: brightness(1.08);
 }
 
+/* Premium chess board effects */
+.premium-chess-board::before,
+.premium-chess-board::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 25;
+}
+
+.premium-chess-board::before {
+  background:
+    radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--board-glow) 52%, transparent), transparent 28%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 34%, rgba(0, 0, 0, 0.16));
+  mix-blend-mode: soft-light;
+  opacity: 0.74;
+}
+
+.premium-chess-board::after {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset 0 0 42px rgba(0, 0, 0, 0.24);
+}
+
+.premium-board-square {
+  isolation: isolate;
+}
+
+.premium-board-square::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.2), transparent 62%);
+  opacity: 0;
+  transform: scale(0.82);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.premium-board-square:hover::after {
+  opacity: 0.56;
+  transform: scale(1);
+}
+
+.premium-piece {
+  cursor: grab;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.28));
+  will-change: transform, filter;
+}
+
+.premium-piece:active {
+  cursor: grabbing;
+}
+
+.board-coordinate {
+  opacity: 0.48;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+  transition: opacity 0.22s ease;
+}
+
+.premium-chess-board:hover .board-coordinate {
+  opacity: 0.95;
+}
+
+.premium-check-warning {
+  background:
+    radial-gradient(circle, var(--board-check) 0 38%, transparent 64%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.14), transparent);
+  animation: boardCheckPulse 0.95s ease-in-out infinite;
+}
+
+.premium-capture-burst span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--board-glow) 75%, white);
+  box-shadow: 0 0 18px var(--board-glow);
+  transform: translate(-50%, -50%);
+  animation: captureBurst 0.46s ease-out forwards;
+}
+
+.premium-capture-burst span:nth-child(2) {
+  animation-delay: 0.03s;
+  --burst-x: -32px;
+  --burst-y: 18px;
+}
+
+.premium-capture-burst span:nth-child(3) {
+  animation-delay: 0.05s;
+  --burst-x: 28px;
+  --burst-y: 24px;
+}
+
+.premium-capture-burst span:nth-child(4) {
+  animation-delay: 0.08s;
+  --burst-x: -14px;
+  --burst-y: -34px;
+}
+
+.premium-capture-burst span:nth-child(1) {
+  --burst-x: 34px;
+  --burst-y: -18px;
+}
+
+@keyframes boardCheckPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes captureBurst {
+  from {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  to {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--burst-x)), calc(-50% + var(--burst-y))) scale(1.8);
+  }
+}
+
 /* ── Player turn indicator pulse */
 @keyframes playerPulse {
   0%,
