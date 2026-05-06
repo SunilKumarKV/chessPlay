@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FormInput, PasswordInput, PrimaryBtn } from "../../../components/ui";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 const GOOGLE_AUTH_URL = import.meta.env.VITE_GOOGLE_AUTH_URL || "";
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 const FACEBOOK_AUTH_URL = import.meta.env.VITE_FACEBOOK_AUTH_URL || "";
+let googleInitializedClientId = "";
+let googleCredentialHandler = null;
 
 function loadGoogleIdentityScript() {
   return new Promise((resolve, reject) => {
@@ -49,6 +51,7 @@ export default function Auth({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
+  const googleButtonRef = useRef(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -104,10 +107,91 @@ export default function Auth({
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setError("");
-    setLoading(true);
+  const handleGoogleCredential = useCallback(
+    async ({ credential }) => {
+      setError("");
+      setLoading(true);
 
+      try {
+        if (!credential) {
+          throw new Error("Google did not return a credential");
+        }
+
+        const response = await fetch(`${BACKEND_URL}/api/auth/google`, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ credential }),
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(data.message || "Google login failed");
+        }
+
+        localStorage.removeItem("token");
+        localStorage.setItem("user", JSON.stringify(data.user));
+        onLogin(data.user);
+      } catch (error) {
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [onLogin],
+  );
+
+  useEffect(() => {
+    googleCredentialHandler = handleGoogleCredential;
+
+    if (!GOOGLE_CLIENT_ID || GOOGLE_AUTH_URL || !googleButtonRef.current) {
+      return () => {
+        googleCredentialHandler = null;
+      };
+    }
+
+    let cancelled = false;
+
+    async function renderGoogleButton() {
+      try {
+        const google = await loadGoogleIdentityScript();
+        if (cancelled || !googleButtonRef.current) return;
+
+        if (googleInitializedClientId !== GOOGLE_CLIENT_ID) {
+          google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: (response) => {
+              googleCredentialHandler?.(response);
+            },
+          });
+          googleInitializedClientId = GOOGLE_CLIENT_ID;
+        }
+
+        googleButtonRef.current.innerHTML = "";
+        google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: "outline",
+          size: "large",
+          type: "standard",
+          text: "continue_with",
+          shape: "rectangular",
+          width: googleButtonRef.current.offsetWidth || 360,
+        });
+      } catch (error) {
+        if (!cancelled) setError(error.message);
+      }
+    }
+
+    renderGoogleButton();
+
+    return () => {
+      cancelled = true;
+      googleCredentialHandler = null;
+    };
+  }, [handleGoogleCredential]);
+
+  const handleGoogleRedirect = () => {
     try {
       if (GOOGLE_AUTH_URL) {
         window.location.href = GOOGLE_AUTH_URL;
@@ -118,58 +202,15 @@ export default function Auth({
         throw new Error("Google login needs VITE_GOOGLE_CLIENT_ID.");
       }
 
-      const google = await loadGoogleIdentityScript();
-      google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: async ({ credential }) => {
-          try {
-            if (!credential) {
-              throw new Error("Google did not return a credential");
-            }
-
-            const response = await fetch(`${BACKEND_URL}/api/auth/google`, {
-              method: "POST",
-              credentials: "include",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ credential }),
-            });
-            const data = await response.json().catch(() => ({}));
-
-            if (!response.ok) {
-              throw new Error(data.message || "Google login failed");
-            }
-
-            localStorage.removeItem("token");
-            localStorage.setItem("user", JSON.stringify(data.user));
-            onLogin(data.user);
-          } catch (error) {
-            setError(error.message);
-          } finally {
-            setLoading(false);
-          }
-        },
-      });
-      google.accounts.id.prompt((notification) => {
-        if (
-          notification.isNotDisplayed() ||
-          notification.isSkippedMoment() ||
-          notification.isDismissedMoment()
-        ) {
-          setLoading(false);
-          setError("Google login popup was closed or blocked.");
-        }
-      });
+      setError("Use the Google button above to continue.");
     } catch (error) {
       setError(error.message);
-      setLoading(false);
     }
   };
 
   const handleSocialLogin = (provider) => {
     if (provider === "google") {
-      handleGoogleLogin();
+      handleGoogleRedirect();
       return;
     }
 
@@ -196,14 +237,20 @@ export default function Auth({
       </div>
 
       <div className="grid gap-2">
-        <button
-          type="button"
-          onClick={() => handleSocialLogin("google")}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-100"
-        >
-          <span className="text-base font-bold">G</span>
-          Continue with Google
-        </button>
+        {GOOGLE_CLIENT_ID && !GOOGLE_AUTH_URL ? (
+          <div className="min-h-11 w-full overflow-hidden rounded-lg bg-white">
+            <div ref={googleButtonRef} className="w-full" />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => handleSocialLogin("google")}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-100"
+          >
+            <span className="text-base font-bold">G</span>
+            Continue with Google
+          </button>
+        )}
         <button
           type="button"
           onClick={() => handleSocialLogin("facebook")}

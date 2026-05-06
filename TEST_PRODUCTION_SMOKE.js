@@ -58,6 +58,7 @@ function assertSourceChecks() {
   assert(!/token,\s*\n\s*user:/.test(auth), "Auth responses should not expose JWT tokens");
   assert(/router\.post\("\/google"/.test(auth), "Google login endpoint is missing");
   assert(/GOOGLE_CLIENT_ID/.test(auth), "Google login must verify the configured client ID");
+  assert(/router\.get\("\/session"/.test(auth), "Session endpoint is missing");
 
   const authMiddleware = read("backend/middleware/auth.js");
   assert(/getCookie\(req, "authToken"\)/.test(authMiddleware), "Auth middleware must read authToken cookie");
@@ -87,6 +88,8 @@ function assertSourceChecks() {
   const authComponent = read("frontend/src/features/auth/components/Auth.jsx");
   assert(/VITE_GOOGLE_CLIENT_ID/.test(authComponent), "Google button must support Google client ID config");
   assert(/\/api\/auth\/google/.test(authComponent), "Google button must send credentials to backend verification");
+  assert(/renderButton/.test(authComponent), "Google login should render the official Google button");
+  assert(!/\.prompt\(/.test(authComponent), "Google login should not use One Tap prompt");
 }
 
 function assertChessStatus() {

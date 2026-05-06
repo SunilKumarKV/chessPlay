@@ -35,10 +35,14 @@ export default function App() {
     async function restoreSession() {
       try {
         localStorage.removeItem("token");
-        const data = await apiClient("/api/auth/profile");
+        const data = await apiClient("/api/auth/session");
         if (cancelled) return;
-        const nextUser = data.user;
-        localStorage.setItem("user", JSON.stringify(nextUser));
+        const nextUser = data.user || null;
+        if (nextUser) {
+          localStorage.setItem("user", JSON.stringify(nextUser));
+        } else {
+          localStorage.removeItem("user");
+        }
         setUser(nextUser);
         notifyUserChanged();
       } catch {

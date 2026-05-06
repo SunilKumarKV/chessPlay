@@ -30,6 +30,14 @@ function setAuthCookie(res, token) {
   res.cookie("authToken", token, cookieOptions());
 }
 
+function getCookie(req, name) {
+  return String(req.headers.cookie || "")
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`))
+    ?.slice(name.length + 1);
+}
+
 function authUserPayload(user) {
   return {
     id: user._id,
@@ -298,6 +306,28 @@ router.post("/google", authLimiter, async (req, res) => {
 router.post("/logout", (req, res) => {
   res.clearCookie("authToken", clearCookieOptions());
   res.json({ message: "Logged out" });
+});
+
+// Current session without noisy 401s for first page load
+router.get("/session", async (req, res) => {
+  try {
+    const token = getCookie(req, "authToken");
+    if (!token) {
+      return res.json({ user: null });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId).select("-password");
+    if (!user) {
+      res.clearCookie("authToken", clearCookieOptions());
+      return res.json({ user: null });
+    }
+
+    res.json({ user });
+  } catch {
+    res.clearCookie("authToken", clearCookieOptions());
+    res.json({ user: null });
+  }
 });
 
 // Get current user profile
