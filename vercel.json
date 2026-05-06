@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "outputDirectory": "frontend/dist",
 
   "headers": [
     {
@@ -25,7 +25,7 @@
       ]
     },
     {
-      "source": "/stockfish-18-lite.js",
+      "source": "/workers/stockfish-worker.js",
       "headers": [
         {
           "key": "Content-Type",
@@ -38,11 +38,11 @@
       ]
     },
     {
-      "source": "/stockfish-18-lite.wasm",
+      "source": "/stockfish/stockfish.js",
       "headers": [
         {
           "key": "Content-Type",
-          "value": "application/wasm"
+          "value": "application/javascript"
         },
         {
           "key": "Cross-Origin-Resource-Policy",
@@ -51,7 +51,7 @@
       ]
     },
     {
-      "source": "/public/(.*)",
+      "source": "/stockfish/(.*)",
       "headers": [
         {
           "key": "Cross-Origin-Resource-Policy",

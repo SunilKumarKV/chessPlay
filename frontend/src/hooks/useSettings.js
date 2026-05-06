@@ -128,10 +128,9 @@ export function useSettings() {
       setOriginalSettings(localSettings);
 
       // Try to load from API (user profile data)
-      const token = localStorage.getItem("token");
-      if (token) {
+      {
         const response = await fetch(`${API_BASE}/auth/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
         });
         if (response.ok) {
           const data = await response.json();
@@ -240,11 +239,8 @@ export function useSettings() {
   // Save settings to API and localStorage
   const saveSettings = useCallback(async () => {
     try {
-      const token = localStorage.getItem("token");
-
       // Save to API for account data and server-enforced privacy.
       if (
-        token &&
         (Object.keys(changes).includes("account") ||
           Object.keys(changes).includes("privacy"))
       ) {
@@ -259,9 +255,9 @@ export function useSettings() {
 
         const response = await fetch(`${API_BASE}/auth/profile`, {
           method: "PUT",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(accountData),
         });

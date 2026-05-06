@@ -18,13 +18,10 @@ export default function GameHistory({ onBack }) {
       setError("");
 
       try {
-        const token = localStorage.getItem("token");
         const response = await fetch(
           `${BACKEND_URL}/api/games/history?limit=50`,
           {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            credentials: "include",
           },
         );
 

@@ -1,18 +1,27 @@
 require("dotenv").config();
 
-// Validate environment variables
-const DEFAULT_JWT_SECRET = "your-super-secret-jwt-key-change-this-in-production";
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET === DEFAULT_JWT_SECRET) {
-  if (process.env.NODE_ENV === "production") {
-    console.error("FATAL ERROR: JWT_SECRET is not set or is using the default value.");
-    console.error("Please set a secure JWT_SECRET in your environment variables.");
-    process.exit(1);
-  } else {
-    process.env.JWT_SECRET = "dev-jwt-secret-not-for-production";
-    console.warn(
-      "Warning: JWT_SECRET is missing/default. Using temporary development secret.",
-    );
-  }
+const isProduction = process.env.NODE_ENV === "production";
+const weakJwtSecrets = new Set([
+  "your-placeholder-secret-key",
+  "your-super-secret-jwt-key-change-this-in-production",
+  "dev-jwt-secret-not-for-production",
+]);
+
+function fatalConfigError(message) {
+  console.error(`FATAL CONFIG ERROR: ${message}`);
+  process.exit(1);
+}
+
+if (!process.env.JWT_SECRET) {
+  fatalConfigError("JWT_SECRET is required.");
+}
+
+if (process.env.JWT_SECRET.length < 32) {
+  fatalConfigError("JWT_SECRET must be at least 32 characters long.");
+}
+
+if (weakJwtSecrets.has(process.env.JWT_SECRET)) {
+  fatalConfigError("JWT_SECRET is using a known weak/default value.");
 }
 
 const express = require("express");
@@ -37,44 +46,109 @@ const { updatePlayerStats } = require("./utils/elo");
 
 const app = express();
 const server = http.createServer(app);
+app.set("trust proxy", 1);
 
-// Configure CORS for the frontend
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "http://127.0.0.1:5173",
-  "http://127.0.0.1:5174",
-  "https://chessplay1.vercel.app",
-  /^http:\/\/192\.168\.\d+\.\d+:5173$/,
-  /^http:\/\/192\.168\.\d+\.\d+:5174$/,
-  /^http:\/\/10\.\d+\.\d+\.\d+:5173$/,
-  /^http:\/\/10\.\d+\.\d+\.\d+:5174$/,
-  /^http:\/\/172\.\d+\.\d+\.\d+:5173$/,
-  /^http:\/\/172\.\d+\.\d+\.\d+:5174$/,
-];
-
-// Add production frontend URL if provided
-if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
+function parseCsvEnv(value) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+function parseCookies(cookieHeader = "") {
+  return cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reduce((cookies, part) => {
+      const separatorIndex = part.indexOf("=");
+      if (separatorIndex === -1) return cookies;
+      const key = decodeURIComponent(part.slice(0, separatorIndex).trim());
+      const value = decodeURIComponent(part.slice(separatorIndex + 1).trim());
+      cookies[key] = value;
+      return cookies;
+    }, {});
+}
 
-    const isAllowed = allowedOrigins.some((pattern) => {
-      if (typeof pattern === "string") return pattern === origin;
-      return pattern.test(origin);
-    });
+// Configure CORS for the frontend
+const configuredOrigins = [
+  ...parseCsvEnv(process.env.FRONTEND_ORIGINS),
+  ...parseCsvEnv(process.env.FRONTEND_URL),
+];
 
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      // callback(new Error("Not allowed by CORS"));
-      console.log("Blocked by CORS:", origin);
-      callback(null, false);
+if (isProduction && configuredOrigins.length === 0) {
+  fatalConfigError("FRONTEND_ORIGINS or FRONTEND_URL must be configured in production.");
+}
+
+const developmentOrigins = isProduction
+  ? []
+  : [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "http://127.0.0.1:5173",
+      "http://127.0.0.1:5174",
+      /^http:\/\/192\.168\.\d+\.\d+:5173$/,
+      /^http:\/\/192\.168\.\d+\.\d+:5174$/,
+      /^http:\/\/10\.\d+\.\d+\.\d+:5173$/,
+      /^http:\/\/10\.\d+\.\d+\.\d+:5174$/,
+      /^http:\/\/172\.\d+\.\d+\.\d+:5173$/,
+      /^http:\/\/172\.\d+\.\d+\.\d+:5174$/,
+    ];
+
+const allowedOrigins = [...configuredOrigins, ...developmentOrigins];
+
+function isAllowedOrigin(origin) {
+  return allowedOrigins.some((pattern) => {
+    if (typeof pattern === "string") return pattern === origin;
+    return pattern.test(origin);
+  });
+}
+
+function corsOriginForRequest(req, origin, callback) {
+  if (!origin) {
+    return callback(null, !isProduction || req.path === "/health");
+  }
+
+  if (isAllowedOrigin(origin)) {
+    return callback(null, true);
+  }
+
+  console.warn("Blocked by CORS:", origin);
+  return callback(null, false);
+}
+
+function createCorsOptions(req) {
+  return {
+    origin(origin, callback) {
+      corsOriginForRequest(req, origin, callback);
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+  };
+}
+
+function enforceProductionOrigin(req, res, next) {
+  if (!isProduction) return next();
+
+  const origin = req.headers.origin;
+  if (!origin) {
+    if (req.path === "/health") return next();
+    return res.status(403).json({ message: "Origin is required" });
+  }
+
+  if (!isAllowedOrigin(origin)) {
+    return res.status(403).json({ message: "Origin is not allowed" });
+  }
+
+  next();
+}
+
+const socketCorsOptions = {
+  origin(origin, callback) {
+    if (!origin) {
+      return callback(null, !isProduction);
     }
+    return callback(null, isAllowedOrigin(origin));
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true,
@@ -90,7 +164,7 @@ const cspConnectSources = [
 ];
 
 const io = socketIo(server, {
-  cors: corsOptions,
+  cors: socketCorsOptions,
 });
 
 const RECONNECTION_GRACE_MS = 60 * 1000;
@@ -105,7 +179,8 @@ const BLOCKED_WORDS = String(process.env.BLOCKED_WORDS || "")
 // Socket authentication middleware
 io.use(async (socket, next) => {
   try {
-    const token = socket.handshake.auth.token;
+    const cookies = parseCookies(socket.handshake.headers.cookie || "");
+    const token = cookies.authToken;
     if (!token) {
       return next(new Error("Authentication required"));
     }
@@ -132,7 +207,8 @@ const reconnectionTimers = new Map(); // `${roomId}:${color}` -> Timeout
 const matchmakingQueue = []; // { socketId, userId, playerName, ratingRange, rating }
 const chatRateLimits = new Map(); // socket.id -> { count, resetAt }
 
-app.use(cors(corsOptions));
+app.use((req, res, next) => cors(createCorsOptions(req))(req, res, next));
+app.use(enforceProductionOrigin);
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -689,14 +765,13 @@ io.on("connection", (socket) => {
     try {
       removeFromQueue(socket.id);
       cleanupSpectator(socket.id, true);
-      const { roomId, token } = data;
-      if (!roomId || !token) {
-        socket.emit("serverError", { message: "Room and token are required" });
+      const { roomId } = data;
+      if (!roomId) {
+        socket.emit("serverError", { message: "Room is required" });
         return;
       }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.userId);
+      const user = await User.findById(socket.user.userId);
       if (!user) {
         socket.emit("serverError", { message: "User not found" });
         return;

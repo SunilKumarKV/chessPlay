@@ -6,6 +6,28 @@ const auth = require("../middleware/auth");
 const router = express.Router();
 const PUBLIC_USER_FIELDS = "username avatar country title rating gamesPlayed gamesWon privacy friends";
 const FRIEND_USER_FIELDS = "username avatar country title rating gamesPlayed gamesWon";
+const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function cookieOptions() {
+  const isProduction = process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    maxAge: TOKEN_MAX_AGE_MS,
+    path: "/",
+  };
+}
+
+function clearCookieOptions() {
+  const options = cookieOptions();
+  delete options.maxAge;
+  return options;
+}
+
+function setAuthCookie(res, token) {
+  res.cookie("authToken", token, cookieOptions());
+}
 
 function isFriend(user, otherUserId) {
   return Boolean(
@@ -131,10 +153,10 @@ router.post("/register", authLimiter, async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "7d" },
     );
+    setAuthCookie(res, token);
 
     res.status(201).json({
       message: "User created successfully",
-      token,
       user: {
         id: user._id,
         username: user.username,
@@ -177,10 +199,10 @@ router.post("/login", authLimiter, async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "7d" },
     );
+    setAuthCookie(res, token);
 
     res.json({
       message: "Login successful",
-      token,
       user: {
         id: user._id,
         username: user.username,
@@ -194,6 +216,12 @@ router.post("/login", authLimiter, async (req, res) => {
     console.error("Login error:", error);
     res.status(500).json({ message: "Server error" });
   }
+});
+
+// Logout
+router.post("/logout", (req, res) => {
+  res.clearCookie("authToken", clearCookieOptions());
+  res.json({ message: "Logged out" });
 });
 
 // Get current user profile

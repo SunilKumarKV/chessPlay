@@ -34,6 +34,7 @@ export default function Auth({
 
       const response = await fetch(`${BACKEND_URL}${endpoint}`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -46,8 +47,7 @@ export default function Auth({
         throw new Error(data.message || "Authentication failed");
       }
 
-      // Store token
-      localStorage.setItem("token", data.token);
+      localStorage.removeItem("token");
       localStorage.setItem("user", JSON.stringify(data.user));
 
       onLogin(data.user);

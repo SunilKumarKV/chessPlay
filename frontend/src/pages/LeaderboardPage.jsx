@@ -17,11 +17,8 @@ export default function Leaderboard({ onBack }) {
       setError("");
 
       try {
-        const token = localStorage.getItem("token");
         const response = await fetch(`${BACKEND_URL}/api/games/leaderboard`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          credentials: "include",
         });
 
         const data = await response.json();

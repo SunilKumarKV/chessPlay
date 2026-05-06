@@ -1,8 +1,16 @@
 const jwt = require("jsonwebtoken");
 
+function getCookie(req, name) {
+  return String(req.headers.cookie || "")
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`))
+    ?.slice(name.length + 1);
+}
+
 const auth = (req, res, next) => {
   try {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
+    const token = getCookie(req, "authToken");
 
     if (!token) {
       return res.status(401).json({ message: "No token provided" });

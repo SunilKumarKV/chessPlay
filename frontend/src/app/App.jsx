@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { notifyUserChanged } from "../hooks/useCurrentUser";
+import { apiClient } from "../services/apiClient";
 import Chess from "../features/chess/pages/ChessPage";
 import MultiplayerChess from "../features/chess/components/MultiplayerChess";
 import Leaderboard from "../pages/LeaderboardPage";
@@ -12,15 +13,12 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import ErrorBoundary from "../components/ErrorBoundary";
 
 export default function App() {
-  // Initialize user from localStorage
   const [user, setUser] = useState(() => {
-    const token = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
-    if (token && storedUser) {
+    if (storedUser) {
       try {
         return JSON.parse(storedUser);
       } catch {
-        // Invalid stored data, clear it
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         return null;
@@ -28,20 +26,59 @@ export default function App() {
     }
     return null;
   });
+  const [authChecked, setAuthChecked] = useState(false);
   const [currentPage, setCurrentPage] = useState("dashboard");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restoreSession() {
+      try {
+        localStorage.removeItem("token");
+        const data = await apiClient("/api/auth/profile");
+        if (cancelled) return;
+        const nextUser = data.user;
+        localStorage.setItem("user", JSON.stringify(nextUser));
+        setUser(nextUser);
+        notifyUserChanged();
+      } catch {
+        if (!cancelled) {
+          localStorage.removeItem("user");
+          setUser(null);
+          notifyUserChanged();
+        }
+      } finally {
+        if (!cancelled) setAuthChecked(true);
+      }
+    }
+
+    restoreSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleLogin = (userData) => {
     setUser(userData);
     notifyUserChanged();
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await apiClient("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Local logout should still complete if the session is already gone.
+    }
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     setUser(null);
     setCurrentPage("dashboard");
     notifyUserChanged();
   };
+
+  if (!authChecked) {
+    return null;
+  }
 
   if (!user) {
     return (

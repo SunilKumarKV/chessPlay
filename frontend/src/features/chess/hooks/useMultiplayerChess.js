@@ -33,9 +33,7 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
   const [opponentName, setOpponentName] = useState(null);
   const [isMyTurn, setIsMyTurn] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
-  const [error, setError] = useState(() =>
-    localStorage.getItem("token") ? null : "Authentication required",
-  );
+  const [error, setError] = useState(null);
   const [drawOffered, setDrawOffered] = useState(false);
   const [drawOfferedBy, setDrawOfferedBy] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -63,20 +61,13 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
 
   // Connect to server
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      return;
-    }
-
     const targetUrl =
       serverUrl || BACKEND_URL || `http://${window.location.hostname}:3001`;
     const newSocket = io(targetUrl, {
       transports: ["polling", "websocket"],
       reconnectionAttempts: 5,
       timeout: 5000,
-      auth: {
-        token: token,
-      },
+      withCredentials: true,
     });
     socketRef.current = newSocket;
 
@@ -86,11 +77,9 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
 
       const storedRoomId = sessionStorage.getItem(STORED_ROOM_ID_KEY);
       const storedPlayerColor = sessionStorage.getItem(STORED_PLAYER_COLOR_KEY);
-      const reconnectToken = localStorage.getItem("token");
-      if (storedRoomId && storedPlayerColor && reconnectToken) {
+      if (storedRoomId && storedPlayerColor) {
         newSocket.emit("rejoinRoom", {
           roomId: storedRoomId,
-          token: reconnectToken,
         });
       }
     });

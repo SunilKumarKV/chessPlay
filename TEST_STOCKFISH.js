@@ -13,6 +13,7 @@ console.log("━━━━━━━━━━━━━━━━━━━━━━�
 
 // 1. Check if the worker used by the app exists
 const workerPath = path.join(__dirname, 'frontend/public/workers/stockfish-worker.js');
+const localStockfishPath = path.join(__dirname, 'frontend/public/stockfish/stockfish.js');
 if (fs.existsSync(workerPath)) {
   const stats = fs.statSync(workerPath);
   console.log("✓ stockfish-worker.js found");
@@ -21,6 +22,12 @@ if (fs.existsSync(workerPath)) {
   console.log("✗ stockfish-worker.js NOT found");
   process.exit(1);
 }
+
+if (!fs.existsSync(localStockfishPath)) {
+  console.log("✗ local Stockfish bundle NOT found");
+  process.exit(1);
+}
+console.log("✓ local Stockfish bundle found");
 
 // 2. Check if useStockfish.js points at the public worker
 const useStockfishPath = path.join(__dirname, 'frontend/src/features/chess/hooks/useStockfish.js');
@@ -44,9 +51,14 @@ const checks = [
     pattern: /msg === "uciok"/,
   },
   {
-    name: "Loads Stockfish bundle",
+    name: "Loads local Stockfish bundle",
     source: workerCode,
-    pattern: /importScripts\([\s\S]*stockfish\.js/,
+    pattern: /importScripts\("\/stockfish\/stockfish\.js"\)/,
+  },
+  {
+    name: "Keeps CDN fallback",
+    source: workerCode,
+    pattern: /cdnjs\.cloudflare\.com\/ajax\/libs\/stockfish\.js\/10\.0\.2\/stockfish\.js/,
   },
 ];
 

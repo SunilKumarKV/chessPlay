@@ -371,9 +371,9 @@ function AccountSection({ user, settings, updateAccount, updateAppearance, theme
     try {
       const response = await fetch(`${API_BASE}/auth/password`, {
         method: "PUT",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         body: JSON.stringify({
           currentPassword: passwordForm.currentPassword,

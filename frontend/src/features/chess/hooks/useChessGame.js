@@ -189,9 +189,6 @@ export function useChessGame({
 
   const recordGameResult = useCallback(
     async (result, winnerColor = null) => {
-      const token = localStorage.getItem("token");
-      if (!token) return false;
-
       const currentPlayerColor = getPlayerColor();
       const payload = {
         moves: history.map((move) => ({
@@ -211,9 +208,9 @@ export function useChessGame({
 
       await fetch(`${BACKEND_URL}/api/games/record`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });

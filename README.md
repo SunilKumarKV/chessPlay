@@ -110,12 +110,13 @@ chessPlay/
 Create `backend/.env`:
 
 ```bash
+NODE_ENV=development
 PORT=3001
 MONGODB_URI=mongodb://127.0.0.1:27017/chessplay
-JWT_SECRET=replace-with-a-long-random-production-secret
-FRONTEND_URL=http://localhost:5173
-# Optional:
-HEALTH_SECRET=replace-with-health-check-secret
+JWT_SECRET=replace-with-a-random-32-plus-character-secret
+FRONTEND_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+HEALTH_SECRET=
+BLOCKED_WORDS=
 ```
 
 Create `frontend/.env` when needed:
@@ -174,9 +175,10 @@ For hosted deployments:
 - Deploy `frontend/dist` to Vercel, Netlify, or static hosting.
 - Deploy `backend` to Render, Railway, Fly.io, or another Node.js host.
 - Set `VITE_BACKEND_URL` to the deployed backend URL.
-- Set `FRONTEND_URL` on the backend to the deployed frontend URL.
+- Set `FRONTEND_ORIGINS` on the backend to the deployed frontend origin. Use a comma-separated list for preview or custom domains.
 - Use a production MongoDB Atlas URI.
-- Use a strong `JWT_SECRET`.
+- Use a strong `JWT_SECRET` with at least 32 characters. Placeholder/default secrets are blocked at startup.
+- Authentication uses an HttpOnly, Secure, SameSite cookie in production; make sure Vercel calls the Render backend over HTTPS.
 
 ## Quality And Production Checks
 
@@ -237,6 +239,7 @@ Expected response:
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
+- `POST /api/auth/logout`
 - `GET /api/auth/profile`
 - `GET /api/auth/profile/:userId`
 - `PUT /api/auth/profile`
