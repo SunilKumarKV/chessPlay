@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { store } from "../store";
 import { loadSettings as loadChessSettings } from "../store/slices/chessSettingsSlice";
 import { setAiDifficulty } from "../store/slices/chessGameSlice";
+import {
+  BOARD_THEME_STORAGE_KEY,
+  normalizeBoardThemeId,
+} from "../features/chess/constants/boardThemes";
 
 const API_BASE = `${import.meta.env.VITE_BACKEND_URL || "http://localhost:3001"}/api`;
 
@@ -56,13 +60,18 @@ const DEFAULT_SETTINGS = {
 };
 
 function mergeSettings(storedSettings = {}) {
-  return Object.keys(DEFAULT_SETTINGS).reduce((merged, section) => {
+  const mergedSettings = Object.keys(DEFAULT_SETTINGS).reduce((merged, section) => {
     merged[section] = {
       ...DEFAULT_SETTINGS[section],
       ...(storedSettings[section] || {}),
     };
     return merged;
   }, {});
+  mergedSettings.appearance.boardTheme = normalizeBoardThemeId(
+    localStorage.getItem(BOARD_THEME_STORAGE_KEY) ||
+      mergedSettings.appearance.boardTheme,
+  );
+  return mergedSettings;
 }
 
 function syncChessSettings(settings) {
@@ -83,7 +92,7 @@ function syncChessSettings(settings) {
   };
 
   const chessSettings = {
-    boardTheme: settings.appearance.boardTheme,
+    boardTheme: normalizeBoardThemeId(settings.appearance.boardTheme),
     pieceSet: settings.appearance.pieceSet,
     showCoordinates: settings.appearance.boardCoordinates,
     pieceNotation:
@@ -105,6 +114,7 @@ function syncChessSettings(settings) {
     "chessplay-settings",
     JSON.stringify({ ...stored, ...chessSettings }),
   );
+  localStorage.setItem(BOARD_THEME_STORAGE_KEY, chessSettings.boardTheme);
   localStorage.setItem(
     "selectedTimeControl",
     timeControlMap[settings.game.defaultTimeControl] || "blitz",

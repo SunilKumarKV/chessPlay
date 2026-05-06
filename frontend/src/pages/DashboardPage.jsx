@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { StatCard, GameCard } from "../components/ui";
 import { apiClient } from "../services/apiClient";
 import { useTheme } from "../hooks/useTheme";
 
@@ -158,377 +157,359 @@ export default function Dashboard({
     );
   }
 
+  const userId = user.id || user._id;
+  const wins = stats?.wins || stats?.gamesWon || 0;
+  const losses = stats?.losses || Math.max((stats?.gamesPlayed || 0) - wins, 0);
+  const gamesPlayed = stats?.gamesPlayed || 0;
+  const winRate = Math.round((wins / Math.max(gamesPlayed, 1)) * 100);
+  const rating = stats?.rating || user?.rating || 1200;
+  const displayName = stats?.username || user?.username || "Player";
+
+  const statCards = [
+    { label: "Rating", value: rating, accent: "#81b64c" },
+    { label: "Win Rate", value: `${winRate}%`, accent: "#38bdf8" },
+    { label: "Games", value: gamesPlayed, accent: "#f59e0b" },
+    { label: "Record", value: `${wins}-${losses}`, accent: "#f472b6" },
+  ];
+
+  const modeCards = [
+    {
+      id: "ai",
+      title: "Play AI",
+      meta: `Stockfish · ${selectedTimeControl}`,
+      accent: "#81b64c",
+      action: () => onStartGame("ai", selectedTimeControl),
+      button: "Start",
+    },
+    {
+      id: "multi",
+      title: "Play Online",
+      meta: "Live room matchmaking",
+      accent: "#38bdf8",
+      action: () => onStartGame("multi", selectedTimeControl),
+      button: "Find Game",
+    },
+    {
+      id: "puzzles",
+      title: "Puzzles",
+      meta: "Tactics training",
+      accent: "#f59e0b",
+      action: () => onNavigate("puzzles"),
+      button: "Open",
+    },
+    {
+      id: "analysis",
+      title: "Analysis",
+      meta: "Review lines",
+      accent: "#f472b6",
+      action: () => onNavigate("analysis"),
+      button: "Analyze",
+    },
+  ];
+
   return (
     <div
-      className="max-w-6xl mx-auto p-4 md:p-8 space-y-8 w-full"
-      style={{ backgroundColor: theme.bg.primary, color: theme.text.primary }}
+      className="relative w-full max-w-7xl mx-auto p-4 md:p-6 xl:p-8 space-y-6"
+      style={{ color: theme.text.primary }}
     >
-      {/* QUICK PLAY HERO CARD */}
-      <div
-        className="relative rounded-xl p-8 md:p-12 overflow-hidden border shadow-lg"
-        style={{
-          backgroundColor: theme.bg.tertiary,
-          borderColor: theme.border.primary,
-        }}
-      >
-        {/* Chess board pattern overlay */}
-        <div
-          className="absolute inset-0 opacity-5"
-          style={{
-            backgroundImage: `
-              linear-gradient(45deg, #f0d9b5 25%, transparent 25%),
-              linear-gradient(-45deg, #f0d9b5 25%, transparent 25%),
-              linear-gradient(45deg, transparent 75%, #f0d9b5 75%),
-              linear-gradient(-45deg, transparent 75%, #f0d9b5 75%)
-            `,
-            backgroundSize: "20px 20px",
-            backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px",
-          }}
-        />
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/10 p-5 shadow-2xl shadow-black/25 backdrop-blur-xl md:p-7">
+          <div
+            className="absolute inset-0 opacity-20"
+            style={{
+              backgroundImage:
+                "linear-gradient(45deg, rgba(129,182,76,.22) 25%, transparent 25%, transparent 75%, rgba(129,182,76,.22) 75%), linear-gradient(45deg, rgba(56,189,248,.16) 25%, transparent 25%, transparent 75%, rgba(56,189,248,.16) 75%)",
+              backgroundPosition: "0 0, 18px 18px",
+              backgroundSize: "36px 36px",
+            }}
+          />
+          <div className="relative z-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-end">
+            <div>
+              <div className="mb-3 inline-flex rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-[#81b64c]">
+                v1.1.0 beta
+              </div>
+              <h1 className="font-['Montserrat'] text-3xl font-black tracking-normal text-white md:text-5xl">
+                {displayName}'s Chess Hub
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
+                Rating {rating} · {gamesPlayed} games · {winRate}% win rate
+              </p>
 
-        <div className="relative z-10 text-center">
-          <h1
-            className="text-4xl md:text-5xl font-bold mb-8 font-['Montserrat']"
-            style={{ color: theme.text.primary }}
-          >
-            Ready to Play Chess?
-          </h1>
+              <div className="mt-6 flex flex-wrap gap-2">
+                {timeControls.map((control) => (
+                  <button
+                    key={control.id}
+                    type="button"
+                    onClick={() => setSelectedTimeControl(control.id)}
+                    className={`rounded-full border px-3 py-2 text-sm font-bold transition-all hover:-translate-y-0.5 ${
+                      selectedTimeControl === control.id
+                        ? "border-[#81b64c] bg-[#81b64c] text-[#07100a]"
+                        : "border-white/10 bg-white/10 text-slate-300 hover:bg-white/15"
+                    }`}
+                  >
+                    {control.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-8">
+            <div className="grid gap-3">
+              <button
+                type="button"
+                onClick={handleQuickPlay}
+                className="rounded-xl bg-[#81b64c] px-5 py-4 text-left font-['Montserrat'] text-lg font-black text-[#07100a] shadow-lg shadow-[#81b64c]/20 transition-all hover:-translate-y-1 hover:bg-[#93c85f]"
+              >
+                Play AI
+              </button>
+              <button
+                type="button"
+                onClick={() => onStartGame("multi", selectedTimeControl)}
+                className="rounded-xl border border-white/10 bg-white/10 px-5 py-4 text-left font-bold text-white transition-all hover:-translate-y-1 hover:border-cyan-300/40 hover:bg-cyan-300/10"
+              >
+                Play Online
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <aside className="rounded-xl border border-white/10 bg-white/10 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-['Montserrat'] text-lg font-black text-white">
+                Control Room
+              </h2>
+              <p className="mt-1 text-xs text-slate-400">
+                {selectedTimeControl} selected
+              </p>
+            </div>
+            <div className="grid h-12 w-12 place-items-center rounded-xl bg-[#81b64c] font-black text-[#07100a]">
+              {String(displayName).charAt(0).toUpperCase()}
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3">
             <button
-              onClick={handleQuickPlay}
-              className="bg-[#81b64c] hover:bg-[#6ba03d] text-[#0e0e0e] font-bold text-xl py-4 px-10 rounded-xl transition-all duration-200 transform hover:scale-105 font-['Montserrat']"
+              type="button"
+              onClick={() => onNavigate("analysis")}
+              className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10"
             >
-              Play
+              Analysis
             </button>
-
             <button
-              onClick={handlePlayVsComputer}
-              className="font-medium py-3 px-6 rounded-lg transition-colors border shadow-sm font-['Inter']"
-              style={{
-                backgroundColor: theme.bg.secondary,
-                color: theme.text.primary,
-                borderColor: theme.border.primary,
-              }}
+              type="button"
+              onClick={() => onNavigate("settings")}
+              className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10"
             >
-              Play vs Computer
+              Settings
             </button>
           </div>
 
-          {/* Time Control Chips */}
-          <div className="flex flex-wrap justify-center gap-3">
-            {timeControls.map((control) => (
+          <div className="mt-5 rounded-lg border border-white/10 bg-black/20 p-4">
+            <div className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+              Top Table
+            </div>
+            <div className="space-y-2">
+              {leaderboard.slice(0, 4).map((player, index) => (
+                <button
+                  key={player._id || player.username || index}
+                  type="button"
+                  onClick={() => onNavigate("leaderboard")}
+                  className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left transition hover:bg-white/10"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="grid h-7 w-7 place-items-center rounded-md bg-white/10 text-xs font-black text-slate-300">
+                      {index + 1}
+                    </span>
+                    <span className="truncate text-sm font-bold text-slate-100">
+                      {player.username || "Unknown"}
+                    </span>
+                  </span>
+                  <span className="text-sm font-black text-[#81b64c]">
+                    {player.rating || 1200}
+                  </span>
+                </button>
+              ))}
+              {leaderboard.length === 0 && (
+                <div className="rounded-lg bg-white/5 px-3 py-4 text-sm text-slate-400">
+                  Leaderboard is empty.
+                </div>
+              )}
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {statCards.map((card) => (
+          <div
+            key={card.label}
+            className="rounded-xl border border-white/10 bg-white/10 p-4 shadow-lg shadow-black/10 backdrop-blur-xl transition-all hover:-translate-y-1 hover:bg-white/15"
+          >
+            <div
+              className="mb-4 h-1.5 w-12 rounded-full"
+              style={{ backgroundColor: card.accent }}
+            />
+            <div className="font-['Montserrat'] text-2xl font-black text-white">
+              {card.value}
+            </div>
+            <div className="mt-1 text-sm font-semibold text-slate-400">
+              {card.label}
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {modeCards.map((mode) => (
               <button
-                key={control.id}
-                onClick={() => setSelectedTimeControl(control.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 font-['Inter'] ${
-                  selectedTimeControl === control.id ? "text-[#0e0e0e]" : ""
-                }`}
-                style={{
-                  backgroundColor:
-                    selectedTimeControl === control.id
-                      ? theme.primary
-                      : theme.bg.secondary,
-                  color:
-                    selectedTimeControl === control.id
-                      ? "#0e0e0e"
-                      : theme.text.secondary,
-                }}
+                key={mode.id}
+                type="button"
+                onClick={mode.action}
+                className="group rounded-xl border border-white/10 bg-white/10 p-4 text-left shadow-lg shadow-black/10 backdrop-blur-xl transition-all hover:-translate-y-1 hover:bg-white/15"
               >
-                <span>{control.icon}</span>
-                {control.label}
+                <div
+                  className="mb-4 grid h-10 w-10 place-items-center rounded-lg text-lg font-black text-[#07100a]"
+                  style={{ backgroundColor: mode.accent }}
+                >
+                  {mode.title.charAt(0)}
+                </div>
+                <h3 className="font-['Montserrat'] text-lg font-black text-white">
+                  {mode.title}
+                </h3>
+                <div className="mt-1 text-sm text-slate-400">{mode.meta}</div>
+                <div
+                  className="mt-4 text-sm font-black transition group-hover:translate-x-1"
+                  style={{ color: mode.accent }}
+                >
+                  {mode.button}
+                </div>
               </button>
             ))}
           </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/10 shadow-xl shadow-black/10 backdrop-blur-xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+              <h2 className="font-['Montserrat'] text-lg font-black text-white">
+                Recent Games
+              </h2>
+              <button
+                type="button"
+                onClick={() => onNavigate("history")}
+                className="text-sm font-bold text-[#81b64c]"
+              >
+                View all
+              </button>
+            </div>
+            <div className="divide-y divide-white/10">
+              {recentGames.slice(0, 5).map((game) => {
+                const opponent = getOpponent(game, userId);
+                const result = formatResult(game, userId);
+                return (
+                  <button
+                    key={game._id}
+                    type="button"
+                    onClick={() => onNavigate("history")}
+                    className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-5 py-4 text-left transition hover:bg-white/10"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-bold text-slate-100">
+                        {opponent.username}
+                      </span>
+                      <span className="mt-1 block text-xs text-slate-500">
+                        {game.aiOpponent ? "AI" : "Online"} ·{" "}
+                        {game.moves?.length || 0} moves ·{" "}
+                        {new Date(game.endTime || game.startTime).toLocaleDateString()}
+                      </span>
+                    </span>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-black ${
+                        result === "Win"
+                          ? "bg-emerald-400/15 text-emerald-300"
+                          : result === "Draw"
+                            ? "bg-amber-400/15 text-amber-300"
+                            : "bg-rose-400/15 text-rose-300"
+                      }`}
+                    >
+                      {result}
+                    </span>
+                  </button>
+                );
+              })}
+              {recentGames.length === 0 && (
+                <div className="px-5 py-8 text-center text-sm text-slate-400">
+                  No recent games yet.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* STATS ROW */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          icon="📊"
-          value={stats?.rating || 1200}
-          label="Current Rating"
-          delta="+12"
-          deltaType="positive"
-        />
-        <StatCard
-          icon="🎯"
-          value={`${Math.round(((stats?.wins || 0) / (stats?.gamesPlayed || 1)) * 100)}%`}
-          label="Win Rate"
-          delta="+5%"
-          deltaType="positive"
-        />
-        <StatCard
-          icon="🎮"
-          value={stats?.gamesPlayed || 0}
-          label="Games Played"
-        />
-        <StatCard icon="🔥" value="7" label="Win Streak" />
-      </div>
-
-      {/* GAME MODE CARDS */}
-      <div className="mb-8">
-        <h2
-          className="text-2xl font-bold mb-6 font-['Montserrat']"
-          style={{ color: theme.text.primary }}
-        >
-          Quick Play
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Play vs AI */}
-          <div
-            className="rounded-xl p-6 border hover:border-[#81b64c] transition-colors cursor-pointer group shadow-md"
-            style={{
-              backgroundColor: theme.bg.tertiary,
-              borderColor: theme.border.primary,
-            }}
-            onClick={() => onStartGame("ai", selectedTimeControl)}
-          >
-            <div className="text-center">
-              <div className="text-5xl mb-4">🤖</div>
-              <h3
-                className="text-xl font-bold mb-3 group-hover:text-[#81b64c] transition-colors font-['Montserrat']"
-                style={{ color: theme.text.primary }}
+        <aside className="space-y-6">
+          <div className="rounded-xl border border-white/10 bg-white/10 p-5 shadow-xl shadow-black/10 backdrop-blur-xl">
+            <h2 className="font-['Montserrat'] text-lg font-black text-white">
+              Session Setup
+            </h2>
+            <div className="mt-4 space-y-3">
+              <button
+                type="button"
+                onClick={handlePlayVsComputer}
+                className="w-full rounded-lg bg-[#81b64c] px-4 py-3 text-left font-black text-[#07100a] transition hover:bg-[#93c85f]"
               >
-                Play vs AI
-              </h3>
-              <p
-                className="text-sm mb-4 font-['Inter']"
-                style={{ color: theme.text.tertiary }}
-              >
-                Challenge Stockfish with adjustable difficulty
-              </p>
-              <button className="w-full bg-[#81b64c] hover:bg-[#6ba03d] text-[#0e0e0e] font-bold py-3 px-4 rounded-lg transition-colors font-['Montserrat']">
-                Play Now
+                Start vs Computer
               </button>
-            </div>
-          </div>
-
-          {/* Multiplayer */}
-          <div
-            className="rounded-xl p-6 border hover:border-[#81b64c] transition-colors cursor-pointer group shadow-md"
-            style={{
-              backgroundColor: theme.bg.tertiary,
-              borderColor: theme.border.primary,
-            }}
-            onClick={() => onStartGame("multi")}
-          >
-            <div className="text-center">
-              <div className="text-5xl mb-4">👥</div>
-              <h3
-                className="text-xl font-bold mb-3 group-hover:text-[#81b64c] transition-colors font-['Montserrat']"
-                style={{ color: theme.text.primary }}
-              >
-                Multiplayer
-              </h3>
-              <p
-                className="text-sm mb-4 font-['Inter']"
-                style={{ color: theme.text.tertiary }}
-              >
-                Real-time games with other players
-              </p>
-              <button className="w-full bg-[#81b64c] hover:bg-[#6ba03d] text-[#0e0e0e] font-bold py-3 px-4 rounded-lg transition-colors font-['Montserrat']">
-                Find Game
-              </button>
-            </div>
-          </div>
-
-          {/* Game History */}
-          <div
-            className="rounded-xl p-6 border hover:border-[#81b64c] transition-colors cursor-pointer group shadow-md"
-            style={{
-              backgroundColor: theme.bg.tertiary,
-              borderColor: theme.border.primary,
-            }}
-            onClick={() => onNavigate("history")}
-          >
-            <div className="text-center">
-              <div className="text-5xl mb-4">📜</div>
-              <h3
-                className="text-xl font-bold mb-3 group-hover:text-[#81b64c] transition-colors font-['Montserrat']"
-                style={{ color: theme.text.primary }}
+              <button
+                type="button"
+                onClick={() => onNavigate("history")}
+                className="w-full rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-left font-bold text-slate-200 transition hover:bg-white/10"
               >
                 Game History
-              </h3>
-              <p
-                className="text-sm mb-4 font-['Inter']"
-                style={{ color: theme.text.tertiary }}
-              >
-                Review and replay your past games
-              </p>
-              <button className="w-full bg-[#81b64c] hover:bg-[#6ba03d] text-[#0e0e0e] font-bold py-3 px-4 rounded-lg transition-colors font-['Montserrat']">
-                View Games
               </button>
-            </div>
-          </div>
-
-          {/* Leaderboard */}
-          <div
-            className="rounded-xl p-6 border hover:border-[#81b64c] transition-colors cursor-pointer group shadow-md"
-            style={{
-              backgroundColor: theme.bg.tertiary,
-              borderColor: theme.border.primary,
-            }}
-            onClick={() => onNavigate("leaderboard")}
-          >
-            <div className="text-center">
-              <div className="text-5xl mb-4">🏆</div>
-              <h3
-                className="text-xl font-bold mb-3 group-hover:text-[#81b64c] transition-colors font-['Montserrat']"
-                style={{ color: theme.text.primary }}
+              <button
+                type="button"
+                onClick={() => onNavigate("leaderboard")}
+                className="w-full rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-left font-bold text-slate-200 transition hover:bg-white/10"
               >
                 Leaderboard
-              </h3>
-              <p
-                className="text-sm mb-4 font-['Inter']"
-                style={{ color: theme.text.tertiary }}
-              >
-                See top players and rankings
-              </p>
-              <button className="w-full bg-[#81b64c] hover:bg-[#6ba03d] text-[#0e0e0e] font-bold py-3 px-4 rounded-lg transition-colors font-['Montserrat']">
-                View Rankings
               </button>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* RECENT GAMES TABLE & LEADERBOARD MINI */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Recent Games */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2
-              className="text-xl font-bold font-['Montserrat']"
-              style={{ color: theme.text.primary }}
-            >
-              Recent Games
-            </h2>
-            <button
-              onClick={() => onNavigate("history")}
-              className="text-sm font-medium font-['Inter']"
-              style={{ color: theme.primary }}
-            >
-              View all →
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {recentGames.slice(0, 5).map((game) => {
-              const opponent = getOpponent(game, user.id);
-              const result = formatResult(game, user.id);
-              return (
-                <GameCard
-                  key={game._id}
-                  opponent={opponent.username}
-                  result={result.toLowerCase()}
-                  timeControl={game.aiOpponent ? "AI" : "10+0"}
-                  moves={game.moves?.length || 0}
-                  date={new Date(
-                    game.endTime || game.startTime,
-                  ).toLocaleDateString()}
-                  onClick={() => onNavigate("history")}
-                />
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Leaderboard Mini */}
-        <div
-          className="rounded-xl border overflow-hidden shadow-lg"
-          style={{
-            backgroundColor: theme.bg.secondary,
-            borderColor: theme.border.primary,
-          }}
-        >
-          <div
-            className="p-6 border-b"
-            style={{ borderColor: theme.border.primary }}
-          >
-            <h2
-              className="text-xl font-bold font-['Montserrat']"
-              style={{ color: theme.text.primary }}
-            >
-              Leaderboard
-            </h2>
-          </div>
-
-          <div className="p-6 space-y-4">
-            {leaderboard.map((player, index) => (
-              <div
-                key={player._id}
-                className={`flex items-center justify-between p-3 rounded-lg transition-colors`}
-                style={{
-                  backgroundColor:
-                    player._id === user.id ? theme.active : "transparent",
-                  border:
-                    player._id === user.id
-                      ? `1px solid ${theme.primary}30`
-                      : "none",
-                }}
-                onMouseEnter={(e) => {
-                  if (player._id !== user.id) {
-                    e.currentTarget.style.backgroundColor = theme.hover;
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (player._id !== user.id) {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }
-                }}
-              >
-                <div className="flex items-center">
-                  <div
-                    className="flex items-center justify-center w-8 h-8 rounded-full text-[#c2c1c0] font-bold text-sm mr-3"
-                    style={{ backgroundColor: theme.bg.tertiary }}
-                  >
-                    {index + 1}
-                  </div>
-                  <div className="w-8 h-8 bg-[#81b64c] rounded-full flex items-center justify-center text-[#0e0e0e] font-bold text-sm mr-3">
-                    {(player.username || "U").charAt(0).toUpperCase()}
-                  </div>
-                  <span
-                    className={`font-medium font-['Inter']`}
-                    style={{
-                      color:
-                        player._id === user.id
-                          ? theme.primary
-                          : theme.text.primary,
-                    }}
-                  >
-                    {player.username || "Unknown"}
-                  </span>
-                </div>
-                <span
-                  className={`font-bold font-['Montserrat']`}
-                  style={{
-                    color:
-                      player._id === user.id
-                        ? theme.primary
-                        : theme.text.primary,
-                  }}
-                >
-                  {player.rating}
-                </span>
+          <div className="rounded-xl border border-white/10 bg-white/10 p-5 shadow-xl shadow-black/10 backdrop-blur-xl">
+            <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+              Player
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-[#81b64c] to-cyan-300 font-black text-[#07100a]">
+                {String(displayName).charAt(0).toUpperCase()}
               </div>
-            ))}
+              <div className="min-w-0">
+                <div className="truncate font-black text-white">{displayName}</div>
+                <div className="text-sm text-slate-400">{rating} ELO</div>
+              </div>
+            </div>
           </div>
+        </aside>
+      </section>
 
-          <div
-            className="p-4 border-t text-center"
-            style={{ borderColor: theme.border.primary }}
-          >
-            <button
-              onClick={() => onNavigate("leaderboard")}
-              className="text-sm font-medium font-['Inter']"
-              style={{ color: theme.primary }}
-            >
-              View full leaderboard →
-            </button>
-          </div>
-        </div>
+      <div className="fixed bottom-5 right-5 z-20 flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => onStartGame("ai", selectedTimeControl)}
+          className="grid h-12 w-12 place-items-center rounded-full bg-[#81b64c] font-black text-[#07100a] shadow-2xl shadow-[#81b64c]/25 transition hover:-translate-y-1"
+          aria-label="Start AI game"
+        >
+          AI
+        </button>
+        <button
+          type="button"
+          onClick={() => onStartGame("multi", selectedTimeControl)}
+          className="grid h-12 w-12 place-items-center rounded-full border border-white/15 bg-slate-950/80 font-black text-cyan-200 shadow-2xl shadow-black/30 backdrop-blur-xl transition hover:-translate-y-1"
+          aria-label="Start online game"
+        >
+          ON
+        </button>
       </div>
     </div>
   );

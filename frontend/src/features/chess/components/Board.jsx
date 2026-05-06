@@ -1,9 +1,10 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 import { selectSquare, makeMove } from "../../../store/slices/chessGameSlice";
 import { motion, AnimatePresence } from "framer-motion";
 import { soundManager } from "../../../utils/sounds/soundManager";
 import { Chess } from "chess.js";
+import { getBoardTheme } from "../constants/boardThemes";
 
 // Fallback text pieces for when images fail to load
 const PIECE_TEXT = {
@@ -36,45 +37,6 @@ const PIECE_IMAGES = {
   bK: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bK.svg",
 };
 
-const BOARD_THEMES = {
-  classic: {
-    light: "#f0d9b5",
-    dark: "#b58863",
-    lightText: "#b58863",
-    darkText: "#f0d9b5",
-  },
-  green: {
-    light: "#ebecd0",
-    dark: "#739552",
-    lightText: "#739552",
-    darkText: "#ebecd0",
-  },
-  blue: {
-    light: "#dee3e6",
-    dark: "#8ca2ad",
-    lightText: "#8ca2ad",
-    darkText: "#dee3e6",
-  },
-  brown: {
-    light: "#ead7b8",
-    dark: "#946f51",
-    lightText: "#946f51",
-    darkText: "#ead7b8",
-  },
-  grey: {
-    light: "#c8c8c8",
-    dark: "#777777",
-    lightText: "#777777",
-    darkText: "#f3f4f6",
-  },
-  dark: {
-    light: "#6b7280",
-    dark: "#262626",
-    lightText: "#262626",
-    darkText: "#e5e7eb",
-  },
-};
-
 function pieceKeyFromCell(cell) {
   if (!cell) return null;
   if (typeof cell === "string") return cell;
@@ -98,6 +60,7 @@ export default function Board(props) {
     isSelected: externalIsSelected,
     isLegalDest: externalIsLegalDest,
     isLastMove: externalIsLastMove,
+    isInCheck: externalIsInCheck,
     onSquareClick: externalOnSquareClick,
     promotion: externalPromotion,
     handlePromotion: externalHandlePromotion,
@@ -112,6 +75,10 @@ export default function Board(props) {
   const [promotionPending, setPromotionPending] = useState(null);
   const boardRef = useRef(null);
   const isExternalBoard = Array.isArray(externalBoard);
+  const boardTheme = useMemo(
+    () => getBoardTheme(settings.boardTheme),
+    [settings.boardTheme],
+  );
 
   // Convert board array to the format expected by the component
   const board = isExternalBoard ? externalBoard : gameState.game.board();
@@ -122,6 +89,18 @@ export default function Board(props) {
 
   const rows = flipped ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
   const cols = flipped ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
+  const latestInternalMove = isExternalBoard
+    ? null
+    : gameState.history[gameState.history.length - 1];
+  const moveEffect =
+    !isExternalBoard && gameState.lastMove
+      ? {
+          from: gameState.lastMove.from,
+          to: gameState.lastMove.to,
+          key: `${gameState.lastMove.from}-${gameState.lastMove.to}-${gameState.history.length}`,
+          isCapture: Boolean(latestInternalMove?.captured),
+        }
+      : null;
 
   // Convert square notation to coordinates
   const squareToCoords = useCallback((square) => {
@@ -358,10 +337,35 @@ export default function Board(props) {
     [gameState.lastMove, squareToCoords, isExternalBoard, externalIsLastMove],
   );
 
+  const isKingInCheckSquare = useCallback(
+    (pieceKey) => {
+      if (!pieceKey || pieceKey[1] !== "K") return false;
+
+      if (isExternalBoard) {
+        return Boolean(externalIsInCheck);
+      }
+
+      return gameState.game.isCheck() && pieceKey[0] === gameState.game.turn();
+    },
+    [externalIsInCheck, gameState.game, isExternalBoard],
+  );
+
   return (
     <div
       ref={boardRef}
-      className="relative w-full aspect-square border-4 border-[#282828] rounded-md overflow-hidden shadow-2xl select-none flex"
+      className="premium-chess-board relative flex aspect-square w-full select-none overflow-hidden rounded-xl border-[6px]"
+      style={{
+        "--board-glow": boardTheme.glow,
+        "--board-legal": boardTheme.legal,
+        "--board-legal-capture": boardTheme.legalCapture,
+        "--board-last-move": boardTheme.lastMove,
+        "--board-selected": boardTheme.selected,
+        "--board-check": boardTheme.check,
+        "--board-trail": boardTheme.trail,
+        borderColor: boardTheme.border,
+        boxShadow: boardTheme.shadow,
+        background: boardTheme.border,
+      }}
     >
       {/* 8x8 Grid */}
       <div className="grid grid-cols-8 grid-rows-8 w-full h-full">
@@ -371,67 +375,109 @@ export default function Board(props) {
               const piece = board[r][c];
               const pieceKey = pieceKeyFromCell(piece);
               const isLightSquare = (r + c) % 2 === 0;
-              const boardTheme =
-                BOARD_THEMES[settings.boardTheme] || BOARD_THEMES.green;
               const useTextPieces = ["minimal", "neo", "modern"].includes(
                 settings.pieceSet,
               );
-
-              const selectedStyle = isSelected(r, c)
-                ? "ring-4 ring-yellow-300 ring-inset"
-                : "";
-              const lastMoveStyle = isLastMove(r, c)
-                ? "shadow-[inset_0_0_0_999px_rgba(250,204,21,0.26)]"
-                : "";
               const squareName = coordsToSquare(r, c);
-              const hintStyle =
+              const isSelectedSquare = isSelected(r, c);
+              const isLastMoveSquare = isLastMove(r, c);
+              const isLegalSquare = isLegalDest(r, c);
+              const hasHint =
                 gameState.hint &&
-                (gameState.hint.from === squareName || gameState.hint.to === squareName)
-                  ? "ring-4 ring-blue-400 ring-inset"
-                  : "";
-              const legalMoveStyle =
-                settings.highlightLegalMoves && isLegalDest(r, c)
-                  ? "shadow-[inset_0_0_0_999px_rgba(96,165,250,0.22)]"
-                  : "";
+                (gameState.hint.from === squareName ||
+                  gameState.hint.to === squareName);
+              const hasMoveTrail =
+                moveEffect?.from === squareName || moveEffect?.to === squareName;
+              const hasCaptureEffect =
+                moveEffect?.isCapture && moveEffect.to === squareName;
+              const isCheckSquare = isKingInCheckSquare(pieceKey);
+              const squareColor = isLightSquare ? boardTheme.light : boardTheme.dark;
+              const coordinateColor = isLightSquare
+                ? boardTheme.lightText
+                : boardTheme.darkText;
 
               return (
                 <MotionDiv
                   key={`${r}-${c}`}
                   layout={settings.pieceAnimations !== "none"}
                   transition={{ duration: settings.animationDuration / 1000 }}
-                  className={`relative flex items-center justify-center ${selectedStyle} ${lastMoveStyle} ${legalMoveStyle} ${hintStyle} cursor-pointer`}
+                  className="premium-board-square relative flex cursor-pointer items-center justify-center overflow-hidden"
                   style={{
-                    backgroundColor: isLightSquare
-                      ? boardTheme.light
-                      : boardTheme.dark,
+                    background: squareColor,
+                    backgroundImage: boardTheme.texture,
                   }}
                   onClick={() => handleSquareClick(r, c)}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, r, c)}
                 >
+                  {hasMoveTrail && (
+                    <MotionDiv
+                      key={`trail-${moveEffect.key}-${squareName}`}
+                      className="pointer-events-none absolute inset-0 z-[1]"
+                      initial={{ opacity: 0.58 }}
+                      animate={{ opacity: 0 }}
+                      transition={{ duration: 0.9, ease: "easeOut" }}
+                      style={{ background: boardTheme.trail }}
+                    />
+                  )}
+
+                  {isLastMoveSquare && (
+                    <MotionDiv
+                      className="pointer-events-none absolute inset-0 z-[2]"
+                      initial={{ opacity: 0.12 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.2 }}
+                      style={{ background: boardTheme.lastMove }}
+                    />
+                  )}
+
+                  {isSelectedSquare && (
+                    <div
+                      className="pointer-events-none absolute inset-0 z-[3]"
+                      style={{
+                        boxShadow: `inset 0 0 0 4px ${boardTheme.selected}`,
+                        background: boardTheme.selected,
+                      }}
+                    />
+                  )}
+
+                  {hasHint && (
+                    <div className="pointer-events-none absolute inset-0 z-[4] ring-4 ring-blue-400/80 ring-inset" />
+                  )}
+
+                  {settings.highlightLegalMoves && isLegalSquare && (
+                    <div
+                      className="pointer-events-none absolute inset-0 z-[4]"
+                      style={{
+                        background: piece
+                          ? "transparent"
+                          : "radial-gradient(circle, var(--board-legal) 0 18%, transparent 19%)",
+                        boxShadow: piece
+                          ? `inset 0 0 0 5px ${boardTheme.legalCapture}`
+                          : `inset 0 0 22px ${boardTheme.legal}`,
+                      }}
+                    />
+                  )}
+
+                  {isCheckSquare && (
+                    <div className="premium-check-warning pointer-events-none absolute inset-0 z-[5]" />
+                  )}
+
                   {/* Square Coordinates */}
                   {settings.showCoordinates && (
                     <>
                       {c === (flipped ? 7 : 0) && (
                         <span
-                          className="absolute top-1 left-1 text-[10px] font-bold"
-                          style={{
-                            color: isLightSquare
-                              ? boardTheme.lightText
-                              : boardTheme.darkText,
-                          }}
+                          className="board-coordinate absolute left-1 top-1 z-20 text-[10px] font-black"
+                          style={{ color: coordinateColor }}
                         >
                           {8 - r}
                         </span>
                       )}
                       {r === (flipped ? 0 : 7) && (
                         <span
-                          className="absolute bottom-0 right-1 text-[10px] font-bold"
-                          style={{
-                            color: isLightSquare
-                              ? boardTheme.lightText
-                              : boardTheme.darkText,
-                          }}
+                          className="board-coordinate absolute bottom-0 right-1 z-20 text-[10px] font-black"
+                          style={{ color: coordinateColor }}
                         >
                           {String.fromCharCode(97 + c)}
                         </span>
@@ -443,12 +489,30 @@ export default function Board(props) {
                   {pieceKey &&
                     !(draggedPiece?.row === r && draggedPiece?.col === c) && (
                       <MotionDiv
-                        className="w-[90%] h-[90%] z-10 drop-shadow-sm select-none flex items-center justify-center"
+                        className="premium-piece z-10 flex h-[90%] w-[90%] select-none items-center justify-center drop-shadow-sm"
                         draggable={settings.moveMethod === "drag"}
                         onDragStart={(e) => handleDragStart(e, r, c)}
                         layout={settings.pieceAnimations !== "none"}
+                        initial={
+                          settings.pieceAnimations === "none"
+                            ? false
+                            : { scale: 0.92, opacity: 0.78 }
+                        }
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.82, opacity: 0 }}
+                        whileHover={
+                          settings.pieceAnimations === "none"
+                            ? undefined
+                            : { y: -5, scale: 1.05 }
+                        }
+                        whileTap={
+                          settings.pieceAnimations === "none"
+                            ? undefined
+                            : { scale: 0.96 }
+                        }
                         transition={{
                           duration: settings.animationDuration / 1000,
+                          ease: [0.2, 0.8, 0.2, 1],
                         }}
                       >
                         {!useTextPieces && (
@@ -483,15 +547,36 @@ export default function Board(props) {
                             : PIECE_TEXT[pieceKey]}
                         </span>
                       </MotionDiv>
-                    )}
+                  )}
 
                   {/* Valid Move Indicator */}
                   {settings.showLegalMoves && isLegalDest(r, c) && (
                     <MotionDiv
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      className={`absolute z-20 ${piece ? "w-full h-full border-[5px] border-black/20 rounded-full" : "w-1/3 h-1/3 bg-black/20 rounded-full"}`}
+                      className={`pointer-events-none absolute z-20 rounded-full ${
+                        piece ? "h-[82%] w-[82%]" : "h-[28%] w-[28%]"
+                      }`}
+                      style={{
+                        background: piece ? "transparent" : boardTheme.legal,
+                        border: piece
+                          ? `5px solid ${boardTheme.legalCapture}`
+                          : "none",
+                        boxShadow: `0 0 18px ${boardTheme.glow}`,
+                      }}
                     />
+                  )}
+
+                  {hasCaptureEffect && (
+                    <div
+                      key={`capture-${moveEffect.key}-${squareName}`}
+                      className="premium-capture-burst pointer-events-none absolute inset-0 z-30"
+                    >
+                      <span />
+                      <span />
+                      <span />
+                      <span />
+                    </div>
                   )}
                 </MotionDiv>
               );
