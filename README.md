@@ -117,6 +117,8 @@ JWT_SECRET=replace-with-a-random-32-plus-character-secret
 FRONTEND_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 HEALTH_SECRET=
 BLOCKED_WORDS=
+# Optional Google Sign-In:
+GOOGLE_CLIENT_ID=
 ```
 
 Create `frontend/.env` when needed:
@@ -124,6 +126,7 @@ Create `frontend/.env` when needed:
 ```bash
 VITE_BACKEND_URL=http://localhost:3001
 # Optional OAuth redirect URLs:
+VITE_GOOGLE_CLIENT_ID=
 VITE_GOOGLE_AUTH_URL=
 VITE_FACEBOOK_AUTH_URL=
 ```
@@ -179,6 +182,7 @@ For hosted deployments:
 - Use a production MongoDB Atlas URI.
 - Use a strong `JWT_SECRET` with at least 32 characters. Placeholder/default secrets are blocked at startup.
 - Authentication uses an HttpOnly, Secure, SameSite cookie in production; make sure Vercel calls the Render backend over HTTPS.
+- For Google Sign-In, set the same Google OAuth client ID in Vercel as `VITE_GOOGLE_CLIENT_ID` and in Render as `GOOGLE_CLIENT_ID`.
 
 ## Quality And Production Checks
 
@@ -230,7 +234,7 @@ Expected response:
 
 - Redeploy the backend after changes to friends, privacy, profile, or game history APIs.
 - The frontend has local friends fallback only to keep the UI usable while an old backend is deployed. Real friend requests require the latest backend.
-- Google/Facebook auth buttons require configured OAuth redirect URLs; otherwise the email flow remains the supported sign-in path.
+- Google Sign-In requires `VITE_GOOGLE_CLIENT_ID` on Vercel and `GOOGLE_CLIENT_ID` on Render. Facebook auth requires a configured OAuth redirect URL; otherwise the email flow remains the supported sign-in path.
 - Keep `JWT_SECRET` and MongoDB credentials out of source control.
 
 ## API Overview

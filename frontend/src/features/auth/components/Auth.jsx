@@ -3,7 +3,36 @@ import { FormInput, PasswordInput, PrimaryBtn } from "../../../components/ui";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 const GOOGLE_AUTH_URL = import.meta.env.VITE_GOOGLE_AUTH_URL || "";
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 const FACEBOOK_AUTH_URL = import.meta.env.VITE_FACEBOOK_AUTH_URL || "";
+
+function loadGoogleIdentityScript() {
+  return new Promise((resolve, reject) => {
+    if (window.google?.accounts?.id) {
+      resolve(window.google);
+      return;
+    }
+
+    const existingScript = document.querySelector(
+      'script[src="https://accounts.google.com/gsi/client"]',
+    );
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(window.google), {
+        once: true,
+      });
+      existingScript.addEventListener("error", reject, { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve(window.google);
+    script.onerror = () => reject(new Error("Unable to load Google login"));
+    document.head.appendChild(script);
+  });
+}
 
 export default function Auth({
   onLogin,
@@ -75,16 +104,81 @@ export default function Auth({
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setError("");
+    setLoading(true);
+
+    try {
+      if (GOOGLE_AUTH_URL) {
+        window.location.href = GOOGLE_AUTH_URL;
+        return;
+      }
+
+      if (!GOOGLE_CLIENT_ID) {
+        throw new Error("Google login needs VITE_GOOGLE_CLIENT_ID.");
+      }
+
+      const google = await loadGoogleIdentityScript();
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: async ({ credential }) => {
+          try {
+            if (!credential) {
+              throw new Error("Google did not return a credential");
+            }
+
+            const response = await fetch(`${BACKEND_URL}/api/auth/google`, {
+              method: "POST",
+              credentials: "include",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ credential }),
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+              throw new Error(data.message || "Google login failed");
+            }
+
+            localStorage.removeItem("token");
+            localStorage.setItem("user", JSON.stringify(data.user));
+            onLogin(data.user);
+          } catch (error) {
+            setError(error.message);
+          } finally {
+            setLoading(false);
+          }
+        },
+      });
+      google.accounts.id.prompt((notification) => {
+        if (
+          notification.isNotDisplayed() ||
+          notification.isSkippedMoment() ||
+          notification.isDismissedMoment()
+        ) {
+          setLoading(false);
+          setError("Google login popup was closed or blocked.");
+        }
+      });
+    } catch (error) {
+      setError(error.message);
+      setLoading(false);
+    }
+  };
+
   const handleSocialLogin = (provider) => {
-    const url = provider === "google" ? GOOGLE_AUTH_URL : FACEBOOK_AUTH_URL;
-    if (url) {
-      window.location.href = url;
+    if (provider === "google") {
+      handleGoogleLogin();
       return;
     }
 
-    setError(
-      `${provider === "google" ? "Google" : "Facebook"} login needs OAuth client configuration before it can be used.`,
-    );
+    if (FACEBOOK_AUTH_URL) {
+      window.location.href = FACEBOOK_AUTH_URL;
+      return;
+    }
+
+    setError("Facebook login needs OAuth client configuration before it can be used.");
   };
 
   const formContent = (

@@ -56,6 +56,8 @@ function assertSourceChecks() {
   assert(/profileVisibility === false/.test(auth), "Profile visibility privacy is not enforced");
   assert(/res\.cookie\("authToken"/.test(auth), "Auth routes must set HttpOnly cookie");
   assert(!/token,\s*\n\s*user:/.test(auth), "Auth responses should not expose JWT tokens");
+  assert(/router\.post\("\/google"/.test(auth), "Google login endpoint is missing");
+  assert(/GOOGLE_CLIENT_ID/.test(auth), "Google login must verify the configured client ID");
 
   const authMiddleware = read("backend/middleware/auth.js");
   assert(/getCookie\(req, "authToken"\)/.test(authMiddleware), "Auth middleware must read authToken cookie");
@@ -81,6 +83,10 @@ function assertSourceChecks() {
   const apiClient = read("frontend/src/services/apiClient.js");
   assert(/credentials: "include"/.test(apiClient), "API client must send auth cookies");
   assert(!/Authorization|Bearer/.test(apiClient), "API client should not send localStorage bearer tokens");
+
+  const authComponent = read("frontend/src/features/auth/components/Auth.jsx");
+  assert(/VITE_GOOGLE_CLIENT_ID/.test(authComponent), "Google button must support Google client ID config");
+  assert(/\/api\/auth\/google/.test(authComponent), "Google button must send credentials to backend verification");
 }
 
 function assertChessStatus() {

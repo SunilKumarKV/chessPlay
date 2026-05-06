@@ -1,5 +1,6 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
 
@@ -27,6 +28,67 @@ function clearCookieOptions() {
 
 function setAuthCookie(res, token) {
   res.cookie("authToken", token, cookieOptions());
+}
+
+function authUserPayload(user) {
+  return {
+    id: user._id,
+    username: user.username,
+    email: user.email,
+    gamesPlayed: user.gamesPlayed,
+    gamesWon: user.gamesWon,
+    rating: user.rating,
+    avatar: user.avatar || null,
+  };
+}
+
+function issueSession(res, user) {
+  const token = jwt.sign(
+    { userId: user._id, username: user.username },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" },
+  );
+  setAuthCookie(res, token);
+}
+
+async function buildUniqueUsername(seed) {
+  const base =
+    String(seed || "player")
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .slice(0, 16) || "player";
+  let candidate = base;
+  let suffix = 0;
+
+  while (await User.exists({ username: candidate })) {
+    suffix += 1;
+    candidate = `${base.slice(0, 16 - String(suffix).length)}${suffix}`;
+  }
+
+  return candidate;
+}
+
+async function verifyGoogleCredential(credential) {
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    throw new Error("Google OAuth is not configured on the server");
+  }
+
+  const params = new URLSearchParams({ id_token: credential });
+  const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?${params}`);
+  const profile = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(profile.error_description || "Invalid Google credential");
+  }
+
+  if (profile.aud !== process.env.GOOGLE_CLIENT_ID) {
+    throw new Error("Google credential audience does not match this app");
+  }
+
+  if (profile.email_verified !== "true" && profile.email_verified !== true) {
+    throw new Error("Google email is not verified");
+  }
+
+  return profile;
 }
 
 function isFriend(user, otherUserId) {
@@ -147,24 +209,11 @@ router.post("/register", authLimiter, async (req, res) => {
     const user = new User({ username, email, password });
     await user.save();
 
-    // Generate token
-    const token = jwt.sign(
-      { userId: user._id, username: user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" },
-    );
-    setAuthCookie(res, token);
+    issueSession(res, user);
 
     res.status(201).json({
       message: "User created successfully",
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        gamesPlayed: user.gamesPlayed,
-        gamesWon: user.gamesWon,
-        rating: user.rating,
-      },
+      user: authUserPayload(user),
     });
   } catch (error) {
     console.error("Registration error:", error);
@@ -193,28 +242,55 @@ router.post("/login", authLimiter, async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
-    // Generate token
-    const token = jwt.sign(
-      { userId: user._id, username: user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" },
-    );
-    setAuthCookie(res, token);
+    issueSession(res, user);
 
     res.json({
       message: "Login successful",
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        gamesPlayed: user.gamesPlayed,
-        gamesWon: user.gamesWon,
-        rating: user.rating,
-      },
+      user: authUserPayload(user),
     });
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Google login
+router.post("/google", authLimiter, async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ message: "Google credential is required" });
+    }
+
+    const profile = await verifyGoogleCredential(credential);
+    const email = String(profile.email || "").toLowerCase();
+    if (!email) {
+      return res.status(400).json({ message: "Google account has no email" });
+    }
+
+    let user = await User.findOne({ email });
+    if (!user) {
+      user = new User({
+        username: await buildUniqueUsername(profile.name || email.split("@")[0]),
+        email,
+        password: crypto.randomBytes(32).toString("hex"),
+        avatar: profile.picture || null,
+      });
+    } else if (!user.avatar && profile.picture) {
+      user.avatar = profile.picture;
+    }
+
+    user.lastLogin = new Date();
+    await user.save();
+    issueSession(res, user);
+
+    res.json({
+      message: "Google login successful",
+      user: authUserPayload(user),
+    });
+  } catch (error) {
+    console.error("Google login error:", error.message);
+    res.status(401).json({ message: error.message || "Google login failed" });
   }
 });
 
