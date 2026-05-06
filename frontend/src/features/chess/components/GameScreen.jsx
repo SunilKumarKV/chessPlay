@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useChessGame } from "../hooks/useChessGame";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../../hooks/useSettings";
 import { useCurrentUser } from "../../../hooks/useCurrentUser";
 import Board from "./Board";
 import AIThinkingIndicator from "./AIThinkingIndicator";
