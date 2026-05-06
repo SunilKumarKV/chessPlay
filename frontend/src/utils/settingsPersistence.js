@@ -7,6 +7,8 @@ const GAME_STATE_KEY = "chessplay-game-state";
 // Default settings
 const defaultSettings = {
   // Board settings
+  boardTheme: "green",
+  pieceSet: "classic",
   showCoordinates: true,
   pieceNotation: "algebraic", // 'algebraic' | 'figurine'
   whiteAlwaysOnBottom: true,
@@ -23,6 +25,8 @@ const defaultSettings = {
   moveMethod: "drag", // 'drag' | 'click'
   highlightLegalMoves: true,
   showLegalMoves: true,
+  autoQueen: true,
+  confirmMove: false,
 
   // Sound settings
   playSounds: true,
@@ -55,9 +59,9 @@ const animationSpeedMap = {
 };
 
 // Save settings to localStorage
-export const saveSettings = () => {
+export const saveSettings = (settingsOverride = null) => {
   try {
-    const settings = store.getState().chessSettings;
+    const settings = settingsOverride || store.getState().chessSettings;
 
     // Remove computed properties before saving
     const { animationDuration: _animationDuration, ...settingsToSave } = settings;

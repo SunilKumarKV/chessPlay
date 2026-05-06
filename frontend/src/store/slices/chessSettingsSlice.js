@@ -2,6 +2,8 @@ import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
   // Board display
+  boardTheme: "green",
+  pieceSet: "classic",
   showCoordinates: true,
   pieceNotation: "algebraic", // 'algebraic' | 'figurine'
   whiteAlwaysOnBottom: false,
@@ -18,6 +20,8 @@ const initialState = {
   moveMethod: "drag", // 'drag' | 'click'
   highlightLegalMoves: true,
   showLegalMoves: true,
+  autoQueen: true,
+  confirmMove: false,
 
   // Sound
   playSounds: true,

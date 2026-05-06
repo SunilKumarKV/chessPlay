@@ -28,6 +28,7 @@ const gameSchema = new mongoose.Schema({
       from: String,
       to: String,
       piece: String,
+      promotion: String,
       timestamp: {
         type: Date,
         default: Date.now,

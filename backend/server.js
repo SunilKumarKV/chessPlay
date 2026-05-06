@@ -242,6 +242,25 @@ function toGameResult(status) {
   return status;
 }
 
+async function updateDrawStats(whiteUserId, blackUserId) {
+  const updates = [];
+  if (whiteUserId) {
+    updates.push(
+      User.findByIdAndUpdate(whiteUserId, {
+        $inc: { gamesPlayed: 1, gamesDrawn: 1 },
+      }),
+    );
+  }
+  if (blackUserId) {
+    updates.push(
+      User.findByIdAndUpdate(blackUserId, {
+        $inc: { gamesPlayed: 1, gamesDrawn: 1 },
+      }),
+    );
+  }
+  await Promise.all(updates);
+}
+
 function getReconnectKey(roomId, color) {
   return `${roomId}:${color}`;
 }
@@ -779,7 +798,6 @@ io.on("connection", (socket) => {
 
       // Record move in database
       const piece = gameState.board[toRow][toCol];
-      const kingCaptured = piece === "wK" || piece === "bK";
       let gameUpdate = {
         $push: {
           moves: {
@@ -790,18 +808,11 @@ io.on("connection", (socket) => {
         },
       };
 
-      if (kingCaptured) {
+      if (gameState.status === "checkmate") {
         const winnerColor = color;
-        const loserColor = opponent(color);
-        gameState.status = "checkmate";
-        gameState.turn = loserColor;
-
+        const loserColor = gameState.turn;
         const winnerId = player.userId;
-        const opponentEntry = Array.from(players.values()).find(
-          (entry) =>
-            entry.roomId === player.roomId && entry.color === loserColor,
-        );
-        const loserId = opponentEntry?.userId || null;
+        const loserId = gameState.players[loserColor]?.userId || null;
 
         gameUpdate = {
           ...gameUpdate,
@@ -810,8 +821,9 @@ io.on("connection", (socket) => {
           endTime: new Date(),
         };
 
-        updatePlayerStats(winnerId, loserId);
+        await updatePlayerStats(winnerId, loserId);
       } else if (
+        gameState.status === "stalemate" ||
         gameState.status === "draw-50move" ||
         gameState.status === "draw-repetition"
       ) {
@@ -821,6 +833,11 @@ io.on("connection", (socket) => {
           winner: null,
           endTime: new Date(),
         };
+        try {
+          await updateDrawStats(gameState.players.w.userId, gameState.players.b.userId);
+        } catch (statsError) {
+          console.error("Draw stats update error:", statsError);
+        }
       }
 
       await Game.findByIdAndUpdate(roomData.gameId, gameUpdate);
@@ -883,20 +900,7 @@ io.on("connection", (socket) => {
       });
 
       try {
-        const whiteUserId = roomData.players.w.userId;
-        const blackUserId = roomData.players.b.userId;
-
-        if (whiteUserId) {
-          await User.findByIdAndUpdate(whiteUserId, {
-            $inc: { gamesPlayed: 1, gamesDrawn: 1 },
-          });
-        }
-
-        if (blackUserId) {
-          await User.findByIdAndUpdate(blackUserId, {
-            $inc: { gamesPlayed: 1, gamesDrawn: 1 },
-          });
-        }
+        await updateDrawStats(roomData.players.w.userId, roomData.players.b.userId);
       } catch (statsError) {
         console.error("Draw stats update error:", statsError);
       }

@@ -2,12 +2,10 @@ const express = require("express");
 const Game = require("../models/Game");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
-const {
-  updatePlayerStats,
-  updatePlayerStatsVsAi,
-} = require("../utils/elo");
 
 const router = express.Router();
+const VALID_RESULTS = new Set(["white", "black", "draw"]);
+const VALID_COLORS = new Set(["w", "b"]);
 
 // Get user's completed game history
 router.get("/history", auth, async (req, res) => {
@@ -15,10 +13,26 @@ router.get("/history", auth, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
+    const targetUserId = req.query.userId || req.user.userId;
+
+    if (String(targetUserId) !== String(req.user.userId)) {
+      const targetUser = await User.findById(targetUserId).select(
+        "privacy friends",
+      );
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const isFriend = targetUser.friends.some(
+        (friendId) => String(friendId) === String(req.user.userId),
+      );
+      if (targetUser.privacy?.gameHistory === false && !isFriend) {
+        return res.status(403).json({ message: "This player's game history is private" });
+      }
+    }
 
     const query = {
       result: { $ne: "ongoing" },
-      $or: [{ whitePlayer: req.user.userId }, { blackPlayer: req.user.userId }],
+      $or: [{ whitePlayer: targetUserId }, { blackPlayer: targetUserId }],
     };
 
     const games = await Game.find(query)
@@ -62,14 +76,29 @@ router.post("/record", auth, async (req, res) => {
     if (!Array.isArray(moves)) {
       return res.status(400).json({ message: "Moves are required" });
     }
+    if (moves.length > 500) {
+      return res.status(400).json({ message: "Too many moves" });
+    }
+    if (!VALID_RESULTS.has(result)) {
+      return res.status(400).json({ message: "Invalid game result" });
+    }
+    if (!VALID_COLORS.has(playerColor)) {
+      return res.status(400).json({ message: "Invalid player color" });
+    }
 
     const gameData = {
-      moves,
-      aiOpponent,
-      aiDifficulty,
+      moves: moves.map((move) => ({
+        from: String(move.from || ""),
+        to: String(move.to || ""),
+        piece: String(move.piece || ""),
+        promotion: move.promotion ? String(move.promotion) : undefined,
+        timestamp: move.timestamp ? new Date(move.timestamp) : new Date(),
+      })),
+      aiOpponent: Boolean(aiOpponent),
+      aiDifficulty: Number(aiDifficulty) || 0,
       playerColor,
       result,
-      duration,
+      duration: duration == null ? null : Number(duration),
       endTime: new Date(),
     };
 
@@ -89,26 +118,6 @@ router.post("/record", auth, async (req, res) => {
 
     const game = new Game(gameData);
     await game.save();
-
-    if (result !== "draw") {
-      const humanWon = winnerColor === playerColor;
-
-      if (aiOpponent) {
-        await updatePlayerStatsVsAi(
-          req.user.userId,
-          humanWon,
-          aiDifficulty,
-        );
-      } else if (game.winner) {
-        const winnerId = game.winner;
-        const loserId =
-          String(winnerId) === String(game.whitePlayer)
-            ? game.blackPlayer
-            : game.whitePlayer;
-
-        await updatePlayerStats(winnerId, loserId);
-      }
-    }
 
     res.status(201).json({ game });
   } catch (error) {

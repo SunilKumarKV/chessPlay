@@ -7,10 +7,19 @@ class SoundManager {
     this.theme = "default";
     this.enabled = true;
     this.preloaded = false;
+    this.initializing = null;
   }
 
   // Initialize audio context (required for Web Audio API)
   async init() {
+    if (this.preloaded) return;
+    if (this.initializing) return this.initializing;
+
+    this.initializing = this.initAudio();
+    return this.initializing;
+  }
+
+  async initAudio() {
     try {
       this.audioContext = new (
         window.AudioContext || window.webkitAudioContext
@@ -19,12 +28,14 @@ class SoundManager {
       this.preloaded = true;
     } catch (error) {
       console.warn("Audio context not available:", error);
+    } finally {
+      this.initializing = null;
     }
   }
 
   // Preload all sound effects
   async preloadSounds() {
-    const baseUrl = import.meta.env.BASE_URL || "/";
+    const appBaseUrl = new URL(import.meta.env.BASE_URL || "/", window.location.origin);
     const soundFiles = {
       default: {
         move: "/sounds/default/move.mp3",
@@ -58,7 +69,7 @@ class SoundManager {
     for (const [theme, files] of Object.entries(soundFiles)) {
       this.sounds[theme] = {};
       for (const [soundName, filePath] of Object.entries(files)) {
-        const soundUrl = new URL(filePath, baseUrl).href;
+        const soundUrl = new URL(filePath.replace(/^\/+/, ""), appBaseUrl).href;
         try {
           const response = await fetch(soundUrl);
           if (!response.ok) {
@@ -152,7 +163,7 @@ class SoundManager {
 
   // Set sound theme
   setTheme(theme) {
-    if (this.sounds[theme]) {
+    if (["default", "classic", "modern"].includes(theme)) {
       this.theme = theme;
     }
   }

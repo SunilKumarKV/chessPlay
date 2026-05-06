@@ -10,7 +10,8 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        ignoredActions: ["persist/PERSIST", "persist/REHYDRATE"],
+        ignoredActions: ["persist/PERSIST", "persist/REHYDRATE", "chessSettings/loadSettings"],
+        ignoredPaths: ["chessGame.game"],
       },
     }),
 });

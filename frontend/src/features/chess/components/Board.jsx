@@ -3,6 +3,7 @@ import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 import { selectSquare, makeMove } from "../../../store/slices/chessGameSlice";
 import { motion, AnimatePresence } from "framer-motion";
 import { soundManager } from "../../../utils/sounds/soundManager";
+import { Chess } from "chess.js";
 
 // Fallback text pieces for when images fail to load
 const PIECE_TEXT = {
@@ -35,6 +36,45 @@ const PIECE_IMAGES = {
   bK: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bK.svg",
 };
 
+const BOARD_THEMES = {
+  classic: {
+    light: "#f0d9b5",
+    dark: "#b58863",
+    lightText: "#b58863",
+    darkText: "#f0d9b5",
+  },
+  green: {
+    light: "#ebecd0",
+    dark: "#739552",
+    lightText: "#739552",
+    darkText: "#ebecd0",
+  },
+  blue: {
+    light: "#dee3e6",
+    dark: "#8ca2ad",
+    lightText: "#8ca2ad",
+    darkText: "#dee3e6",
+  },
+  brown: {
+    light: "#ead7b8",
+    dark: "#946f51",
+    lightText: "#946f51",
+    darkText: "#ead7b8",
+  },
+  grey: {
+    light: "#c8c8c8",
+    dark: "#777777",
+    lightText: "#777777",
+    darkText: "#f3f4f6",
+  },
+  dark: {
+    light: "#6b7280",
+    dark: "#262626",
+    lightText: "#262626",
+    darkText: "#e5e7eb",
+  },
+};
+
 function pieceKeyFromCell(cell) {
   if (!cell) return null;
   if (typeof cell === "string") return cell;
@@ -42,6 +82,11 @@ function pieceKeyFromCell(cell) {
     return `${cell.color}${String(cell.type).toUpperCase()}`;
   }
   return null;
+}
+
+function confirmMoveIfNeeded(confirmMove, from, to) {
+  if (!confirmMove) return true;
+  return window.confirm(`Play ${from}-${to}?`);
 }
 
 export default function Board(props) {
@@ -81,12 +126,12 @@ export default function Board(props) {
   // Convert square notation to coordinates
   const squareToCoords = useCallback((square) => {
     const file = square.charCodeAt(0) - 97; // 'a' = 0
-    const rank = parseInt(square[1]) - 1; // '1' = 0
-    return [rank, file];
+    const rank = parseInt(square[1], 10);
+    return [8 - rank, file];
   }, []);
 
   const coordsToSquare = useCallback((row, col) => {
-    return `${String.fromCharCode(97 + col)}${row + 1}`;
+    return `${String.fromCharCode(97 + col)}${8 - row}`;
   }, []);
 
   // Handle square click
@@ -101,53 +146,44 @@ export default function Board(props) {
       const square = coordsToSquare(row, col);
       const piece = board[row][col];
 
-      if (settings.moveMethod === "click") {
-        if (gameState.selectedSquare) {
-          // Try to make a move
-          const from = gameState.selectedSquare;
-          const to = square;
+      if (gameState.selectedSquare) {
+        // Try to make a move. Click-to-move stays available even in drag mode.
+        const from = gameState.selectedSquare;
+        const to = square;
 
-          try {
-            const move = gameState.game.move({ from, to, promotion: "q" }); // Default to queen
-            if (move) {
-              dispatch(makeMove({ from, to, promotion: "q" }));
+        try {
+          const testGame = new Chess(gameState.fen);
+          const move = testGame.move({ from, to, promotion: "q" }); // Default to queen
+          if (move) {
+            if (!confirmMoveIfNeeded(settings.confirmMove, from, to)) return;
+            if (move.flags.includes("p") && !settings.autoQueen) {
+              setPromotionPending({ from, to, color: move.color });
+              return;
+            }
+            dispatch(makeMove({ from, to, promotion: "q" }));
 
-              // Play sound
-              if (settings.playSounds) {
-                if (move.captured) {
-                  soundManager.playCapture();
-                } else if (
-                  move.flags.includes("k") ||
-                  move.flags.includes("q")
-                ) {
-                  soundManager.playCastle();
-                } else {
-                  soundManager.playMove();
-                }
-              }
-
-              // Check for promotion
-              if (move.flags.includes("p")) {
-                setPromotionPending({ from, to, color: move.color });
+            // Play sound
+            if (settings.playSounds) {
+              if (move.captured) {
+                soundManager.playCapture();
+              } else if (move.flags.includes("k") || move.flags.includes("q")) {
+                soundManager.playCastle();
+              } else {
+                soundManager.playMove();
               }
             }
-          } catch {
-            // Invalid move, select new square
-            if (piece && gameState.game.turn() === piece.color) {
-              dispatch(selectSquare(square));
-            }
+
+            return;
           }
-        } else {
-          // Select piece
-          if (piece && gameState.game.turn() === piece.color) {
-            dispatch(selectSquare(square));
-          }
+        } catch {
+          // Invalid move, select new square below if it contains a friendly piece.
         }
-      } else {
-        // Drag & drop mode - just select
-        if (piece && gameState.game.turn() === piece.color) {
-          dispatch(selectSquare(square));
-        }
+      }
+
+      if (piece && gameState.game.turn() === piece.color) {
+        dispatch(selectSquare(square));
+      } else if (gameState.selectedSquare) {
+        dispatch(selectSquare(null));
       }
     },
     [
@@ -176,7 +212,7 @@ export default function Board(props) {
 
       // Create drag image
       const img = new Image();
-      img.src = PIECE_IMAGES[piece];
+      img.src = PIECE_IMAGES[pieceKeyFromCell(piece)];
       e.dataTransfer.setDragImage(img, 32, 32);
     },
     [
@@ -205,8 +241,20 @@ export default function Board(props) {
       const to = coordsToSquare(row, col);
 
       try {
-        const move = gameState.game.move({ from, to, promotion: "q" });
+        const testGame = new Chess(gameState.fen);
+        const move = testGame.move({ from, to, promotion: "q" });
         if (move) {
+          if (!confirmMoveIfNeeded(settings.confirmMove, from, to)) {
+            setDraggedPiece(null);
+            setDragStart(null);
+            return;
+          }
+          if (move.flags.includes("p") && !settings.autoQueen) {
+            setPromotionPending({ from, to, color: move.color });
+            setDraggedPiece(null);
+            setDragStart(null);
+            return;
+          }
           dispatch(makeMove({ from, to, promotion: "q" }));
 
           if (settings.playSounds) {
@@ -219,9 +267,6 @@ export default function Board(props) {
             }
           }
 
-          if (move.flags.includes("p")) {
-            setPromotionPending({ from, to, color: move.color });
-          }
         }
       } catch {
         console.log("Invalid move");
@@ -232,10 +277,12 @@ export default function Board(props) {
     },
     [
       draggedPiece,
-      gameState.game,
+      gameState.fen,
       dispatch,
       coordsToSquare,
       settings.playSounds,
+      settings.confirmMove,
+      settings.autoQueen,
     ],
   );
 
@@ -248,7 +295,8 @@ export default function Board(props) {
       const promotion = piece.toLowerCase();
 
       try {
-        const move = gameState.game.move({ from, to, promotion });
+        const testGame = new Chess(gameState.fen);
+        const move = testGame.move({ from, to, promotion });
         if (move) {
           dispatch(makeMove({ from, to, promotion }));
 
@@ -262,7 +310,7 @@ export default function Board(props) {
 
       setPromotionPending(null);
     },
-    [promotionPending, gameState.game, dispatch, settings.playSounds],
+    [promotionPending, gameState.fen, dispatch, settings.playSounds],
   );
 
   // Check if square is selected
@@ -323,14 +371,27 @@ export default function Board(props) {
               const piece = board[r][c];
               const pieceKey = pieceKeyFromCell(piece);
               const isLightSquare = (r + c) % 2 === 0;
+              const boardTheme =
+                BOARD_THEMES[settings.boardTheme] || BOARD_THEMES.green;
+              const useTextPieces = ["minimal", "neo", "modern"].includes(
+                settings.pieceSet,
+              );
 
-              // Chess.com standard styling
-              const bgColor = isLightSquare ? "bg-[#ebecd0]" : "bg-[#739552]";
-              const selectedStyle = isSelected(r, c) ? "bg-yellow-400/50" : "";
-              const lastMoveStyle = isLastMove(r, c) ? "bg-yellow-400/30" : "";
+              const selectedStyle = isSelected(r, c)
+                ? "ring-4 ring-yellow-300 ring-inset"
+                : "";
+              const lastMoveStyle = isLastMove(r, c)
+                ? "shadow-[inset_0_0_0_999px_rgba(250,204,21,0.26)]"
+                : "";
+              const squareName = coordsToSquare(r, c);
+              const hintStyle =
+                gameState.hint &&
+                (gameState.hint.from === squareName || gameState.hint.to === squareName)
+                  ? "ring-4 ring-blue-400 ring-inset"
+                  : "";
               const legalMoveStyle =
                 settings.highlightLegalMoves && isLegalDest(r, c)
-                  ? "bg-blue-400/30"
+                  ? "shadow-[inset_0_0_0_999px_rgba(96,165,250,0.22)]"
                   : "";
 
               return (
@@ -338,7 +399,12 @@ export default function Board(props) {
                   key={`${r}-${c}`}
                   layout={settings.pieceAnimations !== "none"}
                   transition={{ duration: settings.animationDuration / 1000 }}
-                  className={`relative flex items-center justify-center ${bgColor} ${selectedStyle} ${lastMoveStyle} ${legalMoveStyle} cursor-pointer`}
+                  className={`relative flex items-center justify-center ${selectedStyle} ${lastMoveStyle} ${legalMoveStyle} ${hintStyle} cursor-pointer`}
+                  style={{
+                    backgroundColor: isLightSquare
+                      ? boardTheme.light
+                      : boardTheme.dark,
+                  }}
                   onClick={() => handleSquareClick(r, c)}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, r, c)}
@@ -348,14 +414,24 @@ export default function Board(props) {
                     <>
                       {c === (flipped ? 7 : 0) && (
                         <span
-                          className={`absolute top-1 left-1 text-[10px] font-bold ${isLightSquare ? "text-[#739552]" : "text-[#ebecd0]"}`}
+                          className="absolute top-1 left-1 text-[10px] font-bold"
+                          style={{
+                            color: isLightSquare
+                              ? boardTheme.lightText
+                              : boardTheme.darkText,
+                          }}
                         >
                           {8 - r}
                         </span>
                       )}
                       {r === (flipped ? 0 : 7) && (
                         <span
-                          className={`absolute bottom-0 right-1 text-[10px] font-bold ${isLightSquare ? "text-[#739552]" : "text-[#ebecd0]"}`}
+                          className="absolute bottom-0 right-1 text-[10px] font-bold"
+                          style={{
+                            color: isLightSquare
+                              ? boardTheme.lightText
+                              : boardTheme.darkText,
+                          }}
                         >
                           {String.fromCharCode(97 + c)}
                         </span>
@@ -365,10 +441,9 @@ export default function Board(props) {
 
                   {/* Piece Image/Text */}
                   {pieceKey &&
-                    draggedPiece?.row !== r &&
-                    draggedPiece?.col !== c && (
+                    !(draggedPiece?.row === r && draggedPiece?.col === c) && (
                       <MotionDiv
-                        className="w-[90%] h-[90%] z-10 drop-shadow-sm pointer-events-none select-none flex items-center justify-center"
+                        className="w-[90%] h-[90%] z-10 drop-shadow-sm select-none flex items-center justify-center"
                         draggable={settings.moveMethod === "drag"}
                         onDragStart={(e) => handleDragStart(e, r, c)}
                         layout={settings.pieceAnimations !== "none"}
@@ -376,21 +451,36 @@ export default function Board(props) {
                           duration: settings.animationDuration / 1000,
                         }}
                       >
-                        <img
-                          src={PIECE_IMAGES[pieceKey]}
-                          alt={pieceKey}
-                          className="w-full h-full object-contain"
-                          onError={(e) => {
-                            // Fallback to text piece if image fails to load
-                            e.target.style.display = "none";
-                            e.target.nextSibling.style.display = "block";
-                          }}
-                        />
+                        {!useTextPieces && (
+                          <img
+                            src={PIECE_IMAGES[pieceKey]}
+                            alt={pieceKey}
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                              // Fallback to text piece if image fails to load
+                              e.target.style.display = "none";
+                              e.target.nextSibling.style.display = "block";
+                            }}
+                          />
+                        )}
                         <span
-                          className="text-4xl font-bold select-none"
-                          style={{ display: "none" }}
+                          className="text-5xl font-bold select-none leading-none"
+                          style={{
+                            display: useTextPieces ? "block" : "none",
+                            color: pieceKey.startsWith("w") ? "#f8fafc" : "#111827",
+                            textShadow:
+                              pieceKey.startsWith("w")
+                                ? "0 2px 3px rgba(0,0,0,.55)"
+                                : "0 1px 2px rgba(255,255,255,.35)",
+                            fontFamily:
+                              settings.pieceSet === "minimal"
+                                ? "'JetBrains Mono', monospace"
+                                : "Georgia, serif",
+                          }}
                         >
-                          {PIECE_TEXT[pieceKey]}
+                          {settings.pieceSet === "minimal"
+                            ? pieceKey.slice(1)
+                            : PIECE_TEXT[pieceKey]}
                         </span>
                       </MotionDiv>
                     )}

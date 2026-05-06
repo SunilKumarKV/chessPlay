@@ -1,5 +1,4 @@
 import openings from "../constants/openings.json";
-import { toAlgebraic } from "./boardUtils";
 
 function stripMoveNumbers(pgn) {
   return pgn

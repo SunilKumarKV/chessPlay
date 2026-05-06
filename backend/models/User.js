@@ -79,6 +79,51 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 1200,
   },
+  privacy: {
+    profileVisibility: {
+      type: Boolean,
+      default: true,
+    },
+    gameHistory: {
+      type: Boolean,
+      default: true,
+    },
+    onlineStatus: {
+      type: Boolean,
+      default: true,
+    },
+    friendRequests: {
+      type: Boolean,
+      default: true,
+    },
+    spectatorMode: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  friends: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  ],
+  friendRequests: [
+    {
+      from: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      status: {
+        type: String,
+        enum: ["pending", "accepted", "declined"],
+        default: "pending",
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
 });
 
 // Hash password before saving

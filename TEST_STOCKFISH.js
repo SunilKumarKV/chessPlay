@@ -1,5 +1,5 @@
 /**
- * Quick Test: Verify Stockfish Worker with SharedArrayBuffer Polyfill
+ * Quick Test: Verify current Stockfish Worker wiring
  * 
  * Run: node TEST_STOCKFISH.js
  */
@@ -8,49 +8,55 @@ const fs = require('fs');
 const path = require('path');
 
 console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-console.log("Stockfish + SharedArrayBuffer Fix Verification");
+console.log("Stockfish Worker Verification");
 console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-// 1. Check if stockfish-18-lite.js exists
-const stockfishPath = path.join(__dirname, 'frontend/public/stockfish-18-lite.js');
-if (fs.existsSync(stockfishPath)) {
-  const stats = fs.statSync(stockfishPath);
-  console.log("✓ stockfish-18-lite.js found");
-  console.log(`  Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+// 1. Check if the worker used by the app exists
+const workerPath = path.join(__dirname, 'frontend/public/workers/stockfish-worker.js');
+if (fs.existsSync(workerPath)) {
+  const stats = fs.statSync(workerPath);
+  console.log("✓ stockfish-worker.js found");
+  console.log(`  Size: ${(stats.size / 1024).toFixed(2)} KB`);
 } else {
-  console.log("✗ stockfish-18-lite.js NOT found");
+  console.log("✗ stockfish-worker.js NOT found");
   process.exit(1);
 }
 
-// 2. Check if useStockfish.js has polyfill
-const useStockfishPath = path.join(__dirname, 'frontend/src/hooks/useStockfish.js');
+// 2. Check if useStockfish.js points at the public worker
+const useStockfishPath = path.join(__dirname, 'frontend/src/features/chess/hooks/useStockfish.js');
 const useStockfishCode = fs.readFileSync(useStockfishPath, 'utf8');
+const workerCode = fs.readFileSync(workerPath, 'utf8');
 
 const checks = [
-  { 
-    name: "SharedArrayBuffer polyfill", 
-    pattern: /self\.SharedArrayBuffer.*=.*ArrayBuffer/,
+  {
+    name: "Creates browser Worker",
+    source: useStockfishCode,
+    pattern: /new Worker\(workerPath\)/,
   },
   {
-    name: "Atomics polyfill",
-    pattern: /self\.Atomics\s*=/,
+    name: "Uses public workers path",
+    source: useStockfishCode,
+    pattern: /workers\/stockfish-worker\.js/,
   },
   {
-    name: "Error handling for imports",
-    pattern: /try.*importScripts/s,
+    name: "Handles UCI ready signal",
+    source: useStockfishCode,
+    pattern: /msg === "uciok"/,
   },
   {
-    name: "Wrapped Stockfish code",
-    pattern: /wrappedCode.*SharedArrayBuffer/s,
+    name: "Loads Stockfish bundle",
+    source: workerCode,
+    pattern: /importScripts\([\s\S]*stockfish\.js/,
   },
 ];
 
 console.log("\n✓ useStockfish.js checks:");
 checks.forEach(check => {
-  if (check.pattern.test(useStockfishCode)) {
+  if (check.pattern.test(check.source)) {
     console.log(`  ✓ ${check.name}`);
   } else {
     console.log(`  ✗ ${check.name}`);
+    process.exitCode = 1;
   }
 });
 
@@ -71,9 +77,14 @@ requiredHeaders.forEach(header => {
 });
 
 console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-console.log("✓ All components ready for Stockfish");
+if (process.exitCode) {
+  console.log("✗ Stockfish wiring verification failed");
+  process.exit(process.exitCode);
+}
+
+console.log("✓ All checked components are wired for Stockfish");
 console.log("\nNext steps:");
 console.log("1. npm run dev (development)");
 console.log("2. Check browser console for: '[Stockfish] Engine loaded'");
-console.log("3. AI should respond without SharedArrayBuffer errors");
+console.log("3. AI should return a bestmove from the worker");
 console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");

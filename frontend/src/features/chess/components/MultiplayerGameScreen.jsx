@@ -100,6 +100,16 @@ export default function MultiplayerGameScreen({
     prevTurnRef.current = currentTurn;
   }, [currentTurn, switchClock]);
 
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      // Call leaveRoom on unmount to clean up server connection
+      if (leaveRoom && typeof leaveRoom === 'function') {
+        leaveRoom();
+      }
+    };
+  }, [leaveRoom]);
+
   // Handle square click for multiplayer
   const handleSquareClick = (row, col) => {
     if (!gameState || !isMyTurn) return;
@@ -281,7 +291,31 @@ export default function MultiplayerGameScreen({
                     src={PIECE_IMAGES[playerColor + type]}
                     alt={type}
                     className="w-16 h-16 mb-2 group-hover:scale-110 transition-transform"
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                      e.target.nextElementSibling.style.display = "block";
+                    }}
                   />
+                  <span
+                    className="hidden w-16 h-16 mb-2 text-4xl flex items-center justify-center"
+                    style={{ display: "none" }}
+                  >
+                    {playerColor === "w"
+                      ? type === "Q"
+                        ? "♕"
+                        : type === "R"
+                          ? "♖"
+                          : type === "B"
+                            ? "♗"
+                            : "♘"
+                      : type === "Q"
+                        ? "♛"
+                        : type === "R"
+                          ? "♜"
+                          : type === "B"
+                            ? "♝"
+                            : "♞"}
+                  </span>
                   <span className="text-xs font-bold text-[#7a7a7a] group-hover:text-[#e0e0e0]">
                     {type === "Q"
                       ? "Queen"
@@ -337,7 +371,7 @@ export default function MultiplayerGameScreen({
             <div
               className="w-full bg-[#404040] transition-all duration-500 ease-in-out"
               style={{
-                height: `${Math.max(5, Math.min(95, 50 - materialAdvantage * 5))}%`,
+                height: `${Math.max(5, Math.min(95, 50 - materialAdvantage * 2.5))}%`,
               }}
             ></div>
             <span
@@ -544,14 +578,14 @@ export default function MultiplayerGameScreen({
               >
                 Resign
               </button>
-            ) : (
+            ) : !isSpectating ? (
               <button
                 onClick={leaveRoom}
                 className="w-full py-2 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#e0e0e0] rounded-lg text-sm transition-colors font-['Inter']"
               >
                 Leave Room
               </button>
-            )}
+            ) : null}
           </div>
 
           {/* Move History */}

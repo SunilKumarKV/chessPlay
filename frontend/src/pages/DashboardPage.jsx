@@ -67,7 +67,8 @@ export default function Dashboard({
 
   useEffect(() => {
     fetchDashboardData();
-  }, [fetchDashboardData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!user) {
     return (

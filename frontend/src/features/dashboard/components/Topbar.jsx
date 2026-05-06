@@ -1,12 +1,105 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useTheme } from "../../../hooks/useTheme";
+import { apiClient } from "../../../services/apiClient";
+
+const STORAGE_KEYS = {
+  messages: "chessplay.topbar.messages",
+  notifications: "chessplay.topbar.notifications",
+  localFriends: "chessplay.topbar.localFriends",
+};
+
+function loadStoredList(key, fallback) {
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export default function Topbar({ onMenuClick, user, onNavigate, onLogout }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState(null);
+  const [friendsData, setFriendsData] = useState({ friends: [], requests: [] });
+  const [localFriends, setLocalFriends] = useState(() =>
+    loadStoredList(STORAGE_KEYS.localFriends, []),
+  );
+  const [friendQuery, setFriendQuery] = useState("");
+  const [friendResults, setFriendResults] = useState([]);
+  const [friendStatus, setFriendStatus] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchStatus, setSearchStatus] = useState("");
+  const [messages, setMessages] = useState(() =>
+    loadStoredList(STORAGE_KEYS.messages, [
+      {
+        id: "welcome",
+        from: "ChessPlay",
+        text: "Welcome. Challenge a friend after they accept your request.",
+        read: false,
+        createdAt: new Date().toISOString(),
+      },
+    ]),
+  );
+  const [notifications, setNotifications] = useState(() =>
+    loadStoredList(STORAGE_KEYS.notifications, [
+      {
+        id: "secure-login",
+        title: "Login security enabled",
+        text: "Protected routes require a valid session token.",
+        read: false,
+        createdAt: new Date().toISOString(),
+      },
+    ]),
+  );
+  const [messageDraft, setMessageDraft] = useState("");
   const dropdownRef = useRef(null);
+  const panelRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
   const { isDark, toggleTheme, theme } = useTheme();
 
   const initial = user?.username ? user.username.charAt(0).toUpperCase() : "U";
+
+  const fallbackUserSearch = useCallback(async (query) => {
+    const normalizedQuery = query.toLowerCase();
+    const data = await apiClient("/api/games/leaderboard?limit=50");
+    const list = data.leaderboard || data.users || data || [];
+    return list
+      .filter((candidate) =>
+        String(candidate.username || "")
+          .toLowerCase()
+          .includes(normalizedQuery),
+      )
+      .slice(0, 10)
+      .map((candidate) => ({
+        id: candidate._id || candidate.id || candidate.username,
+        username: candidate.username,
+        email: candidate.email || "",
+        rating: candidate.rating || 1200,
+        gamesPlayed: candidate.gamesPlayed || 0,
+        gamesWon: candidate.gamesWon || 0,
+        relationship: localFriends.some(
+          (friend) => String(friend.id) === String(candidate._id || candidate.id || candidate.username),
+        )
+          ? "friend"
+          : "none",
+        fallback: true,
+      }));
+  }, [localFriends]);
+
+  const searchUsers = async (query) => {
+    try {
+      const data = await apiClient(
+        `/api/auth/users/search?q=${encodeURIComponent(query)}`,
+      );
+      return data.users || [];
+    } catch (error) {
+      if (error.status === 404) {
+        return fallbackUserSearch(query);
+      }
+      throw error;
+    }
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -14,10 +107,204 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout }) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsDropdownOpen(false);
       }
+      if (panelRef.current && !panelRef.current.contains(event.target)) {
+        setActivePanel(null);
+        setSearchResults([]);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.messages, JSON.stringify(messages));
+  }, [messages]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.notifications, JSON.stringify(notifications));
+  }, [notifications]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.localFriends, JSON.stringify(localFriends));
+  }, [localFriends]);
+
+  const loadFriends = async () => {
+    try {
+      const data = await apiClient("/api/auth/friends");
+      setFriendsData({
+        friends: [...(data.friends || []), ...localFriends],
+        requests: data.requests || [],
+      });
+    } catch (error) {
+      if (error.status === 404) {
+        setFriendsData({ friends: localFriends, requests: [] });
+        setFriendStatus("Using local friends until the latest backend is deployed.");
+        return;
+      }
+      setFriendStatus(error.message);
+    }
+  };
+
+  useEffect(() => {
+    if (activePanel !== "friends" || friendQuery.trim().length < 2) {
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(async () => {
+      try {
+        const data = await apiClient(
+          `/api/auth/users/search?q=${encodeURIComponent(friendQuery.trim())}`,
+        );
+        setFriendResults(data.users || []);
+        setFriendStatus("");
+      } catch (error) {
+        if (error.status === 404) {
+          try {
+            const users = await fallbackUserSearch(friendQuery.trim());
+            setFriendResults(users);
+            setFriendStatus(
+              "Search is using leaderboard fallback. Deploy the latest backend to enable friend requests.",
+            );
+          } catch (fallbackError) {
+            setFriendStatus(fallbackError.message);
+          }
+          return;
+        }
+        setFriendStatus(error.message);
+      }
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [activePanel, friendQuery, fallbackUserSearch]);
+
+  const addLocalFriend = (result) => {
+    const friend = {
+      id: result.id,
+      username: result.username,
+      email: result.email || "",
+      rating: result.rating || 1200,
+      gamesPlayed: result.gamesPlayed || 0,
+      gamesWon: result.gamesWon || 0,
+      localOnly: true,
+    };
+
+    setLocalFriends((items) => {
+      if (items.some((item) => String(item.id) === String(friend.id))) {
+        return items;
+      }
+      return [...items, friend];
+    });
+    setFriendsData((data) => ({
+      ...data,
+      friends: data.friends.some((item) => String(item.id) === String(friend.id))
+        ? data.friends
+        : [...data.friends, friend],
+    }));
+    setFriendResults((results) =>
+      results.map((item) =>
+        String(item.id) === String(friend.id)
+          ? { ...item, relationship: "friend" }
+          : item,
+      ),
+    );
+    setFriendStatus(`${friend.username} added locally.`);
+  };
+
+  const sendFriendRequest = async (target) => {
+    if (target.fallback) {
+      addLocalFriend(target);
+      return;
+    }
+
+    try {
+      await apiClient("/api/auth/friends/request", {
+        method: "POST",
+        body: JSON.stringify({ userId: target.id }),
+      });
+      setFriendStatus("Friend request sent.");
+      setFriendResults((results) =>
+        results.map((item) =>
+          item.id === target.id ? { ...item, relationship: "pending" } : item,
+        ),
+      );
+    } catch (error) {
+      if (error.status === 404) {
+        addLocalFriend(target);
+        return;
+      }
+      setFriendStatus(error.message);
+    }
+  };
+
+  const respondToRequest = async (requestId, action) => {
+    try {
+      await apiClient("/api/auth/friends/respond", {
+        method: "POST",
+        body: JSON.stringify({ requestId, action }),
+      });
+      setFriendStatus(action === "accept" ? "Friend added." : "Request declined.");
+      loadFriends();
+    } catch (error) {
+      setFriendStatus(error.message);
+    }
+  };
+
+  const sendLocalMessage = () => {
+    const text = messageDraft.trim();
+    if (!text) return;
+    setMessages((items) => [
+      {
+        id: `${Date.now()}`,
+        from: user?.username || "You",
+        text,
+        read: true,
+        createdAt: new Date().toISOString(),
+      },
+      ...items,
+    ]);
+    setMessageDraft("");
+  };
+
+  const unreadMessages = messages.filter((message) => !message.read).length;
+  const unreadNotifications = notifications.filter((item) => !item.read).length;
+
+  const openPanel = (panel) => {
+    setActivePanel((current) => (current === panel ? null : panel));
+    if (panel === "friends") {
+      loadFriends();
+    }
+    if (panel === "messages") {
+      setMessages((items) => items.map((message) => ({ ...message, read: true })));
+    }
+    if (panel === "notifications") {
+      setNotifications((items) =>
+        items.map((notification) => ({ ...notification, read: true })),
+      );
+    }
+  };
+
+  const handleTopbarSearch = (value) => {
+    setSearchQuery(value);
+    setSearchStatus("");
+    if (value.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    window.clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = window.setTimeout(async () => {
+      try {
+        const users = await searchUsers(value.trim());
+        setSearchResults(users);
+        if (users.some((item) => item.fallback)) {
+          setSearchStatus("Showing leaderboard matches until backend search is deployed.");
+        }
+      } catch (error) {
+        setSearchResults([]);
+        setSearchStatus(error.message);
+      }
+    }, 250);
+  };
 
   return (
     <header
@@ -97,7 +384,9 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout }) {
           </div>
           <input
             type="text"
-            placeholder="Search players, games, or puzzles..."
+            value={searchQuery}
+            onChange={(e) => handleTopbarSearch(e.target.value)}
+            placeholder="Search players..."
             className="w-full text-sm rounded-lg pl-10 pr-4 py-2.5 focus:outline-none transition-all font-medium"
             style={{
               backgroundColor: isDark
@@ -121,12 +410,79 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout }) {
                 : "rgba(0, 0, 0, 0.03)";
             }}
           />
+          {(searchQuery.trim().length >= 2 || searchStatus) && (
+            <div
+              className="absolute left-0 right-0 top-12 z-50 rounded-xl border shadow-2xl overflow-hidden"
+              style={{
+                backgroundColor: theme.bg.secondary,
+                borderColor: theme.border.secondary,
+              }}
+            >
+              {searchStatus && (
+                <div
+                  className="px-3 py-2 text-xs"
+                  style={{ color: theme.text.tertiary }}
+                >
+                  {searchStatus}
+                </div>
+              )}
+              {searchResults.length === 0 && !searchStatus ? (
+                <div
+                  className="px-3 py-3 text-sm"
+                  style={{ color: theme.text.secondary }}
+                >
+                  No players found.
+                </div>
+              ) : (
+                searchResults.map((result) => (
+                  <button
+                    type="button"
+                    key={`${result.id}-${result.username}`}
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSearchResults([]);
+                      onNavigate?.("leaderboard");
+                    }}
+                    className="w-full px-3 py-2 text-left transition-colors"
+                    style={{ color: theme.text.primary }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = theme.hover;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold">
+                          {result.username}
+                        </div>
+                        <div
+                          className="text-xs"
+                          style={{ color: theme.text.tertiary }}
+                        >
+                          {result.rating} rating · {result.gamesPlayed || 0} games
+                        </div>
+                      </div>
+                      <span
+                        className="text-xs"
+                        style={{ color: theme.text.tertiary }}
+                      >
+                        Player
+                      </span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="flex items-center gap-1 sm:gap-3">
+      <div className="flex items-center gap-1 sm:gap-3 relative" ref={panelRef}>
         {/* Friends Icon */}
         <button
+          onClick={() => openPanel("friends")}
           className="p-2 rounded-lg transition-colors relative"
           style={{
             color: theme.text.secondary,
@@ -155,10 +511,19 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout }) {
               d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
             />
           </svg>
+          {friendsData.requests.length > 0 && (
+            <span
+              className="absolute top-1.5 right-1.5 min-w-4 h-4 px-1 rounded-full text-[10px] leading-4 text-center font-bold"
+              style={{ backgroundColor: theme.primary, color: isDark ? "#000" : "#fff" }}
+            >
+              {friendsData.requests.length}
+            </span>
+          )}
         </button>
 
         {/* Messages Icon */}
         <button
+          onClick={() => openPanel("messages")}
           className="p-2 rounded-lg transition-colors relative"
           style={{
             color: theme.text.secondary,
@@ -187,17 +552,20 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout }) {
               d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
             />
           </svg>
-          <span
-            className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2"
-            style={{
-              backgroundColor: theme.error,
-              borderColor: theme.bg.overlay,
-            }}
-          ></span>
+          {unreadMessages > 0 && (
+            <span
+              className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2"
+              style={{
+                backgroundColor: theme.error,
+                borderColor: theme.bg.overlay,
+              }}
+            ></span>
+          )}
         </button>
 
         {/* Notifications Icon */}
         <button
+          onClick={() => openPanel("notifications")}
           className="p-2 rounded-lg transition-colors relative"
           style={{
             color: theme.text.secondary,
@@ -226,14 +594,246 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout }) {
               d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
             />
           </svg>
-          <span
-            className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2"
-            style={{
-              backgroundColor: theme.primary,
-              borderColor: theme.bg.overlay,
-            }}
-          ></span>
+          {unreadNotifications > 0 && (
+            <span
+              className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2"
+              style={{
+                backgroundColor: theme.primary,
+                borderColor: theme.bg.overlay,
+              }}
+            ></span>
+          )}
         </button>
+
+        {activePanel && (
+          <div
+            className="absolute right-0 top-12 z-50 w-[min(92vw,380px)] rounded-xl border shadow-2xl overflow-hidden"
+            style={{
+              backgroundColor: theme.bg.secondary,
+              borderColor: theme.border.secondary,
+              color: theme.text.primary,
+            }}
+          >
+            {activePanel === "friends" && (
+              <div className="p-4 space-y-4">
+                <div>
+                  <h3 className="font-bold text-lg">Friends</h3>
+                  <p className="text-xs" style={{ color: theme.text.tertiary }}>
+                    Search players, send requests, and approve invites.
+                  </p>
+                </div>
+
+                <input
+                  value={friendQuery}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFriendQuery(value);
+                    if (value.trim().length < 2) {
+                      setFriendResults([]);
+                    }
+                  }}
+                  placeholder="Search username or email"
+                  className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+                  style={{
+                    backgroundColor: theme.bg.tertiary,
+                    border: `1px solid ${theme.border.secondary}`,
+                    color: theme.text.primary,
+                  }}
+                />
+
+                {friendStatus && (
+                  <div
+                    className="rounded-lg px-3 py-2 text-xs"
+                    style={{ backgroundColor: theme.bg.tertiary, color: theme.text.secondary }}
+                  >
+                    {friendStatus}
+                  </div>
+                )}
+
+                {friendResults.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-xs uppercase tracking-wide" style={{ color: theme.text.tertiary }}>
+                      Search Results
+                    </div>
+                    {friendResults.map((result) => (
+                      <div
+                        key={result.id}
+                        className="flex items-center justify-between gap-3 rounded-lg p-2"
+                        style={{ backgroundColor: theme.bg.tertiary }}
+                      >
+                        <div className="min-w-0">
+                          <div className="font-semibold truncate">{result.username}</div>
+                          <div className="text-xs" style={{ color: theme.text.tertiary }}>
+                            {result.rating} rating
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={result.relationship !== "none"}
+                          onClick={() => sendFriendRequest(result)}
+                          className="rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+                          style={{
+                            backgroundColor: theme.primary,
+                            color: isDark ? "#000" : "#fff",
+                          }}
+                        >
+                          {result.relationship === "friend"
+                            ? "Friends"
+                            : result.relationship === "pending"
+                              ? "Pending"
+                              : result.relationship === "incoming"
+                                ? "Requested"
+                                : "Add"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <div className="text-xs uppercase tracking-wide" style={{ color: theme.text.tertiary }}>
+                    Requests
+                  </div>
+                  {friendsData.requests.length === 0 ? (
+                    <div className="text-sm" style={{ color: theme.text.secondary }}>
+                      No pending requests.
+                    </div>
+                  ) : (
+                    friendsData.requests.map((request) => (
+                      <div
+                        key={request.id}
+                        className="flex items-center justify-between gap-2 rounded-lg p-2"
+                        style={{ backgroundColor: theme.bg.tertiary }}
+                      >
+                        <span className="font-semibold">{request.from.username}</span>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => respondToRequest(request.id, "accept")}
+                            className="rounded px-2 py-1 text-xs bg-green-600 text-white"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => respondToRequest(request.id, "decline")}
+                            className="rounded px-2 py-1 text-xs bg-gray-600 text-white"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-xs uppercase tracking-wide" style={{ color: theme.text.tertiary }}>
+                    Friends
+                  </div>
+                  {friendsData.friends.length === 0 ? (
+                    <div className="text-sm" style={{ color: theme.text.secondary }}>
+                      Add friends to start building your chess circle.
+                    </div>
+                  ) : (
+                    friendsData.friends.map((friend) => (
+                      <div
+                        key={friend.id}
+                        className="rounded-lg p-2"
+                        style={{ backgroundColor: theme.bg.tertiary }}
+                      >
+                        <div className="font-semibold">{friend.username}</div>
+                        <div className="text-xs" style={{ color: theme.text.tertiary }}>
+                          {friend.rating} rating · {friend.gamesPlayed} games
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activePanel === "messages" && (
+              <div className="p-4 space-y-4">
+                <h3 className="font-bold text-lg">Messages</h3>
+                <div className="flex gap-2">
+                  <input
+                    value={messageDraft}
+                    onChange={(e) => setMessageDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") sendLocalMessage();
+                    }}
+                    placeholder="Write a quick note"
+                    className="min-w-0 flex-1 rounded-lg px-3 py-2 text-sm outline-none"
+                    style={{
+                      backgroundColor: theme.bg.tertiary,
+                      border: `1px solid ${theme.border.secondary}`,
+                      color: theme.text.primary,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={sendLocalMessage}
+                    className="rounded-lg px-3 py-2 text-sm font-semibold"
+                    style={{ backgroundColor: theme.primary, color: isDark ? "#000" : "#fff" }}
+                  >
+                    Send
+                  </button>
+                </div>
+                <div className="max-h-72 overflow-y-auto space-y-2">
+                  {messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className="rounded-lg p-3"
+                      style={{ backgroundColor: theme.bg.tertiary }}
+                    >
+                      <div className="text-sm font-semibold">{message.from}</div>
+                      <div className="text-sm mt-1" style={{ color: theme.text.secondary }}>
+                        {message.text}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activePanel === "notifications" && (
+              <div className="p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-lg">Notifications</h3>
+                  <button
+                    type="button"
+                    onClick={() => setNotifications([])}
+                    className="text-xs"
+                    style={{ color: theme.text.tertiary }}
+                  >
+                    Clear
+                  </button>
+                </div>
+                {notifications.length === 0 ? (
+                  <div className="text-sm" style={{ color: theme.text.secondary }}>
+                    No notifications.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {notifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className="rounded-lg p-3"
+                        style={{ backgroundColor: theme.bg.tertiary }}
+                      >
+                        <div className="font-semibold">{notification.title}</div>
+                        <div className="text-sm mt-1" style={{ color: theme.text.secondary }}>
+                          {notification.text}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Theme Toggle Button */}
         <button

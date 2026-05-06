@@ -3,24 +3,39 @@ import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 import {
   resetGame,
   makeMove,
+  resignGame,
+  setAiColor,
+  setHint,
+  setTimeControl,
+  undoLastTurn,
+  updateClock,
+  TIME_CONTROLS,
 } from "../../../store/slices/chessGameSlice";
 import Board from "../components/Board";
 import ChessClock from "../components/ChessClock";
-import PlayerInfo from "../components/PlayerInfo";
 import MoveHistory from "../components/MoveHistory";
 import ChessSettingsModal from "../../../components/ChessSettingsModal";
 import EvaluationBar from "../../../components/EvaluationBar";
 import { useStockfish } from "../hooks/useStockfish";
 import { soundManager } from "../../../utils/sounds/soundManager";
 import { loadSettings } from "../../../utils/settingsPersistence";
+import { Chess as ChessEngine } from "chess.js";
 
 export default function Chess() {
   const dispatch = useAppDispatch();
   const gameState = useAppSelector((state) => state.chessGame);
   const settings = useAppSelector((state) => state.chessSettings);
 
-  const [activeTab, setActiveTab] = useState("moves");
   const [showSettings, setShowSettings] = useState(false);
+  const humanColor = gameState.aiColor === "w" ? "b" : "w";
+  const isHumanTurn =
+    !gameState.isGameOver && gameState.game.turn() === humanColor;
+  const currentTimeKey =
+    Object.entries(TIME_CONTROLS).find(
+      ([, control]) =>
+        control.initial === gameState.timeControl.initial &&
+        control.increment === gameState.timeControl.increment,
+    )?.[0] || "blitz";
 
   // Initialize Stockfish using the canonical { enabled } interface.
   // AI move triggering is handled in the useEffect below via getBestMove.
@@ -41,6 +56,32 @@ export default function Chess() {
     soundManager.setVolume(settings.soundVolume);
   }, [settings.playSounds, settings.soundTheme, settings.soundVolume]);
 
+  useEffect(() => {
+    if (
+      gameState.isGameOver ||
+      !gameState.gameStarted ||
+      gameState.timeControl.initial === null
+    ) {
+      return undefined;
+    }
+
+    const timer = window.setInterval(() => {
+      const color = gameState.activeClock;
+      const currentTime = color === "w" ? gameState.whiteTime : gameState.blackTime;
+      dispatch(updateClock({ color, time: Math.max(0, currentTime - 1) }));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [
+    dispatch,
+    gameState.activeClock,
+    gameState.blackTime,
+    gameState.gameStarted,
+    gameState.isGameOver,
+    gameState.timeControl.initial,
+    gameState.whiteTime,
+  ]);
+
   // Handle AI moves: when it's the AI's turn, request a move from Stockfish
   useEffect(() => {
     if (
@@ -52,7 +93,7 @@ export default function Chess() {
       return;
     }
 
-    const thinkingTime = 300 + gameState.aiDifficulty * 85;
+    const thinkingTime = 300 + settings.evaluationDepth * 90;
 
     stockfish
       .getBestMove(gameState.fen, { movetime: thinkingTime })
@@ -64,7 +105,7 @@ export default function Chess() {
 
         try {
           // Validate the move against chess.js before dispatching
-          const testGame = gameState.game;
+          const testGame = new ChessEngine(gameState.fen);
           const move = testGame.move({ from, to, promotion });
           if (move) {
             dispatch(makeMove({ from, to, promotion }));
@@ -107,6 +148,28 @@ export default function Chess() {
     dispatch(resetGame());
     if (settings.playSounds) {
       soundManager.playGameStart();
+    }
+  };
+
+  const handleHint = async () => {
+    if (!isHumanTurn || !stockfish.ready) return;
+    dispatch(setHint(null));
+
+    try {
+      const uci = await stockfish.getBestMove(gameState.fen, {
+        movetime: 700 + settings.evaluationDepth * 60,
+      });
+      if (!uci) return;
+
+      const from = uci.slice(0, 2);
+      const to = uci.slice(2, 4);
+      const testGame = new ChessEngine(gameState.fen);
+      const move = testGame.move({ from, to, promotion: uci[4] || undefined });
+      if (move) {
+        dispatch(setHint({ from, to, san: move.san }));
+      }
+    } catch (error) {
+      console.warn("Hint unavailable:", error.message);
     }
   };
 
@@ -192,6 +255,10 @@ export default function Chess() {
                     ? "Stalemate"
                     : gameState.result === "draw"
                       ? "Draw"
+                      : gameState.result === "resigned"
+                        ? "Resigned"
+                        : gameState.result === "timeout"
+                          ? "Time out"
                       : "Game Over"}
               </span>
             ) : stockfish.thinking ? (
@@ -218,55 +285,101 @@ export default function Chess() {
               New Game
             </button>
             <button
-              onClick={() => dispatch(resetGame())}
-              className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white transition-colors"
+              onClick={() => dispatch(undoLastTurn())}
+              disabled={gameState.history.length === 0 || gameState.isGameOver}
+              className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:hover:bg-gray-700 rounded text-white transition-colors"
             >
-              Reset
+              Undo
             </button>
+            <button
+              onClick={handleHint}
+              disabled={!isHumanTurn || !stockfish.ready}
+              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 rounded text-white transition-colors"
+            >
+              Hint
+            </button>
+            <button
+              onClick={() => dispatch(resignGame())}
+              disabled={gameState.isGameOver || gameState.history.length === 0}
+              className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:hover:bg-red-600 rounded text-white transition-colors"
+            >
+              Resign
+            </button>
+          </div>
+          {gameState.hint && (
+            <div className="mt-3 rounded bg-blue-500/10 px-3 py-2 text-sm text-blue-200">
+              Hint: {gameState.hint.san} ({gameState.hint.from} → {gameState.hint.to})
+            </div>
+          )}
+        </div>
+
+        <div className="bg-[#262421] rounded-lg p-4 border border-white/5">
+          <h3 className="text-lg font-semibold mb-3">Options</h3>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm text-gray-300 mb-1">
+                Time Control
+              </label>
+              <select
+                value={currentTimeKey}
+                onChange={(e) => dispatch(setTimeControl(e.target.value))}
+                className="w-full rounded bg-[#1d1b19] border border-white/10 px-3 py-2 text-sm text-white"
+              >
+                <option value="none">No timer</option>
+                <option value="bullet">Bullet · 1+0</option>
+                <option value="blitz">Blitz · 5+0</option>
+                <option value="rapid">Rapid · 10+0</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-300 mb-1">
+                Play As
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => dispatch(setAiColor("b"))}
+                  className={`rounded px-3 py-2 text-sm transition-colors ${
+                    gameState.aiColor === "b"
+                      ? "bg-[#c9a45c] text-[#1d1b19]"
+                      : "bg-gray-700 text-white hover:bg-gray-600"
+                  }`}
+                >
+                  White
+                </button>
+                <button
+                  type="button"
+                  onClick={() => dispatch(setAiColor("w"))}
+                  className={`rounded px-3 py-2 text-sm transition-colors ${
+                    gameState.aiColor === "w"
+                      ? "bg-[#c9a45c] text-[#1d1b19]"
+                      : "bg-gray-700 text-white hover:bg-gray-600"
+                  }`}
+                >
+                  Black
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Move History */}
-        <div className="bg-[#262421] rounded-lg border border-white/5">
-          <div className="p-4 border-b border-white/5">
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setActiveTab("moves")}
-                className={`px-3 py-1 rounded text-sm ${
-                  activeTab === "moves"
-                    ? "bg-blue-600 text-white"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                Moves
-              </button>
-              <button
-                onClick={() => setActiveTab("analysis")}
-                className={`px-3 py-1 rounded text-sm ${
-                  activeTab === "analysis"
-                    ? "bg-blue-600 text-white"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                Analysis
-              </button>
+        {settings.showMoveHistory && (
+          <div className="bg-[#262421] rounded-lg border border-white/5">
+            <div className="p-4 border-b border-white/5">
+              <h3 className="text-sm font-semibold text-gray-200">Moves</h3>
             </div>
-          </div>
 
-          <div className="p-4 max-h-96 overflow-y-auto">
-            {activeTab === "moves" ? (
+            <div className="p-4 max-h-96 overflow-y-auto">
               <MoveHistory
                 movePairs={movePairs}
                 currentMove={gameState.currentMove}
                 pieceNotation={settings.pieceNotation}
               />
-            ) : (
-              <div className="text-sm text-gray-400">
-                Analysis features coming soon...
-              </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Settings Modal */}

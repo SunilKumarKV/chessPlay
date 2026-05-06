@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { FormInput, PasswordInput, PrimaryBtn } from "../../../components/ui";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
+const GOOGLE_AUTH_URL = import.meta.env.VITE_GOOGLE_AUTH_URL || "";
+const FACEBOOK_AUTH_URL = import.meta.env.VITE_FACEBOOK_AUTH_URL || "";
 
 export default function Auth({
   onLogin,
@@ -9,7 +11,7 @@ export default function Auth({
   initialIsLogin = true,
   onToggleMode,
 }) {
-  const [isLogin, setIsLogin] = useState(initialIsLogin);
+  const [isLogin, setIsLogin] = useState(() => initialIsLogin);
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -17,10 +19,7 @@ export default function Auth({
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setIsLogin(initialIsLogin);
-  }, [initialIsLogin]);
+  const [showEmailForm, setShowEmailForm] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -76,59 +75,111 @@ export default function Auth({
     }
   };
 
+  const handleSocialLogin = (provider) => {
+    const url = provider === "google" ? GOOGLE_AUTH_URL : FACEBOOK_AUTH_URL;
+    if (url) {
+      window.location.href = url;
+      return;
+    }
+
+    setError(
+      `${provider === "google" ? "Google" : "Facebook"} login needs OAuth client configuration before it can be used.`,
+    );
+  };
+
   const formContent = (
-    <>
-      <h2 className="text-2xl font-semibold mb-6 text-center">
-        {isLogin ? "Welcome Back" : "Create Account"}
-      </h2>
+    <div className="space-y-5">
+      <div className="text-center">
+        <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-lg bg-[#c9a45c] text-2xl text-[#171512]">
+          ♟
+        </div>
+        <h2 className="text-2xl font-semibold">
+          {isLogin ? "Welcome back" : "Create your account"}
+        </h2>
+        <p className="mt-1 text-sm text-gray-400">
+          Login security is required for multiplayer, friends, messages, and game history.
+        </p>
+      </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {!isLogin && (
-          <FormInput
-            label="Username"
-            type="text"
-            name="username"
-            value={formData.username}
-            onChange={handleChange}
-            required={!isLogin}
-            placeholder="Enter username"
-          />
-        )}
-
-        <FormInput
-          label="Email"
-          type="email"
-          name="email"
-          value={formData.email}
-          onChange={handleChange}
-          required
-          placeholder="Enter email"
-        />
-
-        <PasswordInput
-          label="Password"
-          name="password"
-          value={formData.password}
-          onChange={handleChange}
-          required
-          minLength={6}
-          placeholder="Enter password"
-        />
-
-        {error && (
-          <div className="text-red-500 text-sm text-center bg-red-900/20 border border-red-800 rounded-lg p-3">
-            {error}
-          </div>
-        )}
-
-        <PrimaryBtn
-          type="submit"
-          disabled={loading}
-          className={`w-full ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+      <div className="grid gap-2">
+        <button
+          type="button"
+          onClick={() => handleSocialLogin("google")}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-100"
         >
-          {loading ? "Please wait..." : isLogin ? "Sign In" : "Sign Up"}
-        </PrimaryBtn>
-      </form>
+          <span className="text-base font-bold">G</span>
+          Continue with Google
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSocialLogin("facebook")}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#1877f2] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#166fe5]"
+        >
+          <span className="text-base font-bold">f</span>
+          Continue with Facebook
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setShowEmailForm((value) => !value);
+            setError("");
+          }}
+          className="w-full rounded-lg border border-[#c9a45c]/40 bg-[#c9a45c]/10 px-4 py-2.5 text-sm font-semibold text-[#f5d78e] hover:bg-[#c9a45c]/20"
+        >
+          Continue with email
+        </button>
+      </div>
+
+      {showEmailForm && (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {!isLogin && (
+            <FormInput
+              label="Username"
+              type="text"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
+              required={!isLogin}
+              minLength={3}
+              placeholder="Choose a username"
+            />
+          )}
+
+          <FormInput
+            label="Email"
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            placeholder="name@example.com"
+          />
+
+          <PasswordInput
+            label="Password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            required
+            minLength={8}
+            placeholder="At least 8 characters"
+          />
+
+          <PrimaryBtn
+            type="submit"
+            disabled={loading}
+            className={`w-full ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            {loading ? "Please wait..." : isLogin ? "Sign In" : "Sign Up"}
+          </PrimaryBtn>
+        </form>
+      )}
+
+      {error && (
+        <div className="text-red-300 text-sm text-center bg-red-900/20 border border-red-800 rounded-lg p-3">
+          {error}
+        </div>
+      )}
 
       <div className="mt-6 text-center">
         <button
@@ -140,7 +191,7 @@ export default function Auth({
             : "Already have an account? Sign in"}
         </button>
       </div>
-    </>
+    </div>
   );
 
   if (isModal) {
@@ -148,16 +199,16 @@ export default function Auth({
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-6">
+    <div className="min-h-screen bg-[#171512] text-white flex items-center justify-center p-6">
       <div className="max-w-md w-full">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-blue-400 mb-2">ChessPlay</h1>
-          <p className="text-gray-400">Welcome to the royal game</p>
+          <h1 className="text-3xl font-bold text-[#f5d78e] mb-2">ChessPlay</h1>
+          <p className="text-gray-400">Secure sign-in for your chess arena</p>
         </div>
 
         {/* Auth Form */}
-        <div className="bg-gray-800 rounded-lg p-8 border border-gray-700">
+        <div className="bg-[#24211d] rounded-xl p-6 border border-[#c9a45c]/20 shadow-2xl">
           {formContent}
         </div>
       </div>

@@ -139,6 +139,9 @@ function isValidMove(gameState, fromRow, fromCol, toRow, toCol, skipCheckValidat
 
   const targetPiece = board[toRow][toCol];
   if (targetPiece && colorOf(targetPiece) === color) return false;
+  if (!skipCheckValidation && targetPiece && typeOf(targetPiece) === "K") {
+    return false;
+  }
 
   const type = typeOf(piece);
   const rowDiff = toRow - fromRow;
@@ -277,6 +280,64 @@ function isValidMove(gameState, fromRow, fromCol, toRow, toCol, skipCheckValidat
 
   // Final check: does this move leave the king in check?
   return !isKingInCheckAfterMove(gameState, fromRow, fromCol, toRow, toCol, color);
+}
+
+function findKing(board, color) {
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      if (board[row][col] === color + "K") {
+        return [row, col];
+      }
+    }
+  }
+  return null;
+}
+
+function isInCheck(gameState, color) {
+  const kingSquare = findKing(gameState.board, color);
+  if (!kingSquare) return false;
+  return isSquareAttackedBy(
+    gameState.board,
+    kingSquare[0],
+    kingSquare[1],
+    opponent(color),
+  );
+}
+
+function hasAnyValidMove(gameState, color) {
+  const originalTurn = gameState.turn;
+  const stateForColor = {
+    ...gameState,
+    turn: color,
+  };
+
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      const piece = gameState.board[row][col];
+      if (!piece || colorOf(piece) !== color) continue;
+
+      for (let toRow = 0; toRow < 8; toRow++) {
+        for (let toCol = 0; toCol < 8; toCol++) {
+          if (isValidMove(stateForColor, row, col, toRow, toCol)) {
+            gameState.turn = originalTurn;
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  gameState.turn = originalTurn;
+  return false;
+}
+
+function getGameStatus(gameState) {
+  const color = gameState.turn;
+  const inCheck = isInCheck(gameState, color);
+  const hasMoves = hasAnyValidMove(gameState, color);
+
+  if (!hasMoves) return inCheck ? "checkmate" : "stalemate";
+  return inCheck ? "check" : "playing";
 }
 
 function toAlgebraic(row, col) {
@@ -450,6 +511,8 @@ function applyMove(gameState, fromRow, fromCol, toRow, toCol, promotionPiece = "
     gameState.status = "draw-50move";
   } else if (hasThreefoldRepetition(gameState.positionHistory)) {
     gameState.status = "draw-repetition";
+  } else {
+    gameState.status = getGameStatus(gameState);
   }
 
   const moveText = `${piece}@${toAlgebraic(fromRow, fromCol)}→${toAlgebraic(
@@ -476,6 +539,8 @@ module.exports = {
   opponent,
   cloneBoard,
   getPositionKey,
+  getGameStatus,
+  isInCheck,
   isValidMove,
   applyMove,
 };

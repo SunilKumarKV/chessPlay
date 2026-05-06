@@ -1,52 +1,227 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useSettings } from "../hooks/useSettings";
-import { TabBar, PrimaryBtn } from "../components/ui";
 import { useTheme } from "../hooks/useTheme";
+import { notifyUserChanged } from "../hooks/useCurrentUser";
 
 const API_BASE = `${import.meta.env.VITE_BACKEND_URL || "http://localhost:3001"}/api`;
 
+const SECTIONS = [
+  { id: "account", label: "Account", hint: "Profile and sign-in" },
+  { id: "board", label: "Board", hint: "Pieces, colors, notation" },
+  { id: "play", label: "Play", hint: "Moves, timers, AI" },
+  { id: "notifications", label: "Notifications", hint: "Alerts and updates" },
+  { id: "privacy", label: "Privacy", hint: "Visibility and requests" },
+];
+
+const LANGUAGES = [
+  { id: "en", label: "English" },
+  { id: "hi", label: "Hindi" },
+  { id: "ta", label: "Tamil" },
+  { id: "te", label: "Telugu" },
+  { id: "kn", label: "Kannada" },
+  { id: "ml", label: "Malayalam" },
+  { id: "es", label: "Spanish" },
+  { id: "fr", label: "French" },
+];
+
+const BOARD_THEMES = [
+  { id: "classic", label: "Classic", light: "#f0d9b5", dark: "#b58863" },
+  { id: "green", label: "Green", light: "#eeeed2", dark: "#769656" },
+  { id: "blue", label: "Blue", light: "#dee3e6", dark: "#8ca2ad" },
+  { id: "brown", label: "Walnut", light: "#ead7b8", dark: "#946f51" },
+  { id: "grey", label: "Slate", light: "#c8c8c8", dark: "#777777" },
+  { id: "dark", label: "Night", light: "#6b7280", dark: "#262626" },
+];
+
+const APP_THEMES = [
+  { id: "light", label: "Light", colors: ["#ffffff", "#f5f5f5", "#81b64c"] },
+  { id: "dark", label: "Dark", colors: ["#0e0e0e", "#262421", "#81b64c"] },
+  { id: "midnight", label: "Midnight", colors: ["#08111f", "#17243a", "#7dd3fc"] },
+  { id: "tournament", label: "Tournament", colors: ["#191715", "#312b24", "#d6a94a"] },
+  { id: "newspaper", label: "Newspaper", colors: ["#f7f3ea", "#e4dac8", "#3f6f45"] },
+];
+
+const APP_FONTS = [
+  { id: "inter", label: "Inter", sample: "Clean dashboard text" },
+  { id: "montserrat", label: "Montserrat", sample: "Strong modern headings" },
+  { id: "system", label: "System", sample: "Native device font" },
+  { id: "mono", label: "JetBrains Mono", sample: "Clock 10:00 + 3" },
+  { id: "serif", label: "Serif", sample: "Classic chess notes" },
+];
+
+const PIECE_SETS = [
+  { id: "classic", label: "Classic", preview: "K Q R B N P" },
+  { id: "modern", label: "Modern", preview: "K Q R B N P" },
+  { id: "neo", label: "Neo", preview: "KQ RBN P" },
+  { id: "minimal", label: "Minimal", preview: "KQRBNP" },
+];
+
+const TIME_CONTROLS = [
+  { id: 0, label: "1+0 Bullet" },
+  { id: 1, label: "2+1 Bullet" },
+  { id: 2, label: "3+0 Blitz" },
+  { id: 3, label: "5+3 Blitz" },
+  { id: 4, label: "10+0 Rapid" },
+  { id: 5, label: "10+5 Rapid" },
+  { id: 6, label: "30+0 Classical" },
+];
+
+const AI_LEVELS = [
+  "Beginner",
+  "Easy",
+  "Medium",
+  "Hard",
+  "Expert",
+  "Master",
+  "Grandmaster",
+];
+
+function panelStyle(theme) {
+  return {
+    backgroundColor: theme.bg.secondary,
+    borderColor: theme.border.secondary,
+    color: theme.text.primary,
+  };
+}
+
+function Card({ title, description, children, theme }) {
+  return (
+    <section className="rounded-xl border p-4 md:p-5 space-y-4" style={panelStyle(theme)}>
+      <div>
+        <h2 className="text-lg font-black">{title}</h2>
+        {description && (
+          <p className="text-sm mt-1" style={{ color: theme.text.secondary }}>
+            {description}
+          </p>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function ToggleRow({ label, description, checked, onChange, theme }) {
+  return (
+    <div
+      className="flex items-center justify-between gap-4 rounded-lg p-3"
+      style={{ backgroundColor: theme.bg.tertiary }}
+    >
+      <div className="min-w-0">
+        <div className="font-semibold">{label}</div>
+        {description && (
+          <div className="text-sm mt-0.5" style={{ color: theme.text.secondary }}>
+            {description}
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        className="relative h-7 w-12 rounded-full flex-shrink-0 transition-colors"
+        style={{ backgroundColor: checked ? "#81b64c" : theme.border.primary }}
+        aria-pressed={checked}
+      >
+        <span
+          className="absolute top-1 h-5 w-5 rounded-full bg-white transition-transform"
+          style={{ transform: checked ? "translateX(23px)" : "translateX(4px)" }}
+        />
+      </button>
+    </div>
+  );
+}
+
+function SelectRow({ label, value, options, onChange, theme }) {
+  return (
+    <label
+      className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-lg p-3"
+      style={{ backgroundColor: theme.bg.tertiary }}
+    >
+      <span className="font-semibold">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="rounded-lg px-3 py-2 outline-none min-w-48"
+        style={{
+          backgroundColor: theme.bg.secondary,
+          border: `1px solid ${theme.border.secondary}`,
+          color: theme.text.primary,
+        }}
+      >
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function Segmented({ value, options, onChange, theme }) {
+  return (
+    <div
+      className="grid gap-2 rounded-lg p-1 sm:inline-grid"
+      style={{
+        gridTemplateColumns: `repeat(${Math.min(options.length, 3)}, minmax(0, 1fr))`,
+        backgroundColor: theme.bg.tertiary,
+      }}
+    >
+      {options.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          onClick={() => onChange(option.id)}
+          className="rounded-md px-3 py-2 text-sm font-bold transition-colors"
+          style={{
+            backgroundColor: value === option.id ? theme.primary : "transparent",
+            color: value === option.id ? "#111" : theme.text.secondary,
+          }}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function Settings({ user, onBack }) {
-  const { theme } = useTheme();
-  const [activeTab, setActiveTab] = useState("account");
-  const [hasChanges, setHasChanges] = useState(false);
+  const { theme, isDark } = useTheme();
+  const settingsApi = useSettings();
+  const current = settingsApi.settings;
+  const [activeSection, setActiveSection] = useState("account");
   const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState("");
 
-  const settings = useSettings();
+  const hasChanges = Object.keys(settingsApi.changes).length > 0;
 
-  const tabs = [
-    { id: "account", label: "Account", icon: "👤" },
-    { id: "appearance", label: "Appearance", icon: "🎨" },
-    { id: "game", label: "Game", icon: "♟️" },
-    { id: "notifications", label: "Notifications", icon: "🔔" },
-    { id: "privacy", label: "Privacy", icon: "🔒" },
-  ];
+  useEffect(() => {
+    if (!status) return undefined;
+    const timeout = window.setTimeout(() => setStatus(""), 3500);
+    return () => window.clearTimeout(timeout);
+  }, [status]);
 
-  const handleSave = async () => {
+  const saveAll = async () => {
     setSaving(true);
+    setStatus("");
     try {
-      await settings.saveSettings();
-      setHasChanges(false);
+      await settingsApi.saveSettings();
+      notifyUserChanged();
+      setStatus("Settings saved.");
     } catch (error) {
-      console.error("Failed to save settings:", error);
+      setStatus(error.message || "Failed to save settings.");
     } finally {
       setSaving(false);
     }
   };
 
-  useEffect(() => {
-    // Check if any settings have changed
-    const hasAnyChanges = Object.keys(settings.changes).length > 0;
-    setHasChanges(hasAnyChanges);
-  }, [settings.changes]);
-
-  if (settings.loading) {
+  if (settingsApi.loading) {
     return (
       <div
-        className="min-h-screen flex items-center justify-center"
+        className="min-h-[70vh] flex items-center justify-center"
         style={{ backgroundColor: theme.bg.primary, color: theme.text.primary }}
       >
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#81b64c] mx-auto mb-4"></div>
+          <div className="h-10 w-10 mx-auto mb-4 rounded-full border-4 border-[#81b64c] border-t-transparent animate-spin" />
           <p style={{ color: theme.text.secondary }}>Loading settings...</p>
         </div>
       </div>
@@ -55,723 +230,584 @@ export default function Settings({ user, onBack }) {
 
   return (
     <div
-      className="min-h-screen font-['Inter']"
+      className="min-h-full w-full p-4 md:p-8"
       style={{ backgroundColor: theme.bg.primary, color: theme.text.primary }}
     >
-      {/* Header */}
-      <header
-        className="border-b px-6 py-4"
-        style={{
-          backgroundColor: theme.bg.secondary,
-          borderColor: theme.border.primary,
-        }}
-      >
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <header className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div>
             <button
+              type="button"
               onClick={onBack}
-              className="transition-colors text-sm"
+              className="text-sm font-semibold mb-3"
               style={{ color: theme.text.secondary }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.color = theme.text.primary)
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = theme.text.secondary)
-              }
             >
-              ← Back to Dashboard
+              Back to dashboard
             </button>
-            <h1
-              className="text-xl font-semibold"
-              style={{ color: theme.text.primary }}
+            <h1 className="text-3xl font-black font-['Montserrat']">Settings</h1>
+            <p className="text-sm mt-1" style={{ color: theme.text.secondary }}>
+              Control your account, board, play preferences, alerts, and privacy.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {status && (
+              <span className="text-sm rounded-lg px-3 py-2" style={{ backgroundColor: theme.bg.secondary }}>
+                {status}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={settingsApi.resetSettings}
+              disabled={!hasChanges || saving}
+              className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50"
+              style={{ borderColor: theme.border.secondary }}
             >
-              Settings
-            </h1>
+              Reset
+            </button>
+            <button
+              type="button"
+              onClick={saveAll}
+              disabled={!hasChanges || saving}
+              className="rounded-lg px-4 py-2 font-bold disabled:opacity-50"
+              style={{ backgroundColor: theme.primary, color: isDark ? "#111" : "#fff" }}
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-6">
-        <div className="space-y-6">
-          {/* Tab Navigation */}
-          <TabBar
-            tabs={tabs.map((tab) => ({ id: tab.id, label: tab.label }))}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
+        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
+          <aside className="rounded-xl border p-2 h-fit" style={panelStyle(theme)}>
+            {SECTIONS.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => setActiveSection(section.id)}
+                className="w-full rounded-lg px-4 py-3 text-left transition-colors"
+                style={{
+                  backgroundColor: activeSection === section.id ? theme.bg.tertiary : "transparent",
+                  color: activeSection === section.id ? theme.text.primary : theme.text.secondary,
+                }}
+              >
+                <div className="font-black">{section.label}</div>
+                <div className="text-xs mt-0.5" style={{ color: theme.text.tertiary }}>
+                  {section.hint}
+                </div>
+              </button>
+            ))}
+          </aside>
 
-          {/* Content Area */}
-          <div
-            className="rounded-lg p-6"
-            style={{
-              backgroundColor: theme.bg.secondary,
-              borderColor: theme.border.primary,
-              border: `1px solid ${theme.border.primary}`,
-            }}
-          >
-            {activeTab === "account" && (
-              <AccountTab user={user} settings={settings} theme={theme} />
+          <main className="space-y-5">
+            {activeSection === "account" && (
+              <AccountSection
+                user={user}
+                settings={current}
+                updateAccount={settingsApi.updateAccount}
+                updateAppearance={settingsApi.updateAppearance}
+                theme={theme}
+                setStatus={setStatus}
+              />
             )}
-            {activeTab === "appearance" && (
-              <AppearanceTab settings={settings} />
+            {activeSection === "board" && (
+              <BoardSection
+                settings={current}
+                updateAppearance={settingsApi.updateAppearance}
+                theme={theme}
+              />
             )}
-            {activeTab === "game" && <GameTab settings={settings} />}
-            {activeTab === "notifications" && (
-              <NotificationsTab settings={settings} />
+            {activeSection === "play" && (
+              <PlaySection
+                settings={current}
+                updateGame={settingsApi.updateGame}
+                theme={theme}
+              />
             )}
-            {activeTab === "privacy" && <PrivacyTab settings={settings} />}
-          </div>
+            {activeSection === "notifications" && (
+              <NotificationsSection
+                settings={current}
+                updateNotifications={settingsApi.updateNotifications}
+                theme={theme}
+              />
+            )}
+            {activeSection === "privacy" && (
+              <PrivacySection
+                settings={current}
+                updatePrivacy={settingsApi.updatePrivacy}
+                theme={theme}
+              />
+            )}
+          </main>
         </div>
-      </main>
-
-      {/* Save Button */}
-      {hasChanges && (
-        <div className="fixed bottom-6 right-6">
-          <PrimaryBtn
-            onClick={handleSave}
-            disabled={saving}
-            className={saving ? "opacity-50 cursor-not-allowed" : ""}
-          >
-            {saving ? "Saving..." : "Save Changes"}
-          </PrimaryBtn>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
 
-// Account Tab Component
-function AccountTab({ user, settings, theme }) {
-  const [showPasswordChange, setShowPasswordChange] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState(null);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmNewPassword, setConfirmNewPassword] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [passwordSuccess, setPasswordSuccess] = useState("");
+function AccountSection({ user, settings, updateAccount, updateAppearance, theme, setStatus }) {
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
   const [passwordSaving, setPasswordSaving] = useState(false);
-  const fileInputRef = useRef(null);
 
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#81b64c] mx-auto mb-4"></div>
-          <p style={{ color: theme.text.secondary }}>Loading user data...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const handleAvatarChange = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => setAvatarPreview(e.target.result);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handlePasswordUpdate = async () => {
-    setPasswordError("");
-    setPasswordSuccess("");
-
-    if (!currentPassword) {
-      setPasswordError("Current password is required.");
+  const updatePassword = async () => {
+    setStatus("");
+    if (!passwordForm.currentPassword) {
+      setStatus("Current password is required.");
       return;
     }
-    if (!newPassword || newPassword.length < 8) {
-      setPasswordError("New password must be at least 8 characters.");
+    if (passwordForm.newPassword.length < 8) {
+      setStatus("New password must be at least 8 characters.");
       return;
     }
-    if (newPassword !== confirmNewPassword) {
-      setPasswordError("New passwords do not match.");
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setStatus("New passwords do not match.");
       return;
     }
 
     setPasswordSaving(true);
     try {
-      const token = localStorage.getItem("token");
       const response = await fetch(`${API_BASE}/auth/password`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        body: JSON.stringify({ currentPassword, newPassword }),
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+        }),
       });
-
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data?.message || "Failed to update password.");
+        throw new Error(data.message || "Failed to update password.");
       }
-
-      setPasswordSuccess(data.message || "Password updated successfully.");
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmNewPassword("");
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setStatus("Password updated.");
     } catch (error) {
-      setPasswordError(error.message || "Failed to update password.");
+      setStatus(error.message);
     } finally {
       setPasswordSaving(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Profile Section */}
-      <div
-        className="rounded-lg p-6"
-        style={{
-          backgroundColor: theme.bg.tertiary,
-          borderColor: theme.border.primary,
-          border: `1px solid ${theme.border.primary}`,
-        }}
-      >
-        <h2
-          className="text-xl font-semibold mb-6"
-          style={{ color: theme.text.primary }}
-        >
-          Profile Information
-        </h2>
-
-        <div className="flex items-start space-x-6">
-          {/* Avatar Upload */}
-          <div className="relative">
+    <>
+      <Card title="Profile" description="These details appear on your ChessPlay profile." theme={theme}>
+        <div className="grid grid-cols-1 md:grid-cols-[120px_1fr] gap-5">
+          <div className="space-y-3">
             <div
-              className="w-24 h-24 rounded-full overflow-hidden"
-              style={{ backgroundColor: theme.bg.secondary }}
+              className="h-28 w-28 rounded-xl overflow-hidden flex items-center justify-center text-4xl font-black"
+              style={{ backgroundColor: theme.bg.tertiary }}
             >
-              {avatarPreview || user?.avatar ? (
-                <img
-                  src={avatarPreview || user.avatar}
-                  alt="Avatar"
-                  className="w-full h-full object-cover"
-                />
+              {settings.account.avatar ? (
+                <img src={settings.account.avatar} alt="Avatar" className="h-full w-full object-cover" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-2xl text-gray-400">
-                  👤
-                </div>
+                <span>{(settings.account.username || user?.username || "U").charAt(0).toUpperCase()}</span>
               )}
             </div>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="absolute inset-0 bg-black bg-opacity-50 rounded-full opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center text-white"
-            >
-              📷
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleAvatarChange}
-              className="hidden"
-            />
           </div>
-
-          {/* Profile Fields */}
-          <div className="flex-1 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Username
-              </label>
-              <input
-                type="text"
-                value={settings?.account?.username || user?.username || ""}
-                onChange={(e) =>
-                  settings?.updateAccount?.("username", e.target.value)
-                }
-                className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#81b64c] transition-colors"
-                placeholder="Enter username"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                value={settings?.account?.email || user?.email || ""}
-                onChange={(e) =>
-                  settings?.updateAccount?.("email", e.target.value)
-                }
-                className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#81b64c] transition-colors"
-                placeholder="Enter email"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Bio
-              </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <TextField
+              label="Username"
+              value={settings.account.username}
+              onChange={(value) => updateAccount("username", value)}
+              theme={theme}
+            />
+            <TextField
+              label="Email"
+              type="email"
+              value={settings.account.email}
+              onChange={(value) => updateAccount("email", value)}
+              theme={theme}
+            />
+            <TextField
+              label="Avatar URL"
+              value={settings.account.avatar || ""}
+              onChange={(value) => updateAccount("avatar", value)}
+              theme={theme}
+            />
+            <TextField
+              label="Country code"
+              value={settings.account.country || "US"}
+              maxLength={2}
+              onChange={(value) => updateAccount("country", value.toUpperCase())}
+              theme={theme}
+            />
+            <label className="md:col-span-2 space-y-2 text-sm font-semibold">
+              <span>Bio</span>
               <textarea
-                value={settings?.account?.bio || ""}
-                onChange={(e) =>
-                  settings?.updateAccount?.("bio", e.target.value)
-                }
-                rows={3}
-                className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#81b64c] transition-colors resize-none"
-                placeholder="Tell us about yourself..."
+                value={settings.account.bio || ""}
+                onChange={(event) => updateAccount("bio", event.target.value)}
+                rows={4}
+                maxLength={500}
+                className="w-full rounded-lg px-3 py-2 outline-none resize-none"
+                style={{
+                  backgroundColor: theme.bg.tertiary,
+                  border: `1px solid ${theme.border.secondary}`,
+                  color: theme.text.primary,
+                }}
               />
-            </div>
+            </label>
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Change Password Section */}
-      <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-6">
+      <Card title="Language" description="Choose the language used for app preferences and future localized screens." theme={theme}>
+        <SelectRow
+          label="Display language"
+          value={settings.appearance.language || "en"}
+          options={LANGUAGES}
+          onChange={(value) => updateAppearance("language", value)}
+          theme={theme}
+        />
+      </Card>
+
+      <Card title="Security" description="Update your password for email sign-in." theme={theme}>
         <button
-          onClick={() => setShowPasswordChange(!showPasswordChange)}
-          className="flex items-center justify-between w-full text-left"
+          type="button"
+          onClick={() => setPasswordOpen((open) => !open)}
+          className="rounded-lg border px-4 py-2 font-bold"
+          style={{ borderColor: theme.border.secondary }}
         >
-          <h2 className="text-xl font-semibold text-white">Change Password</h2>
-          <span className="text-gray-400">
-            {showPasswordChange ? "−" : "+"}
-          </span>
+          {passwordOpen ? "Close Password Form" : "Change Password"}
         </button>
 
-        {showPasswordChange && (
-          <div className="mt-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Current Password
-              </label>
-              <input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#81b64c] transition-colors"
-                placeholder="Enter current password"
-              />
+        {passwordOpen && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            <TextField
+              label="Current password"
+              type="password"
+              value={passwordForm.currentPassword}
+              onChange={(value) => setPasswordForm((form) => ({ ...form, currentPassword: value }))}
+              theme={theme}
+            />
+            <TextField
+              label="New password"
+              type="password"
+              value={passwordForm.newPassword}
+              onChange={(value) => setPasswordForm((form) => ({ ...form, newPassword: value }))}
+              theme={theme}
+            />
+            <TextField
+              label="Confirm password"
+              type="password"
+              value={passwordForm.confirmPassword}
+              onChange={(value) => setPasswordForm((form) => ({ ...form, confirmPassword: value }))}
+              theme={theme}
+            />
+            <div className="md:col-span-3">
+              <button
+                type="button"
+                onClick={updatePassword}
+                disabled={passwordSaving}
+                className="rounded-lg px-4 py-2 font-bold disabled:opacity-60 bg-[#81b64c] text-black"
+              >
+                {passwordSaving ? "Updating..." : "Update Password"}
+              </button>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                New Password
-              </label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#81b64c] transition-colors"
-                placeholder="Enter new password"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Confirm New Password
-              </label>
-              <input
-                type="password"
-                value={confirmNewPassword}
-                onChange={(e) => setConfirmNewPassword(e.target.value)}
-                className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#81b64c] transition-colors"
-                placeholder="Confirm new password"
-              />
-            </div>
-
-            {passwordError && (
-              <div className="text-red-400 text-sm">{passwordError}</div>
-            )}
-            {passwordSuccess && (
-              <div className="text-green-400 text-sm">{passwordSuccess}</div>
-            )}
-
-            <button
-              onClick={handlePasswordUpdate}
-              disabled={passwordSaving}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                passwordSaving
-                  ? "bg-gray-600 text-gray-300 cursor-not-allowed"
-                  : "bg-[#81b64c] hover:bg-[#6ba43d] text-white"
-              }`}
-            >
-              {passwordSaving ? "Updating..." : "Update Password"}
-            </button>
           </div>
         )}
-      </div>
-
-      {/* Danger Zone */}
-      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4 text-red-400">Danger Zone</h2>
-        <p className="text-gray-300 mb-4">
-          Once you delete your account, there is no going back. Please be
-          certain.
-        </p>
-        <button className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors">
-          Delete Account
-        </button>
-      </div>
-    </div>
+      </Card>
+    </>
   );
 }
 
-// Appearance Tab Component
-function AppearanceTab({ settings }) {
-  if (!settings?.appearance) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#81b64c] mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading appearance settings...</p>
-        </div>
-      </div>
-    );
-  }
-  const boardThemes = [
-    { id: "classic", name: "Classic", colors: ["#f0d9b5", "#b58863"] },
-    { id: "green", name: "Green", colors: ["#81b64c", "#59923b"] },
-    { id: "blue", name: "Blue", colors: ["#8b9dc3", "#5d6b7c"] },
-    { id: "purple", name: "Purple", colors: ["#9c88ff", "#6c5ce7"] },
-    { id: "grey", name: "Grey", colors: ["#a4b0be", "#57606f"] },
-    { id: "dark", name: "Dark", colors: ["#2d3436", "#636e72"] },
-  ];
-
-  const pieceSets = [
-    { id: "classic", name: "Classic", preview: "♔♕♖♗♘♙" },
-    { id: "modern", name: "Modern", preview: "♚♛♜♝♞♟" },
-    { id: "neo", name: "Neo", preview: "👑♕♖♗♘♙" },
-    { id: "minimal", name: "Minimal", preview: "KQRBNP" },
-  ];
-
+function BoardSection({ settings, updateAppearance, theme }) {
   return (
-    <div className="space-y-6">
-      {/* Board Theme */}
-      <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-6">
-        <h2 className="text-xl font-semibold mb-6 text-white">Board Theme</h2>
-        <div className="grid grid-cols-3 gap-4">
-          {boardThemes.map((theme) => (
+    <>
+      <Card title="Board Theme" description="Pick the board colors used in chess screens." theme={theme}>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {BOARD_THEMES.map((board) => (
             <button
-              key={theme.id}
-              onClick={() => settings.updateAppearance("boardTheme", theme.id)}
-              className={`p-4 rounded-lg border-2 transition-colors ${
-                settings.appearance.boardTheme === theme.id
-                  ? "border-[#81b64c] bg-[#81b64c]/10"
-                  : "border-[#2a2a2a] hover:border-[#333]"
-              }`}
+              key={board.id}
+              type="button"
+              onClick={() => updateAppearance("boardTheme", board.id)}
+              className="rounded-lg border p-3 text-left transition-colors"
+              style={{
+                borderColor:
+                  settings.appearance.boardTheme === board.id ? theme.primary : theme.border.secondary,
+                backgroundColor: theme.bg.tertiary,
+              }}
             >
-              <div className="flex space-x-1 mb-2">
-                <div
-                  className="w-6 h-6 rounded"
-                  style={{ backgroundColor: theme.colors[0] }}
-                ></div>
-                <div
-                  className="w-6 h-6 rounded"
-                  style={{ backgroundColor: theme.colors[1] }}
-                ></div>
+              <div className="grid grid-cols-4 overflow-hidden rounded-md mb-3 h-12">
+                {[board.light, board.dark, board.dark, board.light].map((color, index) => (
+                  <span key={`${board.id}-${index}`} style={{ backgroundColor: color }} />
+                ))}
               </div>
-              <div className="text-sm font-medium text-white">{theme.name}</div>
+              <div className="font-bold">{board.label}</div>
             </button>
           ))}
         </div>
-      </div>
+      </Card>
 
-      {/* Piece Set */}
-      <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-6">
-        <h2 className="text-xl font-semibold mb-6 text-white">Piece Set</h2>
-        <div className="grid grid-cols-2 gap-4">
-          {pieceSets.map((set) => (
-            <button
-              key={set.id}
-              onClick={() => settings.updateAppearance("pieceSet", set.id)}
-              className={`p-4 rounded-lg border-2 transition-colors ${
-                settings.appearance.pieceSet === set.id
-                  ? "border-[#81b64c] bg-[#81b64c]/10"
-                  : "border-[#2a2a2a] hover:border-[#333]"
-              }`}
-            >
-              <div className="text-2xl mb-2 text-white">{set.preview}</div>
-              <div className="text-sm font-medium text-white">{set.name}</div>
-            </button>
-          ))}
-        </div>
-      </div>
+      <Card title="Pieces And Board" description="Tune visual details for playing and reviewing games." theme={theme}>
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {PIECE_SETS.map((pieceSet) => (
+              <button
+                key={pieceSet.id}
+                type="button"
+                onClick={() => updateAppearance("pieceSet", pieceSet.id)}
+                className="rounded-lg border p-3 text-left"
+                style={{
+                  borderColor:
+                    settings.appearance.pieceSet === pieceSet.id ? theme.primary : theme.border.secondary,
+                  backgroundColor: theme.bg.tertiary,
+                }}
+              >
+                <div className="font-mono text-xl font-black tracking-normal">{pieceSet.preview}</div>
+                <div className="text-sm mt-2 font-bold">{pieceSet.label}</div>
+              </button>
+            ))}
+          </div>
 
-      {/* Theme Toggle */}
-      <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-6">
-        <h2 className="text-xl font-semibold mb-6 text-white">Theme</h2>
-        <div className="flex space-x-2">
-          {[
-            { id: "light", label: "Light", icon: "☀️" },
-            { id: "dark", label: "Dark", icon: "🌙" },
-            { id: "system", label: "System", icon: "💻" },
-          ].map((theme) => (
-            <button
-              key={theme.id}
-              onClick={() => settings.updateAppearance("theme", theme.id)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
-                settings.appearance.theme === theme.id
-                  ? "border-[#81b64c] bg-[#81b64c]/10 text-[#81b64c]"
-                  : "border-[#2a2a2a] hover:border-[#333] text-gray-300"
-              }`}
-            >
-              <span>{theme.icon}</span>
-              <span className="font-medium">{theme.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Font Size */}
-      <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-6">
-        <h2 className="text-xl font-semibold mb-6 text-white">Font Size</h2>
-        <div className="space-y-4">
-          <input
-            type="range"
-            min="12"
-            max="20"
-            value={settings.appearance.fontSize}
-            onChange={(e) =>
-              settings.updateAppearance("fontSize", parseInt(e.target.value))
-            }
-            className="w-full h-2 bg-[#2a2a2a] rounded-lg appearance-none cursor-pointer slider"
+          <ToggleRow
+            label="Board coordinates"
+            description="Show rank and file labels around the board."
+            checked={Boolean(settings.appearance.boardCoordinates)}
+            onChange={(value) => updateAppearance("boardCoordinates", value)}
+            theme={theme}
           />
-          <div className="flex justify-between text-sm text-gray-400">
-            <span>Small (12px)</span>
-            <span className="font-medium text-white">
-              {settings.appearance.fontSize}px
-            </span>
-            <span>Large (20px)</span>
+          <SelectRow
+            label="Move notation"
+            value={settings.appearance.moveNotation || "san"}
+            options={[
+              { id: "san", label: "Standard notation" },
+              { id: "lan", label: "Long algebraic" },
+              { id: "uci", label: "Coordinate notation" },
+            ]}
+            onChange={(value) => updateAppearance("moveNotation", value)}
+            theme={theme}
+          />
+          <SelectRow
+            label="Board animation"
+            value={settings.appearance.boardAnimation || "normal"}
+            options={[
+              { id: "none", label: "None" },
+              { id: "fast", label: "Fast" },
+              { id: "normal", label: "Normal" },
+            ]}
+            onChange={(value) => updateAppearance("boardAnimation", value)}
+            theme={theme}
+          />
+        </div>
+      </Card>
+
+      <Card title="App Theme" description="Choose the app color mode, font, and text scale." theme={theme}>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+            {APP_THEMES.map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() => updateAppearance("theme", mode.id)}
+                className="rounded-lg border p-3 text-left"
+                style={{
+                  borderColor:
+                    settings.appearance.theme === mode.id ? theme.primary : theme.border.secondary,
+                  backgroundColor: theme.bg.tertiary,
+                }}
+              >
+                <div className="flex h-9 overflow-hidden rounded-md mb-3">
+                  {mode.colors.map((color) => (
+                    <span key={color} className="flex-1" style={{ backgroundColor: color }} />
+                  ))}
+                </div>
+                <div className="font-bold">{mode.label}</div>
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {APP_FONTS.map((font) => (
+              <button
+                key={font.id}
+                type="button"
+                onClick={() => updateAppearance("fontFamily", font.id)}
+                className="rounded-lg border p-3 text-left"
+                style={{
+                  borderColor:
+                    settings.appearance.fontFamily === font.id ? theme.primary : theme.border.secondary,
+                  backgroundColor: theme.bg.tertiary,
+                  fontFamily:
+                    font.id === "montserrat"
+                      ? "'Montserrat', sans-serif"
+                      : font.id === "mono"
+                        ? "'JetBrains Mono', monospace"
+                        : font.id === "serif"
+                          ? "Georgia, serif"
+                          : font.id === "system"
+                            ? "system-ui, sans-serif"
+                            : "'Inter', sans-serif",
+                }}
+              >
+                <div className="font-bold">{font.label}</div>
+                <div className="text-sm mt-1" style={{ color: theme.text.secondary }}>
+                  {font.sample}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div>
+            <div className="flex justify-between text-sm mb-2">
+              <span className="font-semibold">Font size</span>
+              <span style={{ color: theme.text.secondary }}>{settings.appearance.fontSize}px</span>
+            </div>
+            <input
+              type="range"
+              min="12"
+              max="20"
+              value={settings.appearance.fontSize}
+              onChange={(event) => updateAppearance("fontSize", Number(event.target.value))}
+              className="w-full"
+            />
           </div>
         </div>
-      </div>
-    </div>
+      </Card>
+    </>
   );
 }
 
-// Game Tab Component
-function GameTab({ settings }) {
-  if (!settings?.game) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#81b64c] mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading game settings...</p>
-        </div>
-      </div>
-    );
-  }
-  const timeControls = [
-    { id: 0, label: "1+0 Bullet", icon: "⚡" },
-    { id: 1, label: "2+1 Bullet", icon: "⚡" },
-    { id: 2, label: "3+0 Blitz", icon: "🚀" },
-    { id: 3, label: "5+3 Blitz", icon: "🏃" },
-    { id: 4, label: "10+0 Rapid", icon: "⏱️" },
-    { id: 5, label: "10+5 Rapid", icon: "⏱️" },
-    { id: 6, label: "30+0 Classical", icon: "👑" },
-  ];
-
-  const difficultyLabels = [
-    "Beginner",
-    "Easy",
-    "Medium",
-    "Hard",
-    "Expert",
-    "Master",
-    "Grandmaster",
-  ];
-
+function PlaySection({ settings, updateGame, theme }) {
   return (
-    <div className="space-y-6">
-      {/* Game Preferences */}
-      <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-6">
-        <h2 className="text-xl font-semibold mb-6 text-white">
-          Game Preferences
-        </h2>
-        <div className="space-y-4">
+    <>
+      <Card title="Move Behavior" description="Controls used during live games and Play vs AI." theme={theme}>
+        <div className="space-y-3">
           {[
-            { key: "showLegalMoves", label: "Show legal move hints" },
-            { key: "showLastMove", label: "Show last move highlight" },
-            { key: "soundEnabled", label: "Enable sound effects" },
-            { key: "autoPromote", label: "Auto-promote to queen" },
-            { key: "confirmMove", label: "Confirm move before submit" },
-          ].map((setting) => (
-            <div
-              key={setting.key}
-              className="flex items-center justify-between"
-            >
-              <span className="text-gray-300">{setting.label}</span>
-              <button
-                onClick={() =>
-                  settings.updateGame(setting.key, !settings.game[setting.key])
-                }
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  settings.game[setting.key] ? "bg-[#81b64c]" : "bg-[#2a2a2a]"
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    settings.game[setting.key]
-                      ? "translate-x-6"
-                      : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
+            ["showLegalMoves", "Show legal moves", "Highlight valid destinations after selecting a piece."],
+            ["showLastMove", "Show last move", "Highlight the latest move on the board."],
+            ["soundEnabled", "Sound effects", "Play move, capture, check, and game-end sounds."],
+            ["confirmMove", "Confirm moves", "Require confirmation before sending a move."],
+            ["premove", "Premoves", "Allow selecting your next move before it is your turn."],
+            ["autoQueen", "Auto queen", "Use a queen automatically when promotion is obvious."],
+          ].map(([key, label, description]) => (
+            <ToggleRow
+              key={key}
+              label={label}
+              description={description}
+              checked={Boolean(settings.game[key])}
+              onChange={(value) => updateGame(key, value)}
+              theme={theme}
+            />
           ))}
         </div>
-      </div>
+      </Card>
 
-      {/* Default Time Control */}
-      <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-6">
-        <h2 className="text-xl font-semibold mb-6 text-white">
-          Default Time Control
-        </h2>
-        <div className="grid grid-cols-2 gap-3">
-          {timeControls.map((control) => (
-            <button
-              key={control.id}
-              onClick={() =>
-                settings.updateGame("defaultTimeControl", control.id)
-              }
-              className={`flex items-center space-x-3 px-4 py-3 rounded-lg border transition-colors ${
-                settings.game.defaultTimeControl === control.id
-                  ? "border-[#81b64c] bg-[#81b64c]/10 text-[#81b64c]"
-                  : "border-[#2a2a2a] hover:border-[#333] text-gray-300"
-              }`}
-            >
-              <span>{control.icon}</span>
-              <span className="font-medium">{control.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* AI Difficulty */}
-      <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-6">
-        <h2 className="text-xl font-semibold mb-6 text-white">AI Difficulty</h2>
+      <Card title="Defaults" description="These values are used when starting new games." theme={theme}>
         <div className="space-y-4">
-          <input
-            type="range"
-            min="0"
-            max="6"
-            value={settings.game.aiDifficulty}
-            onChange={(e) =>
-              settings.updateGame("aiDifficulty", parseInt(e.target.value))
-            }
-            className="w-full h-2 bg-[#2a2a2a] rounded-lg appearance-none cursor-pointer slider"
+          <SelectRow
+            label="Default time control"
+            value={settings.game.defaultTimeControl}
+            options={TIME_CONTROLS}
+            onChange={(value) => updateGame("defaultTimeControl", Number(value))}
+            theme={theme}
           />
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-400">Beginner</span>
-            <span className="font-medium text-[#81b64c]">
-              {difficultyLabels[settings.game.aiDifficulty]}
-            </span>
-            <span className="text-gray-400">Grandmaster</span>
+          <SelectRow
+            label="Board orientation"
+            value={settings.game.boardOrientation || "white"}
+            options={[
+              { id: "white", label: "White at bottom" },
+              { id: "black", label: "Black at bottom" },
+              { id: "auto", label: "Auto by color" },
+            ]}
+            onChange={(value) => updateGame("boardOrientation", value)}
+            theme={theme}
+          />
+          <div>
+            <div className="flex justify-between text-sm mb-2">
+              <span className="font-semibold">AI difficulty</span>
+              <span style={{ color: theme.text.secondary }}>{AI_LEVELS[settings.game.aiDifficulty]}</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="6"
+              value={settings.game.aiDifficulty}
+              onChange={(event) => updateGame("aiDifficulty", Number(event.target.value))}
+              className="w-full"
+            />
           </div>
         </div>
-      </div>
-    </div>
+      </Card>
+    </>
   );
 }
 
-// Notifications Tab Component
-function NotificationsTab({ settings }) {
+function NotificationsSection({ settings, updateNotifications, theme }) {
+  const rows = [
+    ["gameInvites", "Game invites", "When someone challenges you."],
+    ["moveNotifications", "Move reminders", "When it is your turn in a game."],
+    ["gameResults", "Game results", "Win, loss, draw, and rating updates."],
+    ["friendRequests", "Friend requests", "New requests and accepted requests."],
+    ["tournamentUpdates", "Tournament updates", "Tournament rounds, starts, and results."],
+    ["achievementAlerts", "Achievements", "New badges and milestones."],
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-6">
-        <h2 className="text-xl font-semibold mb-6 text-white">Notifications</h2>
-        <div className="space-y-4">
-          {[
-            { key: "gameInvites", label: "Game invites" },
-            { key: "moveNotifications", label: "Move notifications" },
-            { key: "gameResults", label: "Game results" },
-            { key: "friendRequests", label: "Friend requests" },
-            { key: "tournamentUpdates", label: "Tournament updates" },
-            { key: "achievementAlerts", label: "Achievement alerts" },
-          ].map((setting) => (
-            <div
-              key={setting.key}
-              className="flex items-center justify-between"
-            >
-              <span className="text-gray-300">{setting.label}</span>
-              <button
-                onClick={() =>
-                  settings.updateNotifications(
-                    setting.key,
-                    !settings.notifications[setting.key],
-                  )
-                }
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  settings.notifications[setting.key]
-                    ? "bg-[#81b64c]"
-                    : "bg-[#2a2a2a]"
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    settings.notifications[setting.key]
-                      ? "translate-x-6"
-                      : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-          ))}
-        </div>
+    <Card title="Notifications" description="Choose what should show in the top-bar notification panel." theme={theme}>
+      <div className="space-y-3">
+        {rows.map(([key, label, description]) => (
+          <ToggleRow
+            key={key}
+            label={label}
+            description={description}
+            checked={Boolean(settings.notifications[key])}
+            onChange={(value) => updateNotifications(key, value)}
+            theme={theme}
+          />
+        ))}
       </div>
-    </div>
+    </Card>
   );
 }
 
-// Privacy Tab Component
-function PrivacyTab({ settings }) {
-  if (!settings?.privacy) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-center">
-          <div className="text-gray-400">Loading privacy settings...</div>
-        </div>
-      </div>
-    );
-  }
+function PrivacySection({ settings, updatePrivacy, theme }) {
+  const rows = [
+    ["profileVisibility", "Public profile", "Allow other players to view your profile."],
+    ["gameHistory", "Public game history", "Show your finished games to other players."],
+    ["onlineStatus", "Online status", "Show when you are active."],
+    ["friendRequests", "Allow friend requests", "Let players send you connection requests."],
+    ["spectatorMode", "Allow spectators", "Let players watch supported live games."],
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-6">
-        <h2 className="text-xl font-semibold mb-6 text-white">
-          Privacy Settings
-        </h2>
-        <div className="space-y-4">
-          {[
-            { key: "profileVisibility", label: "Public profile visibility" },
-            { key: "gameHistory", label: "Show game history to others" },
-            { key: "onlineStatus", label: "Show online status" },
-            { key: "friendRequests", label: "Allow friend requests" },
-            { key: "spectatorMode", label: "Allow spectators in games" },
-          ].map((setting) => (
-            <div
-              key={setting.key}
-              className="flex items-center justify-between"
-            >
-              <span className="text-gray-300">{setting.label}</span>
-              <button
-                onClick={() =>
-                  settings.updatePrivacy(
-                    setting.key,
-                    !settings.privacy[setting.key],
-                  )
-                }
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  settings.privacy[setting.key]
-                    ? "bg-[#81b64c]"
-                    : "bg-[#2a2a2a]"
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    settings.privacy[setting.key]
-                      ? "translate-x-6"
-                      : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-          ))}
-        </div>
+    <Card title="Privacy" description="Control what other players can see and do." theme={theme}>
+      <div className="space-y-3">
+        {rows.map(([key, label, description]) => (
+          <ToggleRow
+            key={key}
+            label={label}
+            description={description}
+            checked={Boolean(settings.privacy[key])}
+            onChange={(value) => updatePrivacy(key, value)}
+            theme={theme}
+          />
+        ))}
       </div>
-    </div>
+    </Card>
+  );
+}
+
+function TextField({ label, value, onChange, theme, type = "text", maxLength }) {
+  return (
+    <label className="space-y-2 text-sm font-semibold">
+      <span>{label}</span>
+      <input
+        type={type}
+        value={value}
+        maxLength={maxLength}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-lg px-3 py-2 outline-none"
+        style={{
+          backgroundColor: theme.bg.tertiary,
+          border: `1px solid ${theme.border.secondary}`,
+          color: theme.text.primary,
+        }}
+      />
+    </label>
   );
 }

@@ -89,7 +89,6 @@ export function useChessGame({
   ]);
   const [isRepetitionDraw, setIsRepetitionDraw] = useState(false);
   const chessInstanceRef = useRef(null);
-  const sanHistoryRef = useRef([]);
 
   /* =================================
      2️⃣ USER INTERACTION STATE
@@ -112,6 +111,7 @@ export function useChessGame({
   const [hasRecordedGame, setHasRecordedGame] = useState(false);
   const [terminalStatus, setTerminalStatus] = useState(null);
   const [drawPending, setDrawPending] = useState(false);
+  const [sanHistory, setSanHistory] = useState([]);
 
   /* ========================================
      4️⃣ UI STATE
@@ -177,10 +177,9 @@ export function useChessGame({
     isRepetitionDraw,
   ]);
   const status = terminalStatus || boardStatus;
-  const currentOpening = useMemo(
-    () => detectOpening(sanHistoryRef.current),
-    [history],
-  );
+  const currentOpening = useMemo(() => {
+    return detectOpening(sanHistory);
+  }, [sanHistory]);
 
   const getPlayerColor = useCallback(() => {
     if (playerColor) return playerColor;
@@ -251,12 +250,7 @@ export function useChessGame({
       return;
     }
 
-    if (isPlayableStatus(status)) {
-      setHasRecordedGame(false);
-      return;
-    }
-
-    if (hasRecordedGame || history.length === 0) return;
+    if (isPlayableStatus(status) || hasRecordedGame || history.length === 0) return;
 
     const recordCompletedAIGame = async () => {
       try {
@@ -482,10 +476,7 @@ export function useChessGame({
           { strict: false },
         );
         if (result) {
-          sanHistoryRef.current = [
-            ...sanHistoryRef.current,
-            normalizeSan(result.san),
-          ];
+          setSanHistory((prev) => [...prev, normalizeSan(result.san)]);
         }
       } catch {
         // ignore invalid SAN conversion and keep the incremental history intact
@@ -646,7 +637,7 @@ export function useChessGame({
       getPositionKey(INITIAL_BOARD, "w", INITIAL_CASTLING, null),
     ];
     chessInstanceRef.current = null;
-    sanHistoryRef.current = [];
+    setSanHistory([]);
 
     clock.reset();
 
@@ -801,7 +792,6 @@ export function useChessGame({
     offerDraw,
     acceptDraw,
     declineDraw,
-    drawPending,
     handleExportPGN,
 
     toggleFlip: () => setFlipped((f) => !f),
