@@ -5,37 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { soundManager } from "../../../utils/sounds/soundManager";
 import { Chess } from "chess.js";
 import { getBoardTheme } from "../constants/boardThemes";
-
-// Fallback text pieces for when images fail to load
-const PIECE_TEXT = {
-  wP: "♙",
-  wN: "♘",
-  wB: "♗",
-  wR: "♖",
-  wQ: "♕",
-  wK: "♔",
-  bP: "♟",
-  bN: "♞",
-  bB: "♝",
-  bR: "♜",
-  bQ: "♛",
-  bK: "♚",
-};
-
-const PIECE_IMAGES = {
-  wP: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/wP.svg",
-  wN: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/wN.svg",
-  wB: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/wB.svg",
-  wR: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/wR.svg",
-  wQ: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/wQ.svg",
-  wK: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/wK.svg",
-  bP: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bP.svg",
-  bN: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bN.svg",
-  bB: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bB.svg",
-  bR: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bR.svg",
-  bQ: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bQ.svg",
-  bK: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bK.svg",
-};
+import {
+  PIECE_IMAGE_URLS,
+  PIECE_SYMBOLS,
+  PROMOTION_PIECES,
+} from "../constants/pieces";
 
 function pieceKeyFromCell(cell) {
   if (!cell) return null;
@@ -80,7 +54,6 @@ export default function Board(props) {
     [settings.boardTheme],
   );
 
-  // Convert board array to the format expected by the component
   const board = isExternalBoard ? externalBoard : gameState.game.board();
   const flipped = isExternalBoard
     ? Boolean(externalFlipped)
@@ -102,9 +75,8 @@ export default function Board(props) {
         }
       : null;
 
-  // Convert square notation to coordinates
   const squareToCoords = useCallback((square) => {
-    const file = square.charCodeAt(0) - 97; // 'a' = 0
+    const file = square.charCodeAt(0) - 97;
     const rank = parseInt(square[1], 10);
     return [8 - rank, file];
   }, []);
@@ -113,7 +85,6 @@ export default function Board(props) {
     return `${String.fromCharCode(97 + col)}${8 - row}`;
   }, []);
 
-  // Handle square click
   const handleSquareClick = useCallback(
     (row, col) => {
       if (gameState.isGameOver || gameState.aiThinking) return;
@@ -126,13 +97,12 @@ export default function Board(props) {
       const piece = board[row][col];
 
       if (gameState.selectedSquare) {
-        // Try to make a move. Click-to-move stays available even in drag mode.
         const from = gameState.selectedSquare;
         const to = square;
 
         try {
           const testGame = new Chess(gameState.fen);
-          const move = testGame.move({ from, to, promotion: "q" }); // Default to queen
+          const move = testGame.move({ from, to, promotion: "q" });
           if (move) {
             if (!confirmMoveIfNeeded(settings.confirmMove, from, to)) return;
             if (move.flags.includes("p") && !settings.autoQueen) {
@@ -141,7 +111,6 @@ export default function Board(props) {
             }
             dispatch(makeMove({ from, to, promotion: "q" }));
 
-            // Play sound
             if (settings.playSounds) {
               if (move.captured) {
                 soundManager.playCapture();
@@ -176,7 +145,6 @@ export default function Board(props) {
     ],
   );
 
-  // Handle drag start
   const handleDragStart = useCallback(
     (e, row, col) => {
       if (settings.moveMethod !== "drag") return;
@@ -189,9 +157,8 @@ export default function Board(props) {
       setDragStart({ row, col });
       dispatch(selectSquare(coordsToSquare(row, col)));
 
-      // Create drag image
       const img = new Image();
-      img.src = PIECE_IMAGES[pieceKeyFromCell(piece)];
+      img.src = PIECE_IMAGE_URLS[pieceKeyFromCell(piece)];
       e.dataTransfer.setDragImage(img, 32, 32);
     },
     [
@@ -204,12 +171,10 @@ export default function Board(props) {
     ],
   );
 
-  // Handle drag over
   const handleDragOver = useCallback((e) => {
     e.preventDefault();
   }, []);
 
-  // Handle drop
   const handleDrop = useCallback(
     (e, row, col) => {
       e.preventDefault();
@@ -248,7 +213,7 @@ export default function Board(props) {
 
         }
       } catch {
-        console.log("Invalid move");
+        // chess.js rejects illegal drops; the board selection is cleared below.
       }
 
       setDraggedPiece(null);
@@ -265,7 +230,6 @@ export default function Board(props) {
     ],
   );
 
-  // Handle promotion
   const handlePromotion = useCallback(
     (piece) => {
       if (!promotionPending) return;
@@ -292,7 +256,6 @@ export default function Board(props) {
     [promotionPending, gameState.fen, dispatch, settings.playSounds],
   );
 
-  // Check if square is selected
   const isSelected = useCallback(
     (row, col) => {
       if (isExternalBoard && typeof externalIsSelected === "function") {
@@ -305,7 +268,6 @@ export default function Board(props) {
     [gameState.selectedSquare, squareToCoords, isExternalBoard, externalIsSelected],
   );
 
-  // Check if square is a legal destination
   const isLegalDest = useCallback(
     (row, col) => {
       if (isExternalBoard && typeof externalIsLegalDest === "function") {
@@ -321,7 +283,6 @@ export default function Board(props) {
     ],
   );
 
-  // Check if square is part of last move
   const isLastMove = useCallback(
     (row, col) => {
       if (isExternalBoard && typeof externalIsLastMove === "function") {
@@ -367,7 +328,6 @@ export default function Board(props) {
         background: boardTheme.border,
       }}
     >
-      {/* 8x8 Grid */}
       <div className="grid grid-cols-8 grid-rows-8 w-full h-full">
         <AnimatePresence>
           {rows.map((r) =>
@@ -463,7 +423,6 @@ export default function Board(props) {
                     <div className="premium-check-warning pointer-events-none absolute inset-0 z-[5]" />
                   )}
 
-                  {/* Square Coordinates */}
                   {settings.showCoordinates && (
                     <>
                       {c === (flipped ? 7 : 0) && (
@@ -485,7 +444,6 @@ export default function Board(props) {
                     </>
                   )}
 
-                  {/* Piece Image/Text */}
                   {pieceKey &&
                     !(draggedPiece?.row === r && draggedPiece?.col === c) && (
                       <MotionDiv
@@ -517,11 +475,10 @@ export default function Board(props) {
                       >
                         {!useTextPieces && (
                           <img
-                            src={PIECE_IMAGES[pieceKey]}
+                            src={PIECE_IMAGE_URLS[pieceKey]}
                             alt={pieceKey}
                             className="w-full h-full object-contain"
                             onError={(e) => {
-                              // Fallback to text piece if image fails to load
                               e.target.style.display = "none";
                               e.target.nextSibling.style.display = "block";
                             }}
@@ -544,12 +501,11 @@ export default function Board(props) {
                         >
                           {settings.pieceSet === "minimal"
                             ? pieceKey.slice(1)
-                            : PIECE_TEXT[pieceKey]}
+                            : PIECE_SYMBOLS[pieceKey]}
                         </span>
                       </MotionDiv>
                   )}
 
-                  {/* Valid Move Indicator */}
                   {settings.showLegalMoves && isLegalDest(r, c) && (
                     <MotionDiv
                       initial={{ scale: 0 }}
@@ -585,7 +541,6 @@ export default function Board(props) {
         </AnimatePresence>
       </div>
 
-      {/* Pawn Promotion Overlay Dialog */}
       <AnimatePresence>
         {(promotionPending || externalPromotion) && (
           <MotionDiv
@@ -600,24 +555,35 @@ export default function Board(props) {
               exit={{ scale: 0.8, opacity: 0 }}
               className="bg-[#262421] p-6 rounded-xl flex gap-4 shadow-2xl border border-white/10"
             >
-              {["Q", "R", "B", "N"].map((pt) => {
-                const promoColor = promotionPending?.color || externalPromotion?.color;
-                const promoPiece = `${promoColor}${pt}`;
+              {PROMOTION_PIECES.map((promotionPieceType) => {
+                const externalPromotionPiece = externalPromotion
+                  ? pieceKeyFromCell(
+                      board[externalPromotion.from?.[0]]?.[
+                        externalPromotion.from?.[1]
+                      ],
+                    )
+                  : null;
+                const promotionColor =
+                  promotionPending?.color ||
+                  externalPromotion?.color ||
+                  externalPromotionPiece?.[0] ||
+                  "w";
+                const promotionPiece = `${promotionColor}${promotionPieceType}`;
                 return (
                   <MotionButton
-                    key={pt}
+                    key={promotionPieceType}
                     onClick={() =>
                       isExternalBoard && externalHandlePromotion
-                        ? externalHandlePromotion(pt)
-                        : handlePromotion(pt)
+                        ? externalHandlePromotion(promotionPieceType)
+                        : handlePromotion(promotionPieceType)
                     }
                     className="w-20 h-20 bg-[#ebecd0] rounded-lg flex items-center justify-center hover:bg-white hover:-translate-y-1 transition-all shadow-lg text-black"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
                     <img
-                      src={PIECE_IMAGES[promoPiece]}
-                      alt={pt}
+                      src={PIECE_IMAGE_URLS[promotionPiece]}
+                      alt={promotionPieceType}
                       className="w-16 h-16"
                     />
                   </MotionButton>

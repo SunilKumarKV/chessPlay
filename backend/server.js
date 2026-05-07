@@ -36,8 +36,12 @@ const {
   isValidMove: validateMove,
   applyMove,
   opponent,
-  getPositionKey,
 } = require("./chessUtils");
+const {
+  createInitialGameState,
+  isPlayableStatus,
+  toGameResult,
+} = require("./gameState");
 const authRoutes = require("./routes/auth");
 const gameRoutes = require("./routes/games");
 const User = require("./models/User");
@@ -261,61 +265,8 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Initialize a new game state
-function createInitialGameState() {
-  const gameState = {
-    board: [
-      ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"],
-      ["bP", "bP", "bP", "bP", "bP", "bP", "bP", "bP"],
-      [null, null, null, null, null, null, null, null],
-      [null, null, null, null, null, null, null, null],
-      [null, null, null, null, null, null, null, null],
-      [null, null, null, null, null, null, null, null],
-      ["wP", "wP", "wP", "wP", "wP", "wP", "wP", "wP"],
-      ["wR", "wN", "wB", "wQ", "wK", "wB", "wN", "wR"],
-    ],
-    turn: "w", // w or b
-    enPassant: null,
-    castling: {
-      w: { kingSide: true, queenSide: true },
-      b: { kingSide: true, queenSide: true },
-    },
-    status: "playing", // playing, check, checkmate, stalemate
-    halfmoveClock: 0,
-    positionHistory: [],
-    moveHistory: [],
-    capturedW: [],
-    capturedB: [],
-    chatHistory: [],
-    players: {
-      w: { id: null, name: "Player 1", userId: null, disconnected: false },
-      b: { id: null, name: "Player 2", userId: null, disconnected: false },
-    },
-  };
-  gameState.positionHistory = [getPositionKey(gameState)];
-  return gameState;
-}
-
-// Simple move validation wrapper
 function isValidMove(gameState, fromRow, fromCol, toRow, toCol) {
   return validateMove(gameState, fromRow, fromCol, toRow, toCol);
-}
-
-function isPlayableStatus(status) {
-  return status === "playing" || status === "check";
-}
-
-function toGameResult(status) {
-  if (status === "playing" || status === "check") return "ongoing";
-  if (
-    status === "draw" ||
-    status === "stalemate" ||
-    status === "draw-50move" ||
-    status === "draw-repetition"
-  ) {
-    return "draw";
-  }
-  return status;
 }
 
 async function updateDrawStats(whiteUserId, blackUserId) {
@@ -1232,7 +1183,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Get room list (for debugging)
   onSafe("getRooms", () => {
     const roomList = Array.from(rooms.entries()).map(([id, state]) => ({
       id,

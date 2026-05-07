@@ -44,7 +44,6 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
   const playerColorRef = useRef(null);
   const roomIdRef = useRef(null);
 
-  // Keep sound ref up-to-date without triggering socket reconnects
   useEffect(() => {
     soundRef.current = sound;
   }, [sound]);
@@ -59,7 +58,6 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
     setRoomId(nextRoomId);
   };
 
-  // Connect to server
   useEffect(() => {
     const targetUrl =
       serverUrl || BACKEND_URL || `http://${window.location.hostname}:3001`;
@@ -93,7 +91,6 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
       console.error("Socket.IO connect_error:", err);
     });
 
-    // Room events
     newSocket.on("roomCreated", (data) => {
       updateRoomId(data.roomId);
       setGameState(data.gameState);
@@ -334,7 +331,6 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
     };
   }, [serverUrl]);
 
-  // Create a new room
   const createRoom = useCallback(
     (playerName) => {
       if (socketRef.current && isConnected) {
@@ -344,7 +340,6 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
     [isConnected],
   );
 
-  // Join an existing room
   const joinRoom = useCallback(
     (roomId, playerName) => {
       if (socketRef.current && isConnected) {
@@ -363,7 +358,6 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
     [isConnected],
   );
 
-  // Make a move
   const makeMove = useCallback(
     (fromRow, fromCol, toRow, toCol, promotion = null) => {
       if (socketRef.current && isConnected && isMyTurn) {
@@ -435,14 +429,12 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
     setIsSearching(false);
   }, [isConnected]);
 
-  // Get rooms list (for debugging)
   const getRooms = useCallback(() => {
     if (socketRef.current && isConnected) {
       socketRef.current.emit("getRooms");
     }
   }, [isConnected]);
 
-  // Leave current room without tearing down socket connection
   const leaveRoom = useCallback(() => {
     if (socketRef.current && isConnected) {
       socketRef.current.emit("leaveRoom");
@@ -464,11 +456,9 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
   }, [isConnected]);
 
   return {
-    // Connection state
     isConnected,
     error,
 
-    // Game state
     gameState,
     roomId,
     playerColor,
@@ -482,7 +472,6 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
     isSpectating,
     spectatorCount,
 
-    // Actions
     createRoom,
     joinRoom,
     spectateRoom,

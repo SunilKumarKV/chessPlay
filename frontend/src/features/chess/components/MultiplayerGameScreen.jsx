@@ -5,38 +5,23 @@ import { getLegalMoves } from "../utils/moveValidation";
 import Board from "./Board";
 import ChatBox from "./ChatBox";
 import ErrorBoundary from "../../../components/ErrorBoundary";
-
-// High-quality SVG URLs for authentic Chess.com / Lichess feel
-const PIECE_IMAGES = {
-  wP: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/wP.svg",
-  wN: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/wN.svg",
-  wB: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/wB.svg",
-  wR: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/wR.svg",
-  wQ: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/wQ.svg",
-  wK: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/wK.svg",
-  bP: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bP.svg",
-  bN: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bN.svg",
-  bB: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bB.svg",
-  bR: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bR.svg",
-  bQ: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bQ.svg",
-  bK: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/bK.svg",
-};
-
-const DRAW_STATUSES = new Set([
-  "draw",
-  "draw-50move",
-  "draw-repetition",
-  "stalemate",
-]);
-
-function getStatusLabel(status, isMyTurn) {
-  if (status === "checkmate") return "Checkmate";
-  if (status === "draw-50move") return "50-move draw";
-  if (status === "draw-repetition") return "Repetition draw";
-  if (DRAW_STATUSES.has(status)) return "Draw";
-  if (status === "check") return "Check";
-  return isMyTurn ? "Your turn" : "Opponent's turn";
-}
+import MaterialBalanceBar from "./MaterialBalanceBar";
+import MoveListPanel from "./MoveListPanel";
+import PlayerClockPlate from "./PlayerClockPlate";
+import {
+  DRAW_STATUSES,
+  formatClockTime,
+  getBoardMaterialBalance,
+  getMultiplayerStatusLabel,
+  pairMoveHistory,
+  sortCapturedPieces,
+} from "../utils/gamePresentation";
+import {
+  PIECE_IMAGE_URLS,
+  PIECE_NAMES,
+  PIECE_SYMBOLS,
+  PROMOTION_PIECES,
+} from "../constants/pieces";
 
 export default function MultiplayerGameScreen({
   onBack,
@@ -64,7 +49,7 @@ export default function MultiplayerGameScreen({
 }) {
   const [selected, setSelected] = useState(null);
   const [legalMoves, setLegalMoves] = useState([]);
-  const [pendingMove, setPendingMove] = useState(null); // { fromRow, fromCol, toRow, toCol }
+  const [pendingMove, setPendingMove] = useState(null);
 
   const timeControl = TIME_CONTROLS[timeControlIdx];
   const clock = useChessClock({
@@ -85,7 +70,7 @@ export default function MultiplayerGameScreen({
   useEffect(() => {
     resetClock();
     prevTurnRef.current = currentTurn;
-    // Reset only when a new room/time control starts, not after every turn.
+    // Reset only when a new room/time control starts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetClock, roomId, timeControlIdx]);
 
@@ -100,42 +85,40 @@ export default function MultiplayerGameScreen({
     prevTurnRef.current = currentTurn;
   }, [currentTurn, switchClock]);
 
-  // Cleanup on component unmount
   useEffect(() => {
     return () => {
-      // Call leaveRoom on unmount to clean up server connection
-      if (leaveRoom && typeof leaveRoom === 'function') {
+      if (leaveRoom && typeof leaveRoom === "function") {
         leaveRoom();
       }
     };
   }, [leaveRoom]);
 
-  // Handle square click for multiplayer
   const handleSquareClick = (row, col) => {
     if (!gameState || !isMyTurn) return;
 
     if (selected) {
-      const [selRow, selCol] = selected;
-      if (selRow === row && selCol === col) {
-        // Deselect
+      const [selectedRow, selectedCol] = selected;
+      if (selectedRow === row && selectedCol === col) {
         setSelected(null);
         setLegalMoves([]);
       } else {
-        const isLegalMove = legalMoves.some(([r, c]) => r === row && c === col);
+        const isLegalMove = legalMoves.some(
+          ([legalRow, legalCol]) => legalRow === row && legalCol === col,
+        );
         if (isLegalMove) {
-          const piece = gameState.board[selRow][selCol];
+          const piece = gameState.board[selectedRow][selectedCol];
           const isPawn = piece && piece[1] === "P";
           const isPromotion = isPawn && (row === 0 || row === 7);
 
           if (isPromotion) {
             setPendingMove({
-              fromRow: selRow,
-              fromCol: selCol,
+              fromRow: selectedRow,
+              fromCol: selectedCol,
               toRow: row,
               toCol: col,
             });
           } else {
-            makeMove(selRow, selCol, row, col);
+            makeMove(selectedRow, selectedCol, row, col);
             setSelected(null);
             setLegalMoves([]);
           }
@@ -159,10 +142,20 @@ export default function MultiplayerGameScreen({
     }
   };
 
-  const flipped = playerColor === "b"; // Black player sees board flipped
+  const flipped = playerColor === "b";
 
-  const topPlayerColor = playerColor === "w" ? "b" : "w";
-  const bottomPlayerColor = playerColor || "w";
+  const topPlayerColor = isSpectating
+    ? flipped
+      ? "w"
+      : "b"
+    : playerColor === "w"
+      ? "b"
+      : "w";
+  const bottomPlayerColor = isSpectating
+    ? flipped
+      ? "b"
+      : "w"
+    : playerColor || "w";
 
   const whiteName = gameState?.players?.w?.name || "Player 1";
   const blackName = gameState?.players?.b?.name || "Player 2";
@@ -191,70 +184,24 @@ export default function MultiplayerGameScreen({
     color: bottomPlayerColor,
   };
 
-  const formatTime = (time) => {
-    if (time === null || time === undefined) return "∞";
-    const m = Math.floor(time / 60);
-    const s = Math.floor(time % 60);
-    return `${m}:${s < 10 ? "0" : ""}${s}`;
-  };
-
-  const getCapturedPieces = (color) => {
-    const captured =
-      color === "w" ? gameState?.capturedW : gameState?.capturedB;
-    if (!captured) return [];
-    return [...captured].sort(
-      (a, b) =>
-        "PNBRQK".indexOf(b[1].toUpperCase()) -
-        "PNBRQK".indexOf(a[1].toUpperCase()),
-    );
-  };
-
-  const calculateMaterialAdvantage = () => {
-    if (!gameState) return 0;
-
-    const pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
-    let whiteMaterial = 0;
-    let blackMaterial = 0;
-
-    for (let row = 0; row < 8; row++) {
-      for (let col = 0; col < 8; col++) {
-        const piece = gameState.board[row][col];
-        if (piece) {
-          const value = pieceValues[piece[1]];
-          if (piece[0] === "w") whiteMaterial += value;
-          else blackMaterial += value;
-        }
-      }
-    }
-
-    return whiteMaterial - blackMaterial;
-  };
-
-  const formatMoves = (history) => {
-    if (!history) return [];
-    const moves = [];
-    for (let i = 0; i < history.length; i += 2) {
-      const whiteText =
-        typeof history[i] === "object"
-          ? history[i].text || history[i].san
-          : history[i];
-      const blackText = history[i + 1]
-        ? typeof history[i + 1] === "object"
-          ? history[i + 1].text || history[i + 1].san
-          : history[i + 1]
-        : "";
-      moves.push({
-        number: Math.floor(i / 2) + 1,
-        white: whiteText,
-        black: blackText,
-        isLatest: i + 1 >= history.length - 1,
-      });
-    }
-    return moves;
-  };
-
-  const materialAdvantage = calculateMaterialAdvantage();
-  const moves = formatMoves(gameState?.moveHistory || []);
+  const materialAdvantage = getBoardMaterialBalance(gameState?.board || []);
+  const moves = pairMoveHistory(gameState?.moveHistory || []);
+  const topCapturedPieces = sortCapturedPieces(
+    topPlayer.color === "w" ? gameState?.capturedW : gameState?.capturedB,
+  );
+  const bottomCapturedPieces = sortCapturedPieces(
+    bottomPlayer.color === "w" ? gameState?.capturedW : gameState?.capturedB,
+  );
+  const topMaterialBonus =
+    (topPlayer.color === "w" && materialAdvantage > 0) ||
+    (topPlayer.color === "b" && materialAdvantage < 0)
+      ? Math.abs(materialAdvantage)
+      : 0;
+  const bottomMaterialBonus =
+    (bottomPlayer.color === "w" && materialAdvantage > 0) ||
+    (bottomPlayer.color === "b" && materialAdvantage < 0)
+      ? Math.abs(materialAdvantage)
+      : 0;
 
   const handlePromotionSelect = (pieceType) => {
     if (pendingMove) {
@@ -273,7 +220,6 @@ export default function MultiplayerGameScreen({
 
   return (
     <div className="min-h-screen bg-[#0e0e0e] text-[#e0e0e0] font-['Inter'] flex flex-col">
-      {/* Promotion Modal */}
       {pendingMove && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <div className="bg-[#1a1a1a] p-6 rounded-xl border border-[#2a2a2a] shadow-2xl max-w-sm w-full">
@@ -281,52 +227,35 @@ export default function MultiplayerGameScreen({
               Choose Promotion Piece
             </h3>
             <div className="grid grid-cols-2 gap-4">
-              {["Q", "R", "B", "N"].map((type) => (
-                <button
-                  key={type}
-                  onClick={() => handlePromotionSelect(type)}
-                  className="flex flex-col items-center justify-center p-4 bg-[#2a2a2a] hover:bg-[#3a3a3a] rounded-lg transition-all group"
-                >
-                  <img
-                    src={PIECE_IMAGES[playerColor + type]}
-                    alt={type}
-                    className="w-16 h-16 mb-2 group-hover:scale-110 transition-transform"
-                    onError={(e) => {
-                      e.target.style.display = "none";
-                      e.target.nextElementSibling.style.display = "block";
-                    }}
-                  />
-                  <span
-                    className="hidden w-16 h-16 mb-2 text-4xl flex items-center justify-center"
-                    style={{ display: "none" }}
+              {PROMOTION_PIECES.map((pieceType) => {
+                const promotionPiece = `${playerColor || "w"}${pieceType}`;
+                return (
+                  <button
+                    key={pieceType}
+                    onClick={() => handlePromotionSelect(pieceType)}
+                    className="flex flex-col items-center justify-center p-4 bg-[#2a2a2a] hover:bg-[#3a3a3a] rounded-lg transition-all group"
                   >
-                    {playerColor === "w"
-                      ? type === "Q"
-                        ? "♕"
-                        : type === "R"
-                          ? "♖"
-                          : type === "B"
-                            ? "♗"
-                            : "♘"
-                      : type === "Q"
-                        ? "♛"
-                        : type === "R"
-                          ? "♜"
-                          : type === "B"
-                            ? "♝"
-                            : "♞"}
-                  </span>
-                  <span className="text-xs font-bold text-[#7a7a7a] group-hover:text-[#e0e0e0]">
-                    {type === "Q"
-                      ? "Queen"
-                      : type === "R"
-                        ? "Rook"
-                        : type === "B"
-                          ? "Bishop"
-                          : "Knight"}
-                  </span>
-                </button>
-              ))}
+                    <img
+                      src={PIECE_IMAGE_URLS[promotionPiece]}
+                      alt={PIECE_NAMES[pieceType]}
+                      className="w-16 h-16 mb-2 group-hover:scale-110 transition-transform"
+                      onError={(e) => {
+                        e.target.style.display = "none";
+                        e.target.nextElementSibling.style.display = "block";
+                      }}
+                    />
+                    <span
+                      className="hidden w-16 h-16 mb-2 text-4xl flex items-center justify-center"
+                      style={{ display: "none" }}
+                    >
+                      {PIECE_SYMBOLS[promotionPiece]}
+                    </span>
+                    <span className="text-xs font-bold text-[#7a7a7a] group-hover:text-[#e0e0e0]">
+                      {PIECE_NAMES[pieceType]}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             <button
               onClick={() => setPendingMove(null)}
@@ -337,7 +266,6 @@ export default function MultiplayerGameScreen({
           </div>
         </div>
       )}
-      {/* Header */}
       <header className="bg-[#1a1a1a] border-b border-[#2a2a2a] px-4 md:px-6 py-3 md:py-4">
         <div className="flex items-center justify-between">
           <button
@@ -362,92 +290,37 @@ export default function MultiplayerGameScreen({
         </div>
       </header>
 
-      {/* Main Game Layout */}
       <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center p-4 md:p-6 gap-6 max-w-7xl mx-auto w-full">
-        {/* Center - Eval Bar & Board */}
         <div className="flex items-stretch justify-center w-full max-w-[800px]">
-          {/* Evaluation Bar */}
-          <div className="hidden md:flex w-8 flex-shrink-0 bg-[#ffffff] rounded-l-md overflow-hidden relative flex-col border-y-4 border-l-4 border-[#282828] my-[52px] mr-[-4px] z-0">
-            <div
-              className="w-full bg-[#404040] transition-all duration-500 ease-in-out"
-              style={{
-                height: `${Math.max(5, Math.min(95, 50 - materialAdvantage * 2.5))}%`,
-              }}
-            ></div>
-            <span
-              className={`absolute left-0 right-0 text-center text-[10px] font-bold ${
-                materialAdvantage >= 0
-                  ? "bottom-1 text-[#404040]"
-                  : "top-1 text-[#ffffff]"
-              }`}
-            >
-              {materialAdvantage === 0
-                ? "0.0"
-                : materialAdvantage > 0
-                  ? `+${materialAdvantage}`
-                  : materialAdvantage}
-            </span>
-          </div>
+          <MaterialBalanceBar
+            materialAdvantage={materialAdvantage}
+            scale={2.5}
+          />
 
-          {/* Board & Plates Column */}
           <div className="flex flex-col w-full max-w-[650px] z-10">
-            {/* Top Player Plate */}
-            <div className="flex justify-between items-center py-2 px-1">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#2a2a2a] rounded-sm flex items-center justify-center text-xl shadow-sm">
-                  {topPlayer.avatar}
-                </div>
-                <div className="flex flex-col justify-center">
-                  <div className="flex items-center gap-2 leading-tight">
-                    <span className="font-bold text-[#e0e0e0] text-sm">
-                      {topPlayer.name}
-                    </span>
-                    {topPlayer.rating != null && (
-                      <span className="text-[#7a7a7a] text-xs">
-                        ({topPlayer.rating})
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center h-4 mt-0.5">
-                    {getCapturedPieces(topPlayer.color).map((p, i) => (
-                      <img
-                        key={i}
-                        src={PIECE_IMAGES[p]}
-                        className="w-4 h-4 -ml-1.5 first:ml-0 drop-shadow-sm"
-                        alt={p}
-                      />
-                    ))}
-                    {((topPlayer.color === "w" && materialAdvantage > 0) ||
-                      (topPlayer.color === "b" && materialAdvantage < 0)) && (
-                      <span className="text-[#7a7a7a] text-xs ml-1 font-semibold">
-                        +{Math.abs(materialAdvantage)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div
-                className={`px-3 py-1 font-mono text-2xl font-bold rounded-sm transition-colors ${
-                  gameState?.turn === topPlayer.color
-                    ? "bg-[#ffffff] text-[#212121]"
-                    : "bg-[#2a2a2a] text-[#7a7a7a]"
-                }`}
-              >
-                {formatTime(clock.times?.[topPlayer.color])}
-              </div>
-            </div>
+            <PlayerClockPlate
+              player={topPlayer}
+              capturedPieces={topCapturedPieces}
+              materialBonus={topMaterialBonus}
+              timeLabel={formatClockTime(clock.times?.[topPlayer.color])}
+              isClockActive={gameState?.turn === topPlayer.color}
+            />
 
-            {/* Board */}
             <div className="relative my-1">
               <ErrorBoundary>
                 <Board
                   board={gameState?.board}
                   flipped={flipped}
-                  isSelected={(r, c) =>
-                    selected && selected[0] === r && selected[1] === c
+                  isSelected={(row, col) =>
+                    Boolean(
+                      selected && selected[0] === row && selected[1] === col,
+                    )
                   }
-                  isLegalDest={(r, c) =>
-                    legalMoves.some(([lr, lc]) => lr === r && lc === c)
+                  isLegalDest={(row, col) =>
+                    legalMoves.some(
+                      ([legalRow, legalCol]) =>
+                        legalRow === row && legalCol === col,
+                    )
                   }
                   isLastMove={() => false}
                   onSquareClick={handleSquareClick}
@@ -455,58 +328,17 @@ export default function MultiplayerGameScreen({
               </ErrorBoundary>
             </div>
 
-            {/* Bottom Player Plate */}
-            <div className="flex justify-between items-center py-2 px-1">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#2a2a2a] rounded-sm flex items-center justify-center text-xl shadow-sm">
-                  {bottomPlayer.avatar}
-                </div>
-                <div className="flex flex-col justify-center">
-                  <div className="flex items-center gap-2 leading-tight">
-                    <span className="font-bold text-[#e0e0e0] text-sm">
-                      {bottomPlayer.name}
-                    </span>
-                    {bottomPlayer.rating != null && (
-                      <span className="text-[#7a7a7a] text-xs">
-                        ({bottomPlayer.rating})
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center h-4 mt-0.5">
-                    {getCapturedPieces(bottomPlayer.color).map((p, i) => (
-                      <img
-                        key={i}
-                        src={PIECE_IMAGES[p]}
-                        className="w-4 h-4 -ml-1.5 first:ml-0 drop-shadow-sm"
-                        alt={p}
-                      />
-                    ))}
-                    {((bottomPlayer.color === "w" && materialAdvantage > 0) ||
-                      (bottomPlayer.color === "b" &&
-                        materialAdvantage < 0)) && (
-                      <span className="text-[#7a7a7a] text-xs ml-1 font-semibold">
-                        +{Math.abs(materialAdvantage)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div
-                className={`px-3 py-1 font-mono text-2xl font-bold rounded-sm transition-colors ${
-                  gameState?.turn === bottomPlayer.color
-                    ? "bg-[#ffffff] text-[#212121]"
-                    : "bg-[#2a2a2a] text-[#7a7a7a]"
-                }`}
-              >
-                {formatTime(clock.times?.[bottomPlayer.color])}
-              </div>
-            </div>
+            <PlayerClockPlate
+              player={bottomPlayer}
+              capturedPieces={bottomCapturedPieces}
+              materialBonus={bottomMaterialBonus}
+              timeLabel={formatClockTime(clock.times?.[bottomPlayer.color])}
+              isClockActive={gameState?.turn === bottomPlayer.color}
+            />
           </div>
         </div>
 
-        {/* Right Panel */}
         <div className="w-full lg:w-80 flex flex-col gap-4">
-          {/* Game Status */}
           <div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a] space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-[#7a7a7a] text-sm font-['Inter']">
@@ -523,7 +355,7 @@ export default function MultiplayerGameScreen({
               >
                 {isSpectating
                   ? "Spectating"
-                  : getStatusLabel(gameState?.status, isMyTurn)}
+                  : getMultiplayerStatusLabel(gameState?.status, isMyTurn)}
               </span>
             </div>
             {isSpectating && (
@@ -571,7 +403,9 @@ export default function MultiplayerGameScreen({
                 Offer Draw
               </button>
             )}
-            {!isSpectating && gameState && ["playing", "check"].includes(gameState.status) ? (
+            {!isSpectating &&
+            gameState &&
+            ["playing", "check"].includes(gameState.status) ? (
               <button
                 onClick={resign}
                 className="w-full py-2 bg-[#b12f2f] hover:bg-[#992828] text-white rounded-lg text-sm transition-colors font-['Inter']"
@@ -588,49 +422,19 @@ export default function MultiplayerGameScreen({
             ) : null}
           </div>
 
-          {/* Move History */}
           <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] overflow-hidden flex flex-col max-h-[250px] flex-shrink-0">
             <div className="p-3 border-b border-[#2a2a2a] bg-[#212121]">
               <h3 className="font-bold text-[#e0e0e0] text-sm font-['Montserrat']">
                 Moves
               </h3>
             </div>
-            <div className="p-3 overflow-y-auto scrollbar-thin">
-              <div className="space-y-1 font-['JetBrains Mono'] text-sm">
-                {moves.map((move, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-center space-x-3 p-1.5 rounded ${
-                      move.isLatest
-                        ? "bg-[#81b64c]/10 border border-[#81b64c]/30"
-                        : "hover:bg-[#2a2a2a]"
-                    } transition-colors`}
-                  >
-                    <span className="text-[#7a7a7a] w-6 text-xs">
-                      {move.number}.
-                    </span>
-                    <span
-                      className={`flex-1 text-xs ${!move.white ? "text-[#7a7a7a]" : "text-[#e0e0e0]"}`}
-                    >
-                      {move.white}
-                    </span>
-                    <span
-                      className={`flex-1 text-xs ${!move.black ? "text-[#7a7a7a]" : "text-[#e0e0e0]"}`}
-                    >
-                      {move.black}
-                    </span>
-                  </div>
-                ))}
-                {moves.length === 0 && (
-                  <div className="text-[#7a7a7a] text-center py-2 text-sm">
-                    No moves yet
-                  </div>
-                )}
-              </div>
-            </div>
+            <MoveListPanel
+              moves={moves}
+              compact
+              emptyMessage="Moves will appear once the game starts."
+            />
           </div>
 
-          {/* Chat Box */}
           <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] flex-1 min-h-[250px] overflow-hidden flex flex-col">
             <ChatBox
               messages={chatMessages}

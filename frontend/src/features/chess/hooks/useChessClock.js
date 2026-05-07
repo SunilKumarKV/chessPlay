@@ -1,17 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-// useChessClock
-// Manages two independent countdown timers (one per player).
-// Supports increment (Fischer timing): after each move, the
-// player who just moved receives +increment seconds.
-//
-// Time controls (examples):
-//   Bullet  :  { initial: 60,   increment: 0  }
-//   Blitz   :  { initial: 300,  increment: 3  }
-//   Rapid   :  { initial: 600,  increment: 5  }
-//   Classical: { initial: 1800, increment: 30 }
-// ─────────────────────────────────────────────────────────────
-
 export const TIME_CONTROLS = [
   { label: "1+0  Bullet", initial: 60, increment: 0 },
   { label: "2+1  Bullet", initial: 120, increment: 1 },
@@ -31,15 +19,14 @@ export function useChessClock({
   const unlimited = initialSeconds === null;
 
   const [times, setTimes] = useState({ w: initialSeconds, b: initialSeconds });
-  const [active, setActive] = useState(null); // 'w' | 'b' | null
-  const [flagged, setFlagged] = useState(null); // 'w' | 'b' | null  (ran out of time)
-  const [clockOn, setClockOn] = useState(false); // has the clock been started?
+  const [activeColor, setActiveColor] = useState(null);
+  const [flaggedColor, setFlaggedColor] = useState(null);
+  const [hasStarted, setHasStarted] = useState(false);
   const intervalRef = useRef(null);
   const lastTickRef = useRef(null);
 
-  // ── Tick every 100ms for smooth display
   useEffect(() => {
-    if (!enabled || unlimited || active === null || flagged) {
+    if (!enabled || unlimited || activeColor === null || flaggedColor) {
       clearInterval(intervalRef.current);
       return;
     }
@@ -51,61 +38,59 @@ export function useChessClock({
       lastTickRef.current = now;
 
       setTimes((prev) => {
-        const next = { ...prev, [active]: Math.max(0, prev[active] - delta) };
-        if (next[active] <= 0) {
+        const next = {
+          ...prev,
+          [activeColor]: Math.max(0, prev[activeColor] - delta),
+        };
+        if (next[activeColor] <= 0) {
           clearInterval(intervalRef.current);
-          setFlagged(active);
-          setActive(null);
+          setFlaggedColor(activeColor);
+          setActiveColor(null);
         }
         return next;
       });
     }, 100);
 
     return () => clearInterval(intervalRef.current);
-  }, [enabled, unlimited, active, flagged]);
+  }, [enabled, unlimited, activeColor, flaggedColor]);
 
-  /** Switch the running clock to the opponent (call after each move) */
   const switchClock = useCallback(
     (justMoved) => {
-      if (!enabled || unlimited || flagged) return;
-      setClockOn(true);
-      // Add increment to the player who just moved
-      if (increment > 0 && clockOn) {
+      if (!enabled || unlimited || flaggedColor) return;
+      setHasStarted(true);
+      if (increment > 0 && hasStarted) {
         setTimes((prev) => ({
           ...prev,
           [justMoved]: prev[justMoved] + increment,
         }));
       }
-      setActive(justMoved === "w" ? "b" : "w");
+      setActiveColor(justMoved === "w" ? "b" : "w");
     },
-    [enabled, unlimited, flagged, increment, clockOn],
+    [enabled, unlimited, flaggedColor, increment, hasStarted],
   );
 
-  /** Pause both clocks (e.g. during promotion dialog) */
-  const pause = useCallback(() => setActive(null), []);
+  const pause = useCallback(() => setActiveColor(null), []);
 
-  /** Resume for the given player */
   const resume = useCallback(
     (color) => {
-      if (!flagged) setActive(color);
+      if (!flaggedColor) setActiveColor(color);
     },
-    [flagged],
+    [flaggedColor],
   );
 
-  /** Reset to initial times */
   const reset = useCallback(() => {
     clearInterval(intervalRef.current);
     setTimes({ w: initialSeconds, b: initialSeconds });
-    setActive(null);
-    setFlagged(null);
-    setClockOn(false);
+    setActiveColor(null);
+    setFlaggedColor(null);
+    setHasStarted(false);
   }, [initialSeconds]);
 
   return {
     times,
-    active,
-    flagged,
-    clockOn,
+    active: activeColor,
+    flagged: flaggedColor,
+    clockOn: hasStarted,
     switchClock,
     pause,
     resume,
@@ -114,7 +99,6 @@ export function useChessClock({
   };
 }
 
-/** Format seconds as mm:ss or h:mm:ss */
 export function formatTime(seconds) {
   if (seconds === null) return "∞";
   const s = Math.ceil(seconds);

@@ -1,8 +1,26 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-/* =====================
-   CORE GAME CONSTANTS
-   ==================== */
+import { Chess } from "chess.js";
 import { INITIAL_BOARD, INITIAL_CASTLING } from "../constants/board";
+import {
+  colorOf,
+  typeOf,
+  opponent,
+  buildMoveLabel,
+  toAlgebraic,
+} from "../utils/boardUtils";
+import { getLegalMoves, getGameStatus } from "../utils/moveValidation";
+import { applyMove } from "../utils/applyMove";
+import { boardToFen, uciToMove } from "../utils/fen";
+import { exportPGN, downloadPGN } from "../utils/pgn";
+import { detectOpening, normalizeSan } from "../utils/openings";
+import {
+  isDrawStatus,
+  isPlayableStatus,
+} from "../utils/gamePresentation";
+import { useStockfish } from "./useStockfish";
+import { useChessClock, TIME_CONTROLS } from "./useChessClock";
+import { useSoundEffects } from "./useSoundEffects";
+
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 
 function toSquareName([row, col]) {
@@ -25,43 +43,6 @@ function hasThreefoldRepetition(positionHistory) {
   });
 }
 
-const DRAW_STATUSES = new Set([
-  "draw",
-  "draw-50move",
-  "draw-repetition",
-  "stalemate",
-]);
-
-function isDrawStatus(status) {
-  return DRAW_STATUSES.has(status);
-}
-
-function isPlayableStatus(status) {
-  return status === "playing" || status === "check";
-}
-/* =====================
-   BOARD UTILITY FUNCTIONS
-   ==================== */
-
-import { colorOf, typeOf, opponent, buildMoveLabel, toAlgebraic } from "../utils/boardUtils";
-
-import { getLegalMoves, getGameStatus } from "../utils/moveValidation";
-
-import { applyMove } from "../utils/applyMove";
-
-/* =================
-   OPTIONAL FEATURES
-   ================ */
-
-import { boardToFen, uciToMove } from "../utils/fen";
-import { exportPGN, downloadPGN } from "../utils/pgn";
-import { Chess } from "chess.js";
-import { detectOpening, normalizeSan } from "../utils/openings";
-
-import { useStockfish } from "./useStockfish";
-import { useChessClock, TIME_CONTROLS } from "./useChessClock";
-import { useSoundEffects } from "./useSoundEffects";
-
 export function useChessGame({
   initialAiEnabled = false,
   initialAiColor = "b",
@@ -70,18 +51,12 @@ export function useChessGame({
   socket = null,
   playerColor = null,
 } = {}) {
-  /* =====================
-     1️⃣ CORE BOARD STATE
-     Stores the actual chess position
-     ====================== */
-
-  const [board, setBoard] = useState(() => INITIAL_BOARD.map((r) => [...r]));
-
-  const [turn, setTurn] = useState("w"); // whose turn: w | b
+  const [board, setBoard] = useState(() =>
+    INITIAL_BOARD.map((rank) => [...rank]),
+  );
+  const [turn, setTurn] = useState("w");
   const [enPassant, setEnPassant] = useState(null);
   const [castling, setCastling] = useState(INITIAL_CASTLING);
-
-  // used for FEN generation
   const [fullmove, setFullmove] = useState(1);
   const [halfmoveClock, setHalfmoveClock] = useState(0);
   const positionHistory = useRef([
@@ -90,20 +65,10 @@ export function useChessGame({
   const [isRepetitionDraw, setIsRepetitionDraw] = useState(false);
   const chessInstanceRef = useRef(null);
 
-  /* =================================
-     2️⃣ USER INTERACTION STATE
-     Used by UI for board highlighting
-     ================================= */
-
   const [selected, setSelected] = useState(null);
   const [legalMoves, setLegalMoves] = useState([]);
   const [promotion, setPromotion] = useState(null);
   const [lastMove, setLastMove] = useState(null);
-
-  /* ====================================
-     3️⃣ GAME HISTORY
-     Tracks moves and captured pieces
-     ==================================== */
 
   const [history, setHistory] = useState([]);
   const [capturedW, setCapturedW] = useState([]);
@@ -113,38 +78,13 @@ export function useChessGame({
   const [drawPending, setDrawPending] = useState(false);
   const [sanHistory, setSanHistory] = useState([]);
 
-  /* ========================================
-     4️⃣ UI STATE
-     ======================================== */
-
   const [flipped, setFlipped] = useState(false);
-
-  /* ===========================================
-     5️⃣ AI SETTINGS (Stockfish)
-     =========================================== */
-
   const [aiEnabled, setAiEnabled] = useState(initialAiEnabled);
   const [aiColor, setAiColor] = useState(initialAiColor);
   const [aiDifficulty, setAiDifficulty] = useState(initialAiDifficulty);
-
-  /* ==============================================
-     6️⃣ SOUND SETTINGS
-     ============================================== */
-
   const [soundEnabled, setSoundEnabled] = useState(true);
-
-  /* ==============================================
-     7️⃣ CHESS CLOCK
-     ============================================== */
-
   const [timeControlIdx, setTimeControlIdx] = useState(initialTimeControlIdx);
   const timeControl = TIME_CONTROLS[timeControlIdx];
-
-  /* ==============================================
-     8️⃣ SUB HOOKS
-     Initialize external systems
-     ============================================== */
-
   const {
     ready: sfReady,
     thinking: sfThinking,
@@ -221,11 +161,6 @@ export function useChessGame({
     [aiDifficulty, aiEnabled, getPlayerColor, history],
   );
 
-  /* =================================================
-     9️⃣ GAME STATUS CHECKER
-     Runs after every move
-     ================================================= */
-
   useEffect(() => {
     if (status === "resigned") {
       clock.pause();
@@ -277,35 +212,19 @@ export function useChessGame({
     recordGameResult,
   ]);
 
-  /* ====================================================
-     11️⃣ AI MOVE ENGINE - Stockfish Integration
-     
-     Waits for AI's turn, requests best move, applies it.
-     Flow:
-     1. Check preconditions (AI enabled, it's AI's turn, game running)
-     2. Generate FEN for current position
-     3. Request best move from Stockfish
-     4. Parse UCI move (e.g. "e2e4" → {from, to, promotion})
-     5. Apply move with slight delay for UX
-     ================================================= */
-
-  const aiThinking = useRef(false);
+  const aiMoveInFlightRef = useRef(false);
   const commitMoveRef = useRef(null);
   const moveTimeoutRef = useRef(null);
 
   useEffect(() => {
-    // Precondition checks
     if (!aiEnabled) return;
     if (!sfReady) return;
     if (turn !== aiColor) return;
     if (!isPlayableStatus(status)) return;
+    if (aiMoveInFlightRef.current) return;
 
-    // Prevent concurrent AI moves
-    if (aiThinking.current) return;
+    aiMoveInFlightRef.current = true;
 
-    aiThinking.current = true;
-
-    // Generate FEN string for current position
     const fen = boardToFen(
       board,
       turn,
@@ -315,40 +234,37 @@ export function useChessGame({
       fullmove,
     );
 
-    // Calculate thinking time based on difficulty
-    // Easy (3) → ~555ms, Medium (6) → ~810ms, Hard (10) → ~1150ms
     const thinkingTime = 300 + aiDifficulty * 85;
 
-    // Request best move from Stockfish
     getBestMove(fen, { movetime: thinkingTime })
       .then((uci) => {
-        aiThinking.current = false;
+        aiMoveInFlightRef.current = false;
 
-        // Null = Stockfish error or no legal moves (shouldn't happen)
         if (!uci) {
           console.warn("AI: No move returned from Stockfish");
           return;
         }
 
-        // Parse UCI move string (e.g. "e2e4" → {from: [6,4], to: [4,4]})
-        const parsed = uciToMove(uci);
-        if (!parsed) {
+        const stockfishMove = uciToMove(uci);
+        if (!stockfishMove) {
           console.warn("AI: Failed to parse move:", uci);
           return;
         }
 
-        // Add 300-500ms delay for natural feel (prevent instant moves)
         const delayMs = 300 + Math.random() * 200;
         moveTimeoutRef.current = setTimeout(() => {
-          // Double-check commitMoveRef is set (it should be from useEffect below)
           if (commitMoveRef.current) {
-            commitMoveRef.current(parsed.from, parsed.to, parsed.promotion);
+            commitMoveRef.current(
+              stockfishMove.from,
+              stockfishMove.to,
+              stockfishMove.promotion,
+            );
           }
         }, delayMs);
       })
-      .catch((err) => {
-        aiThinking.current = false;
-        console.error("AI: getBestMove error:", err);
+      .catch((error) => {
+        aiMoveInFlightRef.current = false;
+        console.error("AI: getBestMove error:", error);
       });
 
     return () => {
@@ -371,30 +287,24 @@ export function useChessGame({
     aiDifficulty,
   ]);
 
-  /* ====================================================
-     12️⃣ MOVE EXECUTION ENGINE
-     The core function that updates the board
-     ================================================= */
-
   const commitMove = useCallback(
     (from, to, promotionPiece = null) => {
-      const [fr, fc] = from;
-      const [tr, tc] = to;
+      const [fromRow, fromCol] = from;
+      const [toRow, toCol] = to;
 
-      const movingPiece = board[fr][fc];
+      const movingPiece = board[fromRow][fromCol];
 
       const color = colorOf(movingPiece);
       const type = typeOf(movingPiece);
 
-      let capturedPiece = board[tr][tc];
+      let capturedPiece = board[toRow][toCol];
 
-      // detect en passant capture
+      if (type === "P" && toCol !== fromCol && !board[toRow][toCol]) {
+        capturedPiece = board[fromRow][toCol];
+      }
 
-      if (type === "P" && tc !== fc && !board[tr][tc])
-        capturedPiece = board[fr][tc];
-
-      const isCastle = type === "K" && Math.abs(tc - fc) === 2;
-      const isPromotion = type === "P" && (tr === 0 || tr === 7);
+      const isCastle = type === "K" && Math.abs(toCol - fromCol) === 2;
+      const isPromotion = type === "P" && (toRow === 0 || toRow === 7);
       const isCapture = !!capturedPiece;
 
       const { newBoard, newEnPassant, newCastling } = applyMove(
@@ -405,14 +315,14 @@ export function useChessGame({
         promotionPiece || "Q",
       );
 
-      /* update core state */
-
       setBoard(newBoard);
       setEnPassant(newEnPassant);
       setCastling(newCastling);
-      setTurn((t) => opponent(t));
+      setTurn((currentTurn) => opponent(currentTurn));
       setLastMove({ from, to });
-      setHalfmoveClock((n) => (type === "P" || isCapture ? 0 : n + 1));
+      setHalfmoveClock((moveCount) =>
+        type === "P" || isCapture ? 0 : moveCount + 1,
+      );
 
       const nextPositionHistory = [
         ...positionHistory.current,
@@ -424,31 +334,31 @@ export function useChessGame({
       setSelected(null);
       setLegalMoves([]);
 
-      if (color === "b") setFullmove((n) => n + 1);
-
-      /* sound effects */
+      if (color === "b") setFullmove((moveNumber) => moveNumber + 1);
 
       if (isCastle) sound.castle();
       else if (isPromotion) sound.promote();
       else if (isCapture) sound.capture();
       else sound.move();
 
-      /* chess clock */
-
       clock.switchClock(color);
-
-      /* captured pieces */
 
       if (capturedPiece) {
         if (colorOf(capturedPiece) === "b")
-          setCapturedW((p) => [...p, capturedPiece]);
-        else setCapturedB((p) => [...p, capturedPiece]);
+          setCapturedW((capturedPieces) => [
+            ...capturedPieces,
+            capturedPiece,
+          ]);
+        else {
+          setCapturedB((capturedPieces) => [
+            ...capturedPieces,
+            capturedPiece,
+          ]);
+        }
       }
 
-      /* move history */
-
-      setHistory((h) => [
-        ...h,
+      setHistory((moves) => [
+        ...moves,
         {
           text: buildMoveLabel(movingPiece, from, to, promotionPiece),
           color,
@@ -466,8 +376,8 @@ export function useChessGame({
       try {
         const result = chessInstanceRef.current.move(
           {
-            from: toAlgebraic(fr, fc),
-            to: toAlgebraic(tr, tc),
+            from: toAlgebraic(fromRow, fromCol),
+            to: toAlgebraic(toRow, toCol),
             promotion: promotionPiece?.toLowerCase(),
           },
           { strict: false },
@@ -486,26 +396,19 @@ export function useChessGame({
     commitMoveRef.current = commitMove;
   }, [commitMove]);
 
-  /* ====================================================
-   13️⃣ BOARD CLICK HANDLER
-   Handles user interaction with squares.
-   Prevents moves when AI is thinking.
-   ================================================= */
-
   const handleSquareClick = useCallback(
     (row, col) => {
-      // Prevent user moves when it's AI's turn
       if (aiEnabled && turn === aiColor) return;
-
-      // Prevent moves after game ends
       if (!isPlayableStatus(status)) return;
 
       const clickedPiece = board[row][col];
 
       if (selected) {
-        const isLegal = legalMoves.some(([r, c]) => r === row && c === col);
+        const isLegalMove = legalMoves.some(
+          ([legalRow, legalCol]) => legalRow === row && legalCol === col,
+        );
 
-        if (isLegal) {
+        if (isLegalMove) {
           const movingPiece = board[selected[0]][selected[1]];
 
           if (typeOf(movingPiece) === "P" && (row === 0 || row === 7)) {
@@ -558,10 +461,6 @@ export function useChessGame({
     ],
   );
 
-  /* ====================================================
-     14️⃣ PROMOTION HANDLER
-     ================================================= */
-
   const handlePromotion = useCallback(
     (pieceType) => {
       if (!promotion) return;
@@ -574,10 +473,6 @@ export function useChessGame({
     },
     [promotion, commitMove, clock, turn],
   );
-
-  /* ====================================================
-     15️⃣ EXPORT GAME AS PGN
-     ================================================= */
 
   const handleExportPGN = useCallback(() => {
     const meta = {
@@ -603,12 +498,8 @@ export function useChessGame({
     );
   }, [history, status, aiEnabled, aiColor, aiDifficulty, turn, currentOpening]);
 
-  /* ====================================================
-     16️⃣ RESET GAME
-     ================================================= */
-
   const resetGame = useCallback(() => {
-    setBoard(INITIAL_BOARD.map((r) => [...r]));
+    setBoard(INITIAL_BOARD.map((rank) => [...rank]));
 
     setTurn("w");
     setEnPassant(null);
@@ -642,12 +533,8 @@ export function useChessGame({
       clearTimeout(moveTimeoutRef.current);
     }
 
-    aiThinking.current = false;
+    aiMoveInFlightRef.current = false;
   }, [clock]);
-
-  /* ====================================================
-     17️⃣ RESIGN GAME
-     ================================================= */
 
   const resignGame = useCallback(() => {
     const resignedColor = getPlayerColor();
@@ -666,10 +553,6 @@ export function useChessGame({
 
     finishResignation();
   }, [clock, getPlayerColor, recordGameResult]);
-
-  /* ====================================================
-     18️⃣ DRAW GAME
-     ================================================= */
 
   const completeDraw = useCallback(async () => {
     try {
@@ -741,25 +624,18 @@ export function useChessGame({
     };
   }, [completeDraw, socket]);
 
-  /* ====================================================
-     19️⃣ BOARD HELPERS
-     Used by BoardSquare component
-     ================================================= */
+  const isSelected = (row, col) =>
+    selected?.[0] === row && selected?.[1] === col;
 
-  const isSelected = (r, c) => selected?.[0] === r && selected?.[1] === c;
+  const isLegalDest = (row, col) =>
+    legalMoves.some(
+      ([legalRow, legalCol]) => legalRow === row && legalCol === col,
+    );
 
-  const isLegalDest = (r, c) =>
-    legalMoves.some(([lr, lc]) => lr === r && lc === c);
-
-  const isLastMove = (r, c) =>
+  const isLastMove = (row, col) =>
     lastMove &&
-    ((lastMove.from[0] === r && lastMove.from[1] === c) ||
-      (lastMove.to[0] === r && lastMove.to[1] === c));
-
-  /* ====================================================
-     PUBLIC API
-     Everything UI components can access
-     ================================================= */
+    ((lastMove.from[0] === row && lastMove.from[1] === col) ||
+      (lastMove.to[0] === row && lastMove.to[1] === col));
 
   return {
     board,
