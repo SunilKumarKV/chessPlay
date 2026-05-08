@@ -3,16 +3,16 @@ import { useMultiplayerChess } from "../hooks/useMultiplayerChess";
 import { TIME_CONTROLS } from "../hooks/useChessClock";
 import { useCurrentUser } from "../../../hooks/useCurrentUser";
 import MultiplayerGameScreen from "./MultiplayerGameScreen";
-import GoldButton from "../../../components/GoldButton";
 
 export default function MultiplayerChess({ onBack }) {
   const { user } = useCurrentUser();
   const [playerName, setPlayerName] = useState("");
-  const [joinRoomId, setJoinRoomId] = useState("");
+  const [roomCode, setRoomCode] = useState("");
   const [serverUrl, setServerUrl] = useState(
     import.meta.env.VITE_BACKEND_URL || "http://localhost:3001",
   );
-  const [timeControlIdx, setTimeControlIdx] = useState(3);
+  const [selectedTimeControlIndex, setSelectedTimeControlIndex] = useState(3);
+  const [connectionCheck, setConnectionCheck] = useState(null);
 
   const {
     isConnected,
@@ -47,6 +47,8 @@ export default function MultiplayerChess({ onBack }) {
 
   const displayName = playerName.trim() || user?.username || "Player";
   const showRoomSetup = !gameState;
+  const playerNameForRoom = playerName.trim();
+  const roomCodeForJoin = roomCode.trim();
 
   useEffect(() => {
     if (!isConnected || gameState) return;
@@ -56,11 +58,35 @@ export default function MultiplayerChess({ onBack }) {
     return () => clearInterval(interval);
   }, [getRooms, isConnected, gameState]);
 
-  // If not connected to game, show room setup
+  const testServerConnection = async () => {
+    setConnectionCheck({ tone: "info", message: "Checking server..." });
+
+    try {
+      const response = await fetch(`${serverUrl}/health`);
+      if (!response.ok) {
+        throw new Error(`Health check returned ${response.status}`);
+      }
+
+      const health = await response.json();
+      setConnectionCheck({
+        tone: "success",
+        message: health.port
+          ? `Server responded on port ${health.port}.`
+          : "Server is responding.",
+      });
+    } catch (connectionError) {
+      setConnectionCheck({
+        tone: "error",
+        message:
+          connectionError.message ||
+          "Could not reach the server. Check the URL and try again.",
+      });
+    }
+  };
+
   if (showRoomSetup && !gameState) {
     return (
       <div className="min-h-screen bg-gray-900 text-white">
-        {/* Header */}
         <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -77,7 +103,6 @@ export default function MultiplayerChess({ onBack }) {
           </div>
         </header>
 
-        {/* Main Content */}
         <main className="max-w-4xl mx-auto px-6 py-8">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold mb-4">Real-time Chess Games</h2>
@@ -87,7 +112,6 @@ export default function MultiplayerChess({ onBack }) {
           </div>
 
           <div className="space-y-8">
-            {/* Quick Match */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <h3 className="text-lg font-semibold mb-4 text-green-400">
                 Quick Match
@@ -123,7 +147,6 @@ export default function MultiplayerChess({ onBack }) {
               </div>
             </div>
 
-            {/* Server Connection */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <h3 className="text-lg font-semibold mb-4 text-blue-400">
                 Server Connection
@@ -142,19 +165,7 @@ export default function MultiplayerChess({ onBack }) {
                   />
                 </div>
                 <button
-                  onClick={async () => {
-                    try {
-                      const response = await fetch(`${serverUrl}/health`);
-                      const data = await response.json();
-                      if (data.localIP) {
-                        alert(
-                          `Server found! Local IP: ${data.localIP}:${data.port}`,
-                        );
-                      }
-                    } catch {
-                      alert("Could not connect to server. Check the URL.");
-                    }
-                  }}
+                  onClick={testServerConnection}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                 >
                   Test Connection
@@ -170,24 +181,42 @@ export default function MultiplayerChess({ onBack }) {
                   {error && (
                     <div className="text-red-400 text-sm mt-2">{error}</div>
                   )}
+                  {connectionCheck && (
+                    <div
+                      className={`mt-2 text-sm ${
+                        connectionCheck.tone === "success"
+                          ? "text-green-300"
+                          : connectionCheck.tone === "error"
+                            ? "text-red-300"
+                            : "text-blue-300"
+                      }`}
+                    >
+                      {connectionCheck.message}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Time Control */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <h3 className="text-lg font-semibold mb-4 text-purple-400">
                 Time Control
               </h3>
               <div className="space-y-4">
                 <select
-                  value={timeControlIdx}
-                  onChange={(e) => setTimeControlIdx(Number(e.target.value))}
+                  value={selectedTimeControlIndex}
+                  onChange={(e) =>
+                    setSelectedTimeControlIndex(Number(e.target.value))
+                  }
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
                 >
-                  {TIME_CONTROLS.map((tc, idx) => (
-                    <option key={idx} value={idx} className="bg-gray-700">
-                      {tc.label}
+                  {TIME_CONTROLS.map((timeControl, timeControlIndex) => (
+                    <option
+                      key={timeControl.label}
+                      value={timeControlIndex}
+                      className="bg-gray-700"
+                    >
+                      {timeControl.label}
                     </option>
                   ))}
                 </select>
@@ -197,7 +226,6 @@ export default function MultiplayerChess({ onBack }) {
               </div>
             </div>
 
-            {/* Create Room */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <h3 className="text-lg font-semibold mb-4 text-green-400">
                 Create New Room
@@ -217,11 +245,11 @@ export default function MultiplayerChess({ onBack }) {
                 </div>
                 <button
                   onClick={() => {
-                    if (playerName.trim()) {
-                      createRoom(playerName.trim());
+                    if (playerNameForRoom) {
+                      createRoom(playerNameForRoom);
                     }
                   }}
-                  disabled={!isConnected || !playerName.trim()}
+                  disabled={!isConnected || !playerNameForRoom}
                   className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
                 >
                   Create Room
@@ -229,7 +257,6 @@ export default function MultiplayerChess({ onBack }) {
               </div>
             </div>
 
-            {/* Join Room */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <h3 className="text-lg font-semibold mb-4 text-yellow-400">
                 Join Existing Room
@@ -242,22 +269,18 @@ export default function MultiplayerChess({ onBack }) {
                   <input
                     type="text"
                     placeholder="Enter room ID"
-                    value={joinRoomId}
-                    onChange={(e) =>
-                      setJoinRoomId(e.target.value.toUpperCase())
-                    }
+                    value={roomCode}
+                    onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500"
                   />
                 </div>
                 <button
                   onClick={() => {
-                    if (joinRoomId.trim() && playerName.trim()) {
-                      joinRoom(joinRoomId.trim(), playerName.trim());
+                    if (roomCodeForJoin && playerNameForRoom) {
+                      joinRoom(roomCodeForJoin, playerNameForRoom);
                     }
                   }}
-                  disabled={
-                    !isConnected || !joinRoomId.trim() || !playerName.trim()
-                  }
+                  disabled={!isConnected || !roomCodeForJoin || !playerNameForRoom}
                   className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
                 >
                   Join Room
@@ -265,7 +288,6 @@ export default function MultiplayerChess({ onBack }) {
               </div>
             </div>
 
-            {/* Public Rooms */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-cyan-400">
@@ -280,7 +302,10 @@ export default function MultiplayerChess({ onBack }) {
                 </button>
               </div>
               {rooms.length === 0 ? (
-                <p className="text-sm text-gray-400">No active rooms yet.</p>
+                <p className="text-sm text-gray-400">
+                  No public rooms are open right now. Create one or try Quick
+                  Match.
+                </p>
               ) : (
                 <div className="space-y-2">
                   {rooms.map((room) => {
@@ -328,12 +353,11 @@ export default function MultiplayerChess({ onBack }) {
     );
   }
 
-  // Game in progress - use professional game screen
   if (gameState) {
     return (
       <MultiplayerGameScreen
         onBack={onBack}
-        timeControlIdx={timeControlIdx}
+        timeControlIdx={selectedTimeControlIndex}
         playerName={playerName}
         roomId={roomId}
         playerColor={playerColor}

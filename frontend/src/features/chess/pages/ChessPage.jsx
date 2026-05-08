@@ -24,6 +24,16 @@ import { soundManager } from "../../../utils/sounds/soundManager";
 import { loadSettings } from "../../../utils/settingsPersistence";
 import { Chess as ChessEngine } from "chess.js";
 
+const TIME_CONTROL_KEY_BY_SETUP = {
+  "1+0": "bullet",
+  "2+1": "bullet",
+  "3+0": "blitz",
+  "5+3": "blitz",
+  "10+0": "rapid",
+  "10+5": "rapid",
+  "30+0": "rapid",
+};
+
 export default function Chess({
   onBack,
   initialAiEnabled = true,
@@ -37,46 +47,33 @@ export default function Chess({
   const humanColor = gameState.aiColor === "w" ? "b" : "w";
   const isHumanTurn =
     !gameState.isGameOver && gameState.game.turn() === humanColor;
-  const currentTimeKey =
+  const selectedTimeControlKey =
     Object.entries(TIME_CONTROLS).find(
       ([, control]) =>
         control.initial === gameState.timeControl.initial &&
         control.increment === gameState.timeControl.increment,
     )?.[0] || "blitz";
 
-  const incomingTimeControlKey =
-    {
-      "1+0": "bullet",
-      "2+1": "bullet",
-      "3+0": "blitz",
-      "5+3": "blitz",
-      "10+0": "rapid",
-      "10+5": "rapid",
-      "30+0": "rapid",
-    }[timeControl] || null;
+  const initialTimeControlKey = TIME_CONTROL_KEY_BY_SETUP[timeControl] || null;
 
-  // Initialize Stockfish using the canonical { enabled } interface.
-  // AI move triggering is handled in the useEffect below via getBestMove.
   const stockfish = useStockfish({
     enabled: gameState.aiEnabled,
   });
 
-  // Load settings on mount
   useEffect(() => {
     loadSettings();
   }, []);
 
   useEffect(() => {
     dispatch(setAiEnabled(initialAiEnabled));
-    if (incomingTimeControlKey) {
-      dispatch(setTimeControl(incomingTimeControlKey));
+    if (initialTimeControlKey) {
+      dispatch(setTimeControl(initialTimeControlKey));
     }
     // Apply only when the chess screen is opened so an in-progress game is not
     // reset by unrelated parent renders.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Initialize sound manager
   useEffect(() => {
     soundManager.init();
     soundManager.setEnabled(settings.playSounds);
@@ -110,7 +107,6 @@ export default function Chess({
     gameState.whiteTime,
   ]);
 
-  // Handle AI moves: when it's the AI's turn, request a move from Stockfish
   useEffect(() => {
     if (
       !gameState.aiEnabled ||
@@ -132,7 +128,6 @@ export default function Chess({
         const promotion = uci[4] || undefined;
 
         try {
-          // Validate the move against chess.js before dispatching
           const testGame = new ChessEngine(gameState.fen);
           const move = testGame.move({ from, to, promotion });
           if (move) {
@@ -150,23 +145,24 @@ export default function Chess({
           console.error("AI move failed:", error);
         }
       })
-      .catch((err) => {
-        // Timeout or cancellation — not a fatal error
-        console.warn("Stockfish getBestMove:", err.message);
+      .catch((error) => {
+        console.warn("Stockfish getBestMove:", error.message);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameState.fen, gameState.aiEnabled, stockfish.ready]);
 
-  // Helper to pair moves for the history list (e.g., 1. e4 e5)
-  const movePairs = [];
-  for (let i = 0; i < gameState.history.length; i += 2) {
-    movePairs.push({
-      white: gameState.history[i],
-      black: gameState.history[i + 1] || null,
+  const moveHistoryPairs = [];
+  for (
+    let moveIndex = 0;
+    moveIndex < gameState.history.length;
+    moveIndex += 2
+  ) {
+    moveHistoryPairs.push({
+      white: gameState.history[moveIndex],
+      black: gameState.history[moveIndex + 1] || null,
     });
   }
 
-  // Dynamic player names
   const opponentName = gameState.aiEnabled
     ? `Stockfish Lv ${gameState.aiDifficulty}`
     : "Opponent";
@@ -387,7 +383,7 @@ export default function Chess({
                   Time Control
                 </span>
                 <select
-                  value={currentTimeKey}
+                  value={selectedTimeControlKey}
                   onChange={(e) => dispatch(setTimeControl(e.target.value))}
                   className="w-full rounded-lg border border-white/10 bg-[#111827] px-3 py-2 text-sm font-semibold text-white outline-none focus:border-[#81b64c]"
                 >
@@ -434,7 +430,7 @@ export default function Chess({
               </div>
               <div className="max-h-80 overflow-y-auto p-4 custom-scrollbar">
                 <MoveHistory
-                  movePairs={movePairs}
+                  movePairs={moveHistoryPairs}
                   currentMove={gameState.currentMove}
                   pieceNotation={settings.pieceNotation}
                 />

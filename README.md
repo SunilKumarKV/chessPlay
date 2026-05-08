@@ -1,77 +1,18 @@
 # ChessPlay
 
-**Version 1.0.0**
+ChessPlay is a full-stack chess app with a React/Vite frontend and an Express + Socket.IO backend. It supports authenticated play against Stockfish, live multiplayer rooms, quick matchmaking, spectators, chat, game history, leaderboards, profile privacy, and board/settings customization.
 
-ChessPlay is a production-focused chess platform built with React, Vite, Node.js, Express, Socket.IO, MongoDB, and Stockfish. It supports Play vs AI, real-time multiplayer, authenticated profiles, friends, notifications, game history, responsive settings, and production smoke checks.
+The app is intentionally split into a static frontend and a separate API/socket server. The frontend talks to the backend with an HttpOnly auth cookie, and the Stockfish worker is served from `frontend/public`.
 
-## V1.0.0 Highlights
+## Stack
 
-- Legal chess move handling with check, checkmate, stalemate, castling, en passant, repetition, 50-move draw, and promotion support.
-- Play vs AI with Stockfish worker integration, hints, undo, resign, side selection, and time-control options.
-- Real-time multiplayer rooms with server-side move validation, room state, resign handling, and game-end statistics.
-- Authenticated dashboard with profile, game history, leaderboard, friends, messages, and notifications.
-- Production-ready settings area for account, language, board, play behavior, notifications, privacy, theme, font, and security.
-- Server-enforced privacy for profile visibility, game history visibility, and friend requests.
-- Public friend discovery no longer exposes private email addresses.
-- Production smoke test suite covering privacy regressions, promotion behavior wiring, Stockfish worker wiring, and backend chess status.
-
-## Features
-
-### Authentication And Security
-
-- Email/password registration and login.
-- JWT-based authenticated API routes.
-- Password hashing with bcrypt.
-- Password change endpoint.
-- Profile update validation for username and email.
-- Production guard against default JWT secrets.
-- Helmet, CORS controls, and optional health-check secret.
-
-### Chess
-
-- Play vs AI with Stockfish.
-- Real-time multiplayer through Socket.IO.
-- Legal move highlighting and last-move highlighting.
-- Drag-and-drop and click-to-move board interaction.
-- Pawn promotion with non-queen choices when Auto queen is disabled.
-- Resign, undo, hint, side choice, and timer options.
-- Move history rendering with serializable Redux state.
-
-### Social
-
-- Search players by username.
-- Send, accept, and decline friend requests.
-- Friends tab in profile.
-- Local fallback for friends while an older backend deployment is still running.
-- Top-bar player search, messages, and notifications.
-
-### Profile
-
-- Overview, Games, Stats, and Friends tabs.
-- Editable username, email, bio, avatar URL, and country.
-- Rating, game counts, result stats, recent games, and friend/request views.
-- Viewed profiles load the viewed user’s game history, with backend privacy enforcement.
-
-### Settings
-
-- Account: username, email, bio, avatar URL, country, and password change.
-- Language: English, Hindi, Tamil, Telugu, Kannada, Malayalam, Spanish, and French.
-- Board: board theme, piece set, coordinates, notation, and animation.
-- Play: legal moves, last move, sounds, confirm moves, premoves, Auto queen, default timer, board orientation, and AI difficulty.
-- Appearance: Light, Dark, Midnight, Tournament, and Newspaper modes.
-- Fonts: Inter, Montserrat, System, JetBrains Mono, and Serif.
-- Notifications and privacy preferences.
-
-## Tech Stack
-
-- Frontend: React 19, Vite, Tailwind CSS, Redux Toolkit, Framer Motion, Recharts.
-- Chess: chess.js on the frontend, custom authoritative backend chess utilities for multiplayer.
-- AI: Stockfish web worker.
+- Frontend: React 19, Vite, Redux Toolkit, Tailwind CSS, Framer Motion, Recharts.
+- Chess: `chess.js` for the solo board, custom server-side move validation for multiplayer.
+- Engine: Stockfish running in a web worker.
 - Backend: Node.js, Express, Socket.IO, MongoDB, Mongoose.
-- Auth: JWT and bcrypt.
-- Quality: ESLint, production smoke tests, npm audit.
+- Auth: JWT stored in an HttpOnly cookie, bcrypt password hashing, optional Google Sign-In.
 
-## Project Structure
+## Repository Layout
 
 ```text
 chessPlay/
@@ -80,32 +21,30 @@ chessPlay/
 │   ├── routes/
 │   ├── utils/
 │   ├── chessUtils.js
+│   ├── gameState.js
 │   └── server.js
 ├── frontend/
 │   ├── public/
 │   └── src/
 │       ├── app/
 │       ├── components/
-│       ├── context/
-│       ├── features/
+│       ├── features/chess/
 │       ├── hooks/
 │       ├── pages/
 │       ├── services/
-│       ├── store/
-│       └── utils/
+│       └── store/
 ├── TEST_PRODUCTION_SMOKE.js
 ├── TEST_STOCKFISH.js
-├── package.json
-└── README.md
+└── package.json
 ```
 
-## Prerequisites
+## Setup
 
-- Node.js 20 or newer recommended.
-- npm.
-- MongoDB local instance or MongoDB Atlas cluster.
+Use Node 20 or newer. MongoDB can be local or hosted.
 
-## Environment Variables
+```bash
+npm run install:all
+```
 
 Create `backend/.env`:
 
@@ -117,43 +56,33 @@ JWT_SECRET=replace-with-a-random-32-plus-character-secret
 FRONTEND_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 HEALTH_SECRET=
 BLOCKED_WORDS=
-# Optional Google Sign-In:
 GOOGLE_CLIENT_ID=
 ```
 
-Create `frontend/.env` when needed:
+Create `frontend/.env` only when the defaults are not enough:
 
 ```bash
 VITE_BACKEND_URL=http://localhost:3001
-# Optional OAuth redirect URLs:
 VITE_GOOGLE_CLIENT_ID=
 VITE_GOOGLE_AUTH_URL=
 VITE_FACEBOOK_AUTH_URL=
 ```
 
-## Installation
-
-```bash
-git clone https://github.com/SunilKumarKV/chessPlay.git
-cd chessPlay
-npm run install:all
-```
-
 ## Development
 
-Run frontend only:
+Run the frontend:
 
 ```bash
 npm run dev
 ```
 
-Run backend only:
+Run the backend:
 
 ```bash
 npm run server
 ```
 
-Run both frontend and backend:
+Run both:
 
 ```bash
 npm run dev:multi
@@ -163,87 +92,48 @@ Default local URLs:
 
 - Frontend: `http://localhost:5173`
 - Backend: `http://localhost:3001`
-- Health: `http://localhost:3001/health`
+- Health check: `http://localhost:3001/health`
 
-## Production Build
-
-```bash
-npm run build
-cd backend
-npm start
-```
-
-For hosted deployments:
-
-- Deploy `frontend/dist` to Vercel, Netlify, or static hosting.
-- Deploy `backend` to Render, Railway, Fly.io, or another Node.js host.
-- Set `VITE_BACKEND_URL` to the deployed backend URL.
-- Set `FRONTEND_ORIGINS` on the backend to the deployed frontend origin. Use a comma-separated list for preview or custom domains.
-- Use a production MongoDB Atlas URI.
-- Use a strong `JWT_SECRET` with at least 32 characters. Placeholder/default secrets are blocked at startup.
-- Authentication uses an HttpOnly, Secure, SameSite cookie in production; make sure Vercel calls the Render backend over HTTPS.
-- For Google Sign-In, set the same Google OAuth client ID in Vercel as `VITE_GOOGLE_CLIENT_ID` and in Render as `GOOGLE_CLIENT_ID`.
-
-## Quality And Production Checks
-
-Run the standard checks:
+## Quality Checks
 
 ```bash
 npm run lint
 npm run build
 npm run test:production
-npm audit --omit=dev
 ```
 
-`npm run test:production` runs:
+`npm run test:production` runs the two repository smoke tests:
 
 - `TEST_PRODUCTION_SMOKE.js`
 - `TEST_STOCKFISH.js`
 
-The production smoke test checks:
+Those tests cover the privacy-sensitive API paths, auth cookie wiring, promotion behavior, Stockfish worker files, and backend chess status checks.
 
-- Public friend APIs do not expose private email fields.
-- Backend privacy enforcement is wired.
-- Viewed profiles request the viewed user’s game history.
-- Settings save does not reset active game clocks.
-- Promotion flow respects Auto queen.
-- Backend chess utilities detect checkmate.
-- Stockfish worker files and headers are wired.
-
-Backend syntax check:
+For a quick backend syntax pass:
 
 ```bash
-rg --files backend | rg '\.js$' | xargs -n 1 node -c
+find backend -path backend/node_modules -prune -o -name '*.js' -exec node -c {} \;
 ```
 
-Temporary backend health smoke test:
+## Deployment Notes
 
-```bash
-cd backend
-PORT=3011 MONGODB_URI=mongodb://127.0.0.1:27017/chessplay-smoke node server.js
-curl http://127.0.0.1:3011/health
-```
+- Deploy `frontend/dist` to a static host such as Vercel or Netlify.
+- Deploy `backend` to a Node host such as Render, Railway, or Fly.io.
+- Set `VITE_BACKEND_URL` in the frontend environment to the deployed backend URL.
+- Set `FRONTEND_ORIGINS` on the backend to the deployed frontend origin.
+- Use MongoDB Atlas or another production MongoDB instance.
+- Use a real `JWT_SECRET` with at least 32 characters. The server refuses known placeholder secrets.
+- In production, auth cookies are Secure and SameSite=None, so frontend-to-backend calls must use HTTPS.
+- If Google Sign-In is enabled, configure the same client ID as `VITE_GOOGLE_CLIENT_ID` on the frontend and `GOOGLE_CLIENT_ID` on the backend.
 
-Expected response:
+## API Snapshot
 
-```json
-{"status":"ok","rooms":0,"players":0}
-```
-
-## Important Production Notes
-
-- Redeploy the backend after changes to friends, privacy, profile, or game history APIs.
-- The frontend has local friends fallback only to keep the UI usable while an old backend is deployed. Real friend requests require the latest backend.
-- Google Sign-In requires `VITE_GOOGLE_CLIENT_ID` on Vercel and `GOOGLE_CLIENT_ID` on Render. Facebook auth requires a configured OAuth redirect URL; otherwise the email flow remains the supported sign-in path.
-- Keep `JWT_SECRET` and MongoDB credentials out of source control.
-
-## API Overview
-
-### Auth
+Auth:
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
+- `GET /api/auth/session`
 - `GET /api/auth/profile`
 - `GET /api/auth/profile/:userId`
 - `PUT /api/auth/profile`
@@ -253,7 +143,7 @@ Expected response:
 - `POST /api/auth/friends/request`
 - `POST /api/auth/friends/respond`
 
-### Games
+Games:
 
 - `GET /api/games/history`
 - `GET /api/games/history?userId=<id>`
@@ -261,32 +151,19 @@ Expected response:
 - `GET /api/games/leaderboard`
 - `GET /api/games/:gameId`
 
-### Socket Events
+Socket events:
 
-Client to server:
+- Client emits: `createRoom`, `joinRoom`, `rejoinRoom`, `joinQueue`, `leaveQueue`, `makeMove`, `drawOffer`, `drawAccepted`, `drawDeclined`, `resign`, `sendMessage`, `spectateRoom`, `getRooms`.
+- Server emits: `roomCreated`, `joinedRoom`, `rejoinedRoom`, `matchFound`, `moveMade`, `playerResigned`, `playerDisconnected`, `playerAbandoned`, `drawOffer`, `drawAccepted`, `drawDeclined`, `chatMessage`, `roomsList`, `serverError`.
 
-- `createRoom`
-- `joinRoom`
-- `joinQueue`
-- `leaveQueue`
-- `makeMove`
-- `resign`
-- `getRooms`
+## Production Safeguards
 
-Server to client:
-
-- `roomCreated`
-- `playerJoined`
-- `moveMade`
-- `gameOver`
-- `playerLeft`
-- `roomsList`
-- `error`
-
-## Release Status
-
-V1.0.0 is the first production-ready release candidate. It includes the production blocker fixes for privacy, public data exposure, promotion behavior, settings side effects, viewed-profile history, and repeatable smoke checks.
+- Public user lookups do not expose email addresses.
+- Profile visibility, game history visibility, and friend request privacy are enforced on the backend.
+- Browser API calls use credentials and do not rely on localStorage bearer tokens.
+- Chat messages are length-limited, lightly sanitized, optionally censored via `BLOCKED_WORDS`, and rate-limited per socket.
+- Multiplayer rooms keep a short reconnection grace period before awarding abandonment wins.
 
 ## License
 
-This project is open source and available under the MIT License.
+MIT

@@ -8,6 +8,18 @@ const router = express.Router();
 const PUBLIC_USER_FIELDS = "username avatar country title rating gamesPlayed gamesWon privacy friends";
 const FRIEND_USER_FIELDS = "username avatar country title rating gamesPlayed gamesWon";
 const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_SEARCH_QUERY_LENGTH = 32;
+const MAX_LEADERBOARD_LIMIT = 50;
+
+function parsePositiveInt(value, fallback, max = Number.MAX_SAFE_INTEGER) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return Math.min(parsed, max);
+}
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 function cookieOptions() {
   const isProduction = process.env.NODE_ENV === "production";
@@ -371,10 +383,13 @@ router.get("/profile/:userId", auth, async (req, res) => {
 // Search users for friend discovery
 router.get("/users/search", auth, async (req, res) => {
   try {
-    const query = String(req.query.q || "").trim();
+    const query = String(req.query.q || "")
+      .trim()
+      .slice(0, MAX_SEARCH_QUERY_LENGTH);
     if (query.length < 2) {
       return res.json({ users: [] });
     }
+    const usernamePattern = escapeRegex(query);
 
     const currentUser = await User.findById(req.user.userId).select(
       "friends friendRequests",
@@ -385,7 +400,7 @@ router.get("/users/search", auth, async (req, res) => {
 
     const users = await User.find({
       _id: { $ne: req.user.userId },
-      username: { $regex: query, $options: "i" },
+      username: { $regex: usernamePattern, $options: "i" },
     })
       .select(PUBLIC_USER_FIELDS)
       .limit(10);
@@ -655,7 +670,7 @@ router.put("/password", authLimiter, auth, async (req, res) => {
 // Get leaderboard
 router.get("/leaderboard", auth, async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = parsePositiveInt(req.query.limit, 10, MAX_LEADERBOARD_LIMIT);
 
     const users = await User.find({})
       .select("username rating gamesPlayed gamesWon")
