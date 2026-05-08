@@ -8,6 +8,7 @@
     "server": "cd backend && npm run dev",
     "build": "cd frontend && npm run build",
     "lint": "cd frontend && npm run lint",
+    "test": "npm run test:production && npm --workspace backend test",
     "test:production": "node TEST_PRODUCTION_SMOKE.js && node TEST_STOCKFISH.js",
     "preview": "cd frontend && npm run preview",
     "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",

@@ -6,12 +6,19 @@ const auth = require("../middleware/auth");
 const router = express.Router();
 const VALID_RESULTS = new Set(["white", "black", "draw"]);
 const VALID_COLORS = new Set(["w", "b"]);
+const MAX_PAGE_SIZE = 50;
+
+function parsePositiveInt(value, fallback, max = Number.MAX_SAFE_INTEGER) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return Math.min(parsed, max);
+}
 
 // Get user's completed game history
 router.get("/history", auth, async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const page = parsePositiveInt(req.query.page, 1);
+    const limit = parsePositiveInt(req.query.limit, 10, MAX_PAGE_SIZE);
     const skip = (page - 1) * limit;
     const targetUserId = req.query.userId || req.user.userId;
 
@@ -129,7 +136,7 @@ router.post("/record", auth, async (req, res) => {
 // Get leaderboard
 router.get("/leaderboard", auth, async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit, 10) || 20;
+    const limit = parsePositiveInt(req.query.limit, 20, MAX_PAGE_SIZE);
     const leaderboard = await User.find()
       .sort({ gamesWon: -1, rating: -1, gamesPlayed: -1, username: 1 })
       .limit(limit)

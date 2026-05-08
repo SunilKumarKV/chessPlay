@@ -722,8 +722,8 @@ io.on("connection", (socket) => {
         return;
       }
 
-      const user = await User.findById(socket.user.userId);
-      if (!user) {
+      const user = socket.user;
+      if (!user?._id) {
         socket.emit("serverError", { message: "User not found" });
         return;
       }

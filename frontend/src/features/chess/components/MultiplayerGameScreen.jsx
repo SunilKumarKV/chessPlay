@@ -85,13 +85,12 @@ export default function MultiplayerGameScreen({
     prevTurnRef.current = currentTurn;
   }, [currentTurn, switchClock]);
 
-  useEffect(() => {
-    return () => {
-      if (leaveRoom && typeof leaveRoom === "function") {
-        leaveRoom();
-      }
-    };
-  }, [leaveRoom]);
+  const handleBackToDashboard = () => {
+    if (!["playing", "check"].includes(gameState?.status)) {
+      leaveRoom?.();
+    }
+    onBack?.();
+  };
 
   const handleSquareClick = (row, col) => {
     if (!gameState || !isMyTurn) return;
@@ -269,7 +268,7 @@ export default function MultiplayerGameScreen({
       <header className="bg-[#1a1a1a] border-b border-[#2a2a2a] px-4 md:px-6 py-3 md:py-4">
         <div className="flex items-center justify-between">
           <button
-            onClick={onBack}
+            onClick={handleBackToDashboard}
             className="flex items-center space-x-2 text-[#7a7a7a] hover:text-[#e0e0e0] transition-colors text-sm md:text-base"
           >
             <span>←</span>
