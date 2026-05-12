@@ -15,6 +15,10 @@ import LanPlayPage from "../pages/LanPlayPage";
 import AppSplash from "../components/AppSplash";
 import DashboardLayout from "../layouts/DashboardLayout";
 import ErrorBoundary from "../components/ErrorBoundary";
+import PrivacyPolicyPage from "../pages/legal/PrivacyPolicyPage";
+import TermsPage from "../pages/legal/TermsPage";
+import DeleteAccountPage from "../pages/legal/DeleteAccountPage";
+import ForgotPasswordPage from "../pages/ForgotPasswordPage";
 
 export default function App() {
   const [user, setUser] = useState(() => {
@@ -204,6 +208,14 @@ export default function App() {
             onPlay={() => handleStartGame("ai", "3+0")}
           />
         );
+      case "privacy":
+        return <PrivacyPolicyPage onBack={() => setCurrentPage("dashboard")} />;
+      case "terms":
+        return <TermsPage onBack={() => setCurrentPage("dashboard")} />;
+      case "delete-account":
+        return <DeleteAccountPage onBack={() => setCurrentPage("settings")} onDeleted={handleLogout} />;
+      case "forgot-password":
+        return <ForgotPasswordPage onBack={() => setCurrentPage("dashboard")} />;
       default:
         return (
           <div className="p-8">

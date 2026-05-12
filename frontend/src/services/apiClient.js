@@ -1,22 +1,38 @@
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 
-/**
- * Centralized fetch wrapper to handle authorization headers
- * and common error processing automatically.
- */
-export const apiClient = async (endpoint, options = {}) => {
+async function readJson(response) {
+  return response.json().catch(() => ({}));
+}
+
+async function request(endpoint, options = {}) {
   const headers = {
     "Content-Type": "application/json",
     ...options.headers,
   };
 
-  const response = await fetch(`${BACKEND_URL}${endpoint}`, {
+  return fetch(`${BACKEND_URL}${endpoint}`, {
     ...options,
     headers,
     credentials: "include",
   });
+}
 
-  const data = await response.json().catch(() => ({}));
+/**
+ * Centralized fetch wrapper.
+ * Auth is cookie-based. Do not store JWTs in localStorage.
+ * On expired access token, it tries one refresh-token rotation before failing.
+ */
+export const apiClient = async (endpoint, options = {}) => {
+  let response = await request(endpoint, options);
+
+  if (response.status === 401 && endpoint !== "/api/auth/refresh") {
+    const refreshResponse = await request("/api/auth/refresh", { method: "POST" });
+    if (refreshResponse.ok) {
+      response = await request(endpoint, options);
+    }
+  }
+
+  const data = await readJson(response);
 
   if (!response.ok) {
     const error = new Error(data.message || "An API error occurred");
