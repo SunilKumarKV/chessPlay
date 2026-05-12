@@ -28,8 +28,7 @@ export default function DashboardLayout({
     <div
       className="flex h-screen font-['Inter'] w-full overflow-hidden transition-colors duration-300"
       style={{
-        background:
-          "linear-gradient(135deg, #05070d 0%, #0f172a 46%, #101512 100%)",
+        background: `linear-gradient(135deg, ${theme.bg.primary} 0%, ${theme.bg.secondary} 48%, ${theme.bg.tertiary} 100%)`,
         color: theme.text.primary,
       }}
     >
@@ -48,8 +47,7 @@ export default function DashboardLayout({
       <div
         className="flex-1 flex flex-col min-w-0 overflow-hidden transition-colors duration-300"
         style={{
-          background:
-            "linear-gradient(180deg, rgba(15,23,42,0.72), rgba(5,7,13,0.96))",
+          background: theme.bg.primary,
         }}
       >
         <Topbar
@@ -64,8 +62,7 @@ export default function DashboardLayout({
           <main
             className="flex-1 overflow-y-auto custom-scrollbar flex items-start justify-center transition-colors duration-300"
             style={{
-              background:
-                "linear-gradient(135deg, rgba(15,23,42,.84), rgba(10,13,20,.98))",
+              background: theme.bg.primary,
             }}
           >
             <div className="w-full h-full max-w-7xl mx-auto">{children}</div>

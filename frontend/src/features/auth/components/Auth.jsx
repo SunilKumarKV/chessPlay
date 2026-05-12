@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FormInput, PasswordInput, PrimaryBtn } from "../../../components/ui";
+import { validateProductionEmail } from "../../../utils/emailValidation";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 const GOOGLE_AUTH_URL = import.meta.env.VITE_GOOGLE_AUTH_URL || "";
@@ -59,6 +60,9 @@ export default function Auth({
     setLoading(true);
 
     try {
+      const emailError = validateProductionEmail(formData.email);
+      if (emailError) throw new Error(emailError);
+
       const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
       const payload = isLogin
         ? { email: formData.email, password: formData.password }
@@ -293,7 +297,7 @@ export default function Auth({
             value={formData.email}
             onChange={handleChange}
             required
-            placeholder="name@example.com"
+            placeholder="name@gmail.com"
           />
 
           <PasswordInput

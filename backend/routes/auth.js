@@ -11,6 +11,49 @@ const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_SEARCH_QUERY_LENGTH = 32;
 const MAX_LEADERBOARD_LIMIT = 50;
 
+const BLOCKED_EMAIL_DOMAINS = new Set([
+  "example.com",
+  "example.org",
+  "example.net",
+  "email.com",
+  "test.com",
+  "mailinator.com",
+  "tempmail.com",
+  "10minutemail.com",
+  "guerrillamail.com",
+]);
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function validateProductionEmail(email) {
+  const normalized = normalizeEmail(email);
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(normalized)) {
+    return { ok: false, message: "Invalid email format" };
+  }
+
+  const domain = normalized.split("@").pop();
+  if (BLOCKED_EMAIL_DOMAINS.has(domain)) {
+    return { ok: false, message: "Temporary, demo, or placeholder emails are not allowed" };
+  }
+
+  const allowedDomains = String(process.env.AUTH_ALLOWED_EMAIL_DOMAINS || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (allowedDomains.length && !allowedDomains.includes(domain)) {
+    return {
+      ok: false,
+      message: `Only authorized email domains are allowed: ${allowedDomains.join(", ")}`,
+    };
+  }
+
+  return { ok: true, email: normalized };
+}
+
 function parsePositiveInt(value, fallback, max = Number.MAX_SAFE_INTEGER) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed < 1) return fallback;
@@ -194,13 +237,12 @@ const authLimiter = createRateLimiter({
 // Register
 router.post("/register", authLimiter, async (req, res) => {
   try {
-    const { username, email, password } = req.body;
-
-    // Input validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
-      return res.status(400).json({ message: "Invalid email format" });
+    const { username, password } = req.body;
+    const emailValidation = validateProductionEmail(req.body.email);
+    if (!emailValidation.ok) {
+      return res.status(400).json({ message: emailValidation.message });
     }
+    const email = emailValidation.email;
 
     if (!password || password.length < 8) {
       return res.status(400).json({ message: "Password must be at least 8 characters long" });
@@ -244,7 +286,8 @@ router.post("/register", authLimiter, async (req, res) => {
 // Login
 router.post("/login", authLimiter, async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = normalizeEmail(req.body.email);
 
     // Find user
     const user = await User.findOne({ email });

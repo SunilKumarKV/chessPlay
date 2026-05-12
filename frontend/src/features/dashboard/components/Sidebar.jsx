@@ -20,6 +20,8 @@ export default function Sidebar({
         { id: "dashboard", label: "Dashboard", icon: "♜" },
         { id: "ai", label: "Play AI", icon: "♞" },
         { id: "multi", label: "Play Online", icon: "♟" },
+        { id: "local", label: "Play vs Player", icon: "♙" },
+        { id: "lan", label: "Same WiFi", icon: "⇄" },
         { id: "puzzles", label: "Puzzles", icon: "◇" },
         { id: "analysis", label: "Analysis", icon: "∑" },
         { id: "leaderboard", label: "Leaderboard", icon: "★" },
@@ -52,8 +54,7 @@ export default function Sidebar({
           isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         } ${isCollapsed ? "w-20" : "w-72"} flex flex-col backdrop-blur-2xl`}
         style={{
-          background:
-            "linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(13, 18, 25, 0.98))",
+          background: `linear-gradient(180deg, ${theme.bg.secondary}, ${theme.bg.primary})`,
           borderRightColor: theme.border.secondary,
           borderRight: `1px solid ${theme.border.secondary}`,
           color: theme.text.primary,

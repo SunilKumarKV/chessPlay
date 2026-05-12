@@ -16,13 +16,20 @@ export default function Dashboard({
   const [loading, setLoading] = useState(true);
 
   const fetchWithAuth = useCallback(async (url) => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 8000);
     try {
-      return await apiClient(url);
+      return await apiClient(url, { signal: controller.signal });
     } catch (error) {
+      if (error.name === "AbortError") {
+        throw new Error("Dashboard request timed out. Please check backend URL.");
+      }
       if (error.status === 401 || error.status === 403) {
         if (typeof onAuthError === "function") onAuthError();
       }
       throw error;
+    } finally {
+      window.clearTimeout(timer);
     }
   }, [onAuthError]);
 
@@ -199,6 +206,22 @@ export default function Dashboard({
       button: user?.isGuest ? "Login Required" : "Find Game",
     },
     {
+      id: "local",
+      title: "Play vs Player",
+      meta: "Offline pass-and-play",
+      accent: "#a78bfa",
+      action: () => onNavigate("local"),
+      button: "Start Local",
+    },
+    {
+      id: "lan",
+      title: "Same WiFi",
+      meta: "LAN setup guide",
+      accent: "#22c55e",
+      action: () => onNavigate("lan"),
+      button: "Open LAN",
+    },
+    {
       id: "puzzles",
       title: "Puzzles",
       meta: "Tactics training",
@@ -272,10 +295,10 @@ export default function Dashboard({
               </button>
               <button
                 type="button"
-                onClick={() => onStartGame("multi", selectedTimeControl)}
+                onClick={() => user?.isGuest ? onNavigate("settings") : onStartGame("multi", selectedTimeControl)}
                 className="rounded-xl border border-white/10 bg-white/10 px-5 py-4 text-left font-bold text-white transition-all hover:-translate-y-1 hover:border-cyan-300/40 hover:bg-cyan-300/10"
               >
-                Play Online
+                {user?.isGuest ? "Login for Online" : "Play Online"}
               </button>
             </div>
           </div>

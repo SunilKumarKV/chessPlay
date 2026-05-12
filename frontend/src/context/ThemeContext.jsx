@@ -232,6 +232,13 @@ export function ThemeProvider({ children }) {
     localStorage.setItem("theme", themeMode);
     // Update document class for global styling if needed
     document.documentElement.setAttribute("data-theme", themeMode);
+    document.documentElement.style.setProperty("--color-primary", theme.primary);
+    document.documentElement.style.setProperty("--color-bg-primary", theme.bg.primary);
+    document.documentElement.style.setProperty("--color-bg-secondary", theme.bg.secondary);
+    document.documentElement.style.setProperty("--color-bg-tertiary", theme.bg.tertiary);
+    document.documentElement.style.setProperty("--color-text-primary", theme.text.primary);
+    document.documentElement.style.setProperty("--color-text-secondary", theme.text.secondary);
+    document.documentElement.style.setProperty("--color-border-primary", theme.border.primary);
     document.documentElement.style.setProperty(
       "--app-font-family",
       FONT_STACKS[appFont] || FONT_STACKS.inter,
@@ -240,7 +247,19 @@ export function ThemeProvider({ children }) {
     document.documentElement.lang = language;
     document.body.style.fontFamily = `var(--app-font-family)`;
     document.body.style.fontSize = `var(--app-font-size)`;
-  }, [appFont, fontSize, language, themeMode]);
+  }, [
+    appFont,
+    fontSize,
+    language,
+    theme.bg.primary,
+    theme.bg.secondary,
+    theme.bg.tertiary,
+    theme.border.primary,
+    theme.primary,
+    theme.text.primary,
+    theme.text.secondary,
+    themeMode,
+  ]);
 
   useEffect(() => {
     const handleAppearanceChange = (event) => {

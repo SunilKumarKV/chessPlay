@@ -10,6 +10,9 @@ import Dashboard from "../pages/DashboardPage";
 import Settings from "../pages/SettingsPage";
 import Profile from "../pages/ProfilePage";
 import ComingSoonPage from "../pages/ComingSoonPage";
+import AnalysisPage from "../pages/AnalysisPage";
+import LanPlayPage from "../pages/LanPlayPage";
+import AppSplash from "../components/AppSplash";
 import DashboardLayout from "../layouts/DashboardLayout";
 import ErrorBoundary from "../components/ErrorBoundary";
 
@@ -28,10 +31,18 @@ export default function App() {
     return null;
   });
   const [authChecked, setAuthChecked] = useState(false);
+  const [authTimedOut, setAuthTimedOut] = useState(false);
   const [currentPage, setCurrentPage] = useState("dashboard");
 
   useEffect(() => {
     let cancelled = false;
+
+    const fallbackTimer = window.setTimeout(() => {
+      if (!cancelled) {
+        setAuthTimedOut(true);
+        setAuthChecked(true);
+      }
+    }, 6000);
 
     async function restoreSession() {
       try {
@@ -53,13 +64,18 @@ export default function App() {
           notifyUserChanged();
         }
       } finally {
-        if (!cancelled) setAuthChecked(true);
+        window.clearTimeout(fallbackTimer);
+        if (!cancelled) {
+          setAuthTimedOut(false);
+          setAuthChecked(true);
+        }
       }
     }
 
     restoreSession();
     return () => {
       cancelled = true;
+      window.clearTimeout(fallbackTimer);
     };
   }, []);
 
@@ -98,7 +114,7 @@ export default function App() {
   };
 
   if (!authChecked) {
-    return null;
+    return <AppSplash />;
   }
 
   if (!user) {
@@ -114,6 +130,8 @@ export default function App() {
       setCurrentPage("ai");
     } else if (gameType === "multi") {
       setCurrentPage("multi");
+    } else if (gameType === "local") {
+      setCurrentPage("local");
     }
     // Store time control for later use
     localStorage.setItem("selectedTimeControl", timeControl);
@@ -143,6 +161,27 @@ export default function App() {
       }
       case "multi":
         return <MultiplayerChess onBack={() => setCurrentPage("dashboard")} />;
+      case "local": {
+        const selectedTimeControl =
+          localStorage.getItem("selectedTimeControl") || "3+0";
+        return (
+          <Chess
+            onBack={() => setCurrentPage("dashboard")}
+            initialAiEnabled={false}
+            timeControl={selectedTimeControl}
+            title="Play vs Player"
+            opponentName="Player 2"
+            playerName="Player 1"
+          />
+        );
+      }
+      case "lan":
+        return (
+          <LanPlayPage
+            onBack={() => setCurrentPage("dashboard")}
+            onStartLocal={() => setCurrentPage("local")}
+          />
+        );
       case "history":
         return <GameHistory onBack={() => setCurrentPage("dashboard")} />;
       case "leaderboard":
@@ -155,8 +194,9 @@ export default function App() {
         return (
           <Settings user={user} onBack={() => setCurrentPage("dashboard")} />
         );
-      case "puzzles":
       case "analysis":
+        return <AnalysisPage onBack={() => setCurrentPage("dashboard")} />;
+      case "puzzles":
         return (
           <ComingSoonPage
             feature={currentPage}
@@ -183,7 +223,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <DashboardLayout
-        activePage={currentPage}
+        activePage={authTimedOut ? "offline" : currentPage}
         onNavigate={setCurrentPage}
         onLogout={handleLogout}
       >

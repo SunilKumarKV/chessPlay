@@ -38,6 +38,9 @@ export default function Chess({
   onBack,
   initialAiEnabled = true,
   timeControl = "3+0",
+  title = initialAiEnabled ? "Play AI" : "Play vs Player",
+  opponentName: opponentNameProp,
+  playerName: playerNameProp,
 }) {
   const dispatch = useAppDispatch();
   const gameState = useAppSelector((state) => state.chessGame);
@@ -163,10 +166,10 @@ export default function Chess({
     });
   }
 
-  const opponentName = gameState.aiEnabled
+  const opponentName = opponentNameProp || (gameState.aiEnabled
     ? `Stockfish Lv ${gameState.aiDifficulty}`
-    : "Opponent";
-  const playerName = "Guest Player";
+    : "Player 2");
+  const playerName = playerNameProp || "Player 1";
 
   const handleNewGame = () => {
     dispatch(resetGame());
@@ -229,7 +232,7 @@ export default function Chess({
                 </button>
               )}
               <h1 className="font-['Montserrat'] text-2xl font-black text-white md:text-3xl">
-                Play AI
+                {title}
               </h1>
               <p className="mt-1 text-sm text-slate-400">
                 {opponentName} · {statusLabel}
