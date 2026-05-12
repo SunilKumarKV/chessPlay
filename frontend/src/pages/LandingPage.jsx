@@ -3,7 +3,7 @@ import { PrimaryBtn, SecondaryBtn, Modal } from "../components/ui";
 import Auth from "../features/auth/components/Auth";
 import { useTheme } from "../hooks/useTheme";
 
-export default function LandingPage({ onLogin }) {
+export default function LandingPage({ onLogin, onGuestPlay }) {
   const { theme } = useTheme();
   const [showAuth, setShowAuth] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
@@ -67,7 +67,7 @@ export default function LandingPage({ onLogin }) {
           <PrimaryBtn onClick={handleGetStarted} className="text-lg px-8 py-3">
             Get Started
           </PrimaryBtn>
-          <SecondaryBtn onClick={() => {}} className="text-lg px-8 py-3">
+          <SecondaryBtn onClick={onGuestPlay} className="text-lg px-8 py-3">
             Play as Guest
           </SecondaryBtn>
         </div>

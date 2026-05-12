@@ -19,7 +19,7 @@ export default function Dashboard({
     try {
       return await apiClient(url);
     } catch (error) {
-      if (error.message.includes("401") || error.message.includes("403")) {
+      if (error.status === 401 || error.status === 403) {
         if (typeof onAuthError === "function") onAuthError();
       }
       throw error;
@@ -39,6 +39,15 @@ export default function Dashboard({
       setLoading(false);
       return;
     }
+
+    if (user.isGuest) {
+      setStats(user);
+      setRecentGames([]);
+      setLeaderboard([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const statsData = await fetchWithAuth("/api/auth/profile");
       setStats(statsData.user || null);
@@ -184,10 +193,10 @@ export default function Dashboard({
     {
       id: "multi",
       title: "Play Online",
-      meta: "Live room matchmaking",
+      meta: user?.isGuest ? "Login required for live rooms" : "Live room matchmaking",
       accent: "#38bdf8",
-      action: () => onStartGame("multi", selectedTimeControl),
-      button: "Find Game",
+      action: () => user?.isGuest ? onNavigate("settings") : onStartGame("multi", selectedTimeControl),
+      button: user?.isGuest ? "Login Required" : "Find Game",
     },
     {
       id: "puzzles",

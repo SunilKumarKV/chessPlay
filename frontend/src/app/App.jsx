@@ -9,6 +9,7 @@ import LandingPage from "../pages/LandingPage";
 import Dashboard from "../pages/DashboardPage";
 import Settings from "../pages/SettingsPage";
 import Profile from "../pages/ProfilePage";
+import ComingSoonPage from "../pages/ComingSoonPage";
 import DashboardLayout from "../layouts/DashboardLayout";
 import ErrorBoundary from "../components/ErrorBoundary";
 
@@ -63,7 +64,22 @@ export default function App() {
   }, []);
 
   const handleLogin = (userData) => {
+    localStorage.removeItem("guestMode");
     setUser(userData);
+    notifyUserChanged();
+  };
+
+  const handleGuestPlay = () => {
+    const guestUser = {
+      id: "guest",
+      username: "Guest Player",
+      rating: 1200,
+      isGuest: true,
+    };
+    localStorage.setItem("guestMode", "true");
+    localStorage.setItem("selectedTimeControl", "3+0");
+    setUser(guestUser);
+    setCurrentPage("ai");
     notifyUserChanged();
   };
 
@@ -75,6 +91,7 @@ export default function App() {
     }
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("guestMode");
     setUser(null);
     setCurrentPage("dashboard");
     notifyUserChanged();
@@ -87,7 +104,7 @@ export default function App() {
   if (!user) {
     return (
       <ErrorBoundary>
-        <LandingPage onLogin={handleLogin} />
+        <LandingPage onLogin={handleLogin} onGuestPlay={handleGuestPlay} />
       </ErrorBoundary>
     );
   }
@@ -137,6 +154,15 @@ export default function App() {
       case "settings":
         return (
           <Settings user={user} onBack={() => setCurrentPage("dashboard")} />
+        );
+      case "puzzles":
+      case "analysis":
+        return (
+          <ComingSoonPage
+            feature={currentPage}
+            onBack={() => setCurrentPage("dashboard")}
+            onPlay={() => handleStartGame("ai", "3+0")}
+          />
         );
       default:
         return (
