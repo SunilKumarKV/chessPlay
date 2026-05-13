@@ -261,3 +261,8 @@ html[data-theme="newspaper"] .border-gray-700,
 html[data-theme="newspaper"] .border-gray-600 {
   border-color: var(--color-border-primary) !important;
 }
+
+@keyframes floatPiece {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-22px) rotate(8deg); }
+}

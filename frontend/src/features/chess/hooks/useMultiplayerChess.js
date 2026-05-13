@@ -486,10 +486,10 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
   }, [isConnected, roomId]);
 
   const joinQueue = useCallback(
-    (playerName) => {
+    (playerName, options = {}) => {
       if (socketRef.current && isConnected) {
         setIsSearching(true);
-        socketRef.current.emit("joinQueue", { playerName });
+        socketRef.current.emit("joinQueue", { playerName, ...options });
       }
     },
     [isConnected],

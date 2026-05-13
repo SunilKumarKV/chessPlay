@@ -398,11 +398,13 @@ function getRatingRange(rating) {
 }
 
 function findQueuedOpponent(entry) {
-  return matchmakingQueue.find(
-    (candidate) =>
-      candidate.socketId !== entry.socketId &&
-      Math.abs(candidate.rating - entry.rating) <= 200,
-  );
+  return matchmakingQueue.find((candidate) => {
+    if (candidate.socketId === entry.socketId) return false;
+    const sameMode = !entry.mode || !candidate.mode || entry.mode === "casual" || candidate.mode === "casual" || entry.mode === candidate.mode;
+    const sameTime = typeof entry.timeControlIndex !== "number" || typeof candidate.timeControlIndex !== "number" || entry.timeControlIndex === candidate.timeControlIndex;
+    const ratingWindow = entry.mode === "advanced" || candidate.mode === "advanced" ? 350 : entry.mode === "beginner" || candidate.mode === "beginner" ? 300 : 200;
+    return sameMode && sameTime && Math.abs(candidate.rating - entry.rating) <= ratingWindow;
+  });
 }
 
 function stripHtmlTags(text) {
@@ -503,6 +505,11 @@ async function createMatchRoom(playerA, playerB) {
     roomId,
   });
   await game.save();
+
+  gameState.matchmaking = {
+    mode: whitePlayer.mode || blackPlayer.mode || "casual",
+    timeControlIndex: Number.isInteger(whitePlayer.timeControlIndex) ? whitePlayer.timeControlIndex : blackPlayer.timeControlIndex,
+  };
 
   rooms.set(roomId, { ...gameState, gameId: game._id });
 
@@ -610,6 +617,8 @@ io.on("connection", (socket) => {
         userId: socket.user._id,
         playerName: data.playerName || socket.user.username,
         rating,
+        mode: ["casual", "ranked", "blitz", "rapid", "beginner", "intermediate", "advanced"].includes(data.mode) ? data.mode : "casual",
+        timeControlIndex: Number.isInteger(data.timeControlIndex) ? data.timeControlIndex : null,
         ratingRange: data.ratingRange || getRatingRange(rating),
       };
 

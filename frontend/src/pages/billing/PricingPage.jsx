@@ -37,7 +37,7 @@ export default function PricingPage({ onBack, onNavigate }) {
   const [plans, setPlans] = useState(DEFAULT_PLANS);
   const [upiId, setUpiId] = useState("your-upi-id@bank");
   const [merchantName, setMerchantName] = useState("ChessPlay");
-  const [selectedPlan, setSelectedPlan] = useState("supporter_monthly");
+  const [selectedPlan, setSelectedPlan] = useState(() => sessionStorage.getItem("chessplay_selected_plan") || "supporter_monthly");
   const [form, setForm] = useState({ upiId: "", utr: "", paymentProofUrl: "", note: "" });
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");

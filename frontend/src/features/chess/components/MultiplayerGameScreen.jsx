@@ -5,6 +5,7 @@ import { getLegalMoves } from "../utils/moveValidation";
 import Board from "./Board";
 import ChatBox from "./ChatBox";
 import ErrorBoundary from "../../../components/ErrorBoundary";
+import MatchResultModal from "../../../components/MatchResultModal";
 import MaterialBalanceBar from "./MaterialBalanceBar";
 import MoveListPanel from "./MoveListPanel";
 import PlayerClockPlate from "./PlayerClockPlate";
@@ -50,6 +51,7 @@ export default function MultiplayerGameScreen({
   const [selected, setSelected] = useState(null);
   const [legalMoves, setLegalMoves] = useState([]);
   const [pendingMove, setPendingMove] = useState(null);
+  const [resultPopupSeenStatus, setResultPopupSeenStatus] = useState(null);
 
   const timeControl = TIME_CONTROLS[timeControlIdx];
   const clock = useChessClock({
@@ -202,6 +204,23 @@ export default function MultiplayerGameScreen({
       ? Math.abs(materialAdvantage)
       : 0;
 
+  const finalStatuses = new Set(["checkmate", "draw", "stalemate", "draw-50move", "draw-repetition", "resigned", "abandoned"]);
+  const isFinalStatus = finalStatuses.has(gameState?.status);
+  const isDrawResult = DRAW_STATUSES.has(gameState?.status) || gameState?.status === "draw";
+  const winnerColor = gameState?.winnerColor || (gameState?.status === "checkmate" ? (gameState?.turn === "w" ? "b" : "w") : null);
+  const resultType = isDrawResult ? "draw" : winnerColor && winnerColor === playerColor ? "win" : "loss";
+  const resultPopupKey = `${roomId}:${gameState?.status}:${gameState?.moveHistory?.length || 0}`;
+  const showResultPopup = isFinalStatus && resultPopupSeenStatus !== resultPopupKey;
+  const closeResultPopup = () => setResultPopupSeenStatus(resultPopupKey);
+  const shareResult = async () => {
+    const text = `I just played a ChessPlay multiplayer match: ${resultType === "win" ? "Victory" : resultType === "draw" ? "Draw" : "Game over"}.`;
+    if (navigator.share) {
+      await navigator.share({ title: "ChessPlay result", text, url: window.location.origin }).catch(() => {});
+    } else {
+      await navigator.clipboard?.writeText(text);
+    }
+  };
+
   const handlePromotionSelect = (pieceType) => {
     if (pendingMove) {
       makeMove(
@@ -219,6 +238,16 @@ export default function MultiplayerGameScreen({
 
   return (
     <div className="min-h-screen bg-[#0e0e0e] text-[#e0e0e0] font-['Inter'] flex flex-col">
+      <MatchResultModal
+        open={showResultPopup}
+        result={resultType}
+        title={resultType === "win" ? "You won the match!" : resultType === "draw" ? "Draw game" : "Match finished"}
+        subtitle={`Status: ${gameState?.status || "game over"}.`}
+        onClose={closeResultPopup}
+        onRematch={() => { closeResultPopup(); leaveRoom?.(); onBack?.(); }}
+        onReview={closeResultPopup}
+        onShare={shareResult}
+      />
       {pendingMove && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <div className="bg-[#1a1a1a] p-6 rounded-xl border border-[#2a2a2a] shadow-2xl max-w-sm w-full">

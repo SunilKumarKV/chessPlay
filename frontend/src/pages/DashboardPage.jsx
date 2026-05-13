@@ -4,6 +4,7 @@ import { apiClient } from "../services/apiClient";
 import { useTheme } from "../hooks/useTheme";
 import PlanBadge from "../components/billing/PlanBadge";
 import AdSlot from "../components/billing/AdSlot";
+import UpgradeModal from "../components/billing/UpgradeModal";
 
 export default function Dashboard({
   user,
@@ -19,9 +20,19 @@ export default function Dashboard({
   const [loading, setLoading] = useState(true);
   const [backendStatus, setBackendStatus] = useState(null);
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(() => sessionStorage.getItem("chessplay_upgrade_popup_seen") !== "true" && !user?.isPremium && !user?.isSupporter);
   const showDebugStatus =
     new URLSearchParams(window.location.search).get("debug") === "true" ||
     localStorage.getItem("chessplay-debug") === "true";
+
+  const closeUpgradeModal = () => {
+    sessionStorage.setItem("chessplay_upgrade_popup_seen", "true");
+    setShowUpgradeModal(false);
+  };
+
+  const openUpgradeModal = () => {
+    setShowUpgradeModal(true);
+  };
 
   const fetchWithAuth = useCallback(async (url) => {
     const controller = new AbortController();
@@ -295,6 +306,7 @@ export default function Dashboard({
       className="relative w-full max-w-7xl mx-auto p-4 md:p-6 xl:p-8 space-y-6"
       style={{ color: theme.text.primary }}
     >
+      <UpgradeModal open={showUpgradeModal} onClose={closeUpgradeModal} onNavigate={onNavigate} />
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/10 p-5 shadow-2xl shadow-black/25 backdrop-blur-xl md:p-7">
           <div
@@ -392,6 +404,13 @@ export default function Dashboard({
               className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10"
             >
               Analysis
+            </button>
+            <button
+              type="button"
+              onClick={openUpgradeModal}
+              className="col-span-2 rounded-lg border border-amber-300/30 bg-amber-300/10 px-3 py-3 text-left text-sm font-black text-amber-100 transition hover:bg-amber-300/15"
+            >
+              Support ChessPlay / Upgrade
             </button>
           </div>
 
