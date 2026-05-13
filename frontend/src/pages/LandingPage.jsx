@@ -1,21 +1,51 @@
 import { useState } from "react";
-import { PrimaryBtn, SecondaryBtn, Modal } from "../components/ui";
+import { Modal } from "../components/ui";
 import Auth from "../features/auth/components/Auth";
-import { useTheme } from "../hooks/useTheme";
+
+const BOARD = [
+  ["r", "n", "b", "q", "k", "b", "n", "r"],
+  ["p", "p", "p", "", "", "p", "p", "p"],
+  ["", "", "", "", "p", "", "", ""],
+  ["", "", "", "p", "P", "", "", ""],
+  ["", "", "", "", "", "N", "", ""],
+  ["", "", "N", "", "", "", "", ""],
+  ["P", "P", "P", "P", "", "P", "P", "P"],
+  ["R", "", "B", "Q", "K", "B", "", "R"],
+];
+
+const PIECES = {
+  r: "♜",
+  n: "♞",
+  b: "♝",
+  q: "♛",
+  k: "♚",
+  p: "♟",
+  R: "♖",
+  N: "♘",
+  B: "♗",
+  Q: "♕",
+  K: "♔",
+  P: "♙",
+};
+
+const FEATURE_ROWS = [
+  ["Stockfish", "Local engine, fast best-move analysis, PGN export"],
+  ["Live rooms", "Socket matchmaking, spectators, room links, chat"],
+  ["Trust layer", "HttpOnly cookies, rate limits, privacy controls"],
+];
 
 export default function LandingPage({ onLogin, onGuestPlay }) {
-  const { theme } = useTheme();
   const [showAuth, setShowAuth] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
 
-  const handleGetStarted = () => {
+  const openSignup = () => {
+    setIsLogin(false);
     setShowAuth(true);
-    setIsLogin(false); // Show signup first
   };
 
-  const handleLoginClick = () => {
-    setShowAuth(true);
+  const openLogin = () => {
     setIsLogin(true);
+    setShowAuth(true);
   };
 
   const handleAuthSuccess = (userData) => {
@@ -24,162 +54,139 @@ export default function LandingPage({ onLogin, onGuestPlay }) {
   };
 
   return (
-    <div
-      className="min-h-screen font-['Inter']"
-      style={{
-        background: `linear-gradient(to bottom right, ${theme.bg.primary}, ${theme.bg.secondary}, ${theme.bg.primary})`,
-        color: theme.text.primary,
-      }}
-    >
-      {/* Header */}
-      <header
-        className="flex justify-between items-center p-6 border-b"
-        style={{ borderColor: theme.border.primary }}
-      >
-        <div className="flex items-center space-x-2">
-          <span className="text-2xl">♟️</span>
-          <h1
-            className="text-xl font-bold font-['Montserrat']"
-            style={{ color: theme.text.primary }}
-          >
+    <div className="min-h-screen bg-[#07100d] text-white">
+      <header className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 md:px-8">
+        <button
+          type="button"
+          onClick={onGuestPlay}
+          className="flex items-center gap-3"
+          aria-label="ChessPlay home"
+        >
+          <span className="grid h-10 w-10 place-items-center rounded-lg bg-[#81b64c] text-xl font-black text-[#07100d]">
+            ♘
+          </span>
+          <span className="font-['Montserrat'] text-xl font-black">
             ChessPlay
-          </h1>
-        </div>
-        <div className="flex space-x-4">
-          <SecondaryBtn onClick={handleLoginClick}>Log In</SecondaryBtn>
-          <PrimaryBtn onClick={handleGetStarted}>Sign Up</PrimaryBtn>
+          </span>
+        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={openLogin}
+            className="rounded-lg border border-white/10 px-4 py-2 text-sm font-bold text-slate-200 transition hover:bg-white/10"
+          >
+            Log in
+          </button>
+          <button
+            type="button"
+            onClick={openSignup}
+            className="rounded-lg bg-[#81b64c] px-4 py-2 text-sm font-black text-[#07100d] transition hover:bg-[#93c85f]"
+          >
+            Create account
+          </button>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="text-center py-20 px-6">
-        <h2 className="text-5xl font-bold mb-6 font-['Montserrat'] bg-linear-to-r from-[#e0e0e0] to-[#b0b0b0] bg-clip-text text-transparent">
-          Play Chess Online
-        </h2>
-        <p
-          className="text-xl mb-8 max-w-2xl mx-auto"
-          style={{ color: theme.text.tertiary }}
-        >
-          Challenge players worldwide, improve your skills with AI, and climb
-          the leaderboard in the ultimate chess experience.
-        </p>
-        <div className="flex justify-center space-x-4">
-          <PrimaryBtn onClick={handleGetStarted} className="text-lg px-8 py-3">
-            Get Started
-          </PrimaryBtn>
-          <SecondaryBtn onClick={onGuestPlay} className="text-lg px-8 py-3">
-            Play as Guest
-          </SecondaryBtn>
-        </div>
-      </section>
+      <main className="mx-auto grid min-h-[calc(100vh-74px)] max-w-7xl items-center gap-8 px-4 pb-10 pt-4 md:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(360px,520px)]">
+        <section className="max-w-3xl">
+          <div className="mb-5 inline-flex rounded-full border border-[#81b64c]/25 bg-[#81b64c]/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-[#a8e36f]">
+            v1.2.0 launch ready
+          </div>
+          <h1 className="font-['Montserrat'] text-5xl font-black leading-[1.02] tracking-normal text-white md:text-7xl">
+            ChessPlay
+          </h1>
+          <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300 md:text-xl">
+            A polished chess room for fast AI games, live multiplayer, post-game
+            analysis, and player progress without making the first move feel
+            heavy.
+          </p>
 
-      {/* Features Section */}
-      <section className="py-16 px-6">
-        <div className="max-w-6xl mx-auto">
-          <h3
-            className="text-3xl font-bold text-center mb-12 font-['Montserrat']"
-            style={{ color: theme.text.primary }}
-          >
-            Why Choose ChessPlay?
-          </h3>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div
-              className="text-center p-6 rounded-lg border"
-              style={{
-                backgroundColor: theme.bg.secondary,
-                borderColor: theme.border.primary,
-              }}
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={onGuestPlay}
+              className="rounded-xl bg-[#81b64c] px-6 py-4 text-base font-black text-[#07100d] shadow-xl shadow-[#81b64c]/20 transition hover:-translate-y-0.5 hover:bg-[#93c85f]"
             >
-              <div className="text-4xl mb-4">🤖</div>
-              <h4
-                className="text-xl font-semibold mb-2 font-['Montserrat']"
-                style={{ color: theme.text.primary }}
-              >
-                Play vs AI
-              </h4>
-              <p style={{ color: theme.text.tertiary }}>
-                Challenge our advanced AI engine with multiple difficulty levels
-                and time controls.
-              </p>
+              Play as guest
+            </button>
+            <button
+              type="button"
+              onClick={openSignup}
+              className="rounded-xl border border-white/15 bg-white/10 px-6 py-4 text-base font-black text-white transition hover:-translate-y-0.5 hover:bg-white/15"
+            >
+              Create account
+            </button>
+          </div>
+
+          <div className="mt-10 grid gap-3 md:grid-cols-3">
+            {FEATURE_ROWS.map(([title, copy]) => (
+              <div key={title} className="border-l border-white/15 pl-4">
+                <div className="font-['Montserrat'] text-lg font-black">
+                  {title}
+                </div>
+                <div className="mt-2 text-sm leading-6 text-slate-400">
+                  {copy}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="relative">
+          <div className="absolute -inset-4 rounded-[2rem] bg-[#81b64c]/10 blur-2xl" />
+          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#111917] shadow-2xl shadow-black/40">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+              <div>
+                <div className="text-sm font-black text-white">Live board</div>
+                <div className="text-xs text-slate-400">Blitz 3+0</div>
+              </div>
+              <div className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-black text-emerald-300">
+                Online
+              </div>
             </div>
-            <div
-              className="text-center p-6 rounded-lg border"
-              style={{
-                backgroundColor: theme.bg.secondary,
-                borderColor: theme.border.primary,
-              }}
-            >
-              <div className="text-4xl mb-4">👥</div>
-              <h4
-                className="text-xl font-semibold mb-2 font-['Montserrat']"
-                style={{ color: theme.text.primary }}
-              >
-                Multiplayer
-              </h4>
-              <p style={{ color: theme.text.tertiary }}>
-                Compete against players from around the world in real-time
-                matches.
-              </p>
+            <div className="grid grid-cols-8 p-4">
+              {BOARD.flatMap((row, rowIndex) =>
+                row.map((piece, colIndex) => {
+                  const light = (rowIndex + colIndex) % 2 === 0;
+                  return (
+                    <div
+                      key={`${rowIndex}-${colIndex}`}
+                      className={`grid aspect-square place-items-center text-2xl md:text-4xl ${
+                        light ? "bg-[#e7d8bd]" : "bg-[#527a45]"
+                      }`}
+                    >
+                      <span
+                        className={
+                          piece === piece.toUpperCase()
+                            ? "text-[#f7f0df]"
+                            : "text-[#172019]"
+                        }
+                      >
+                        {PIECES[piece] || ""}
+                      </span>
+                    </div>
+                  );
+                }),
+              )}
             </div>
-            <div
-              className="text-center p-6 rounded-lg border"
-              style={{
-                backgroundColor: theme.bg.secondary,
-                borderColor: theme.border.primary,
-              }}
-            >
-              <div className="text-4xl mb-4">📚</div>
-              <h4
-                className="text-xl font-semibold mb-2 font-['Montserrat']"
-                style={{ color: theme.text.primary }}
-              >
-                Learn & Improve
-              </h4>
-              <p style={{ color: theme.text.tertiary }}>
-                Access puzzles, game analysis, and track your progress over
-                time.
-              </p>
+            <div className="grid grid-cols-3 gap-3 border-t border-white/10 p-4 text-center">
+              {[
+                ["1200", "Guest ELO"],
+                ["<2s", "AI ready"],
+                ["Live", "Rooms"],
+              ].map(([value, label]) => (
+                <div key={label} className="rounded-lg bg-black/20 px-3 py-3">
+                  <div className="font-['Montserrat'] text-xl font-black">
+                    {value}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-400">{label}</div>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      {/* CTA Section */}
-      <section
-        className="py-16 px-6 border-t"
-        style={{
-          backgroundColor: theme.bg.secondary,
-          borderColor: theme.border.primary,
-        }}
-      >
-        <div className="max-w-4xl mx-auto text-center">
-          <h3
-            className="text-3xl font-bold mb-6 font-['Montserrat']"
-            style={{ color: theme.text.primary }}
-          >
-            Ready to Start Playing?
-          </h3>
-          <p className="text-xl mb-8" style={{ color: theme.text.tertiary }}>
-            Join thousands of players and begin your chess journey today.
-          </p>
-          <PrimaryBtn onClick={handleGetStarted} className="text-lg px-8 py-3">
-            Create Your Account
-          </PrimaryBtn>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer
-        className="py-8 px-6 border-t text-center"
-        style={{
-          borderColor: theme.border.primary,
-          color: theme.text.tertiary,
-        }}
-      >
-        <p>&copy; 2026 ChessPlay. Built with passion for chess enthusiasts.</p>
-      </footer>
-
-      {/* Auth Modal */}
       <Modal
         isOpen={showAuth}
         onClose={() => setShowAuth(false)}

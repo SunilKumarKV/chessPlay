@@ -12,16 +12,23 @@ function fatalConfigError(message) {
   process.exit(1);
 }
 
-if (!process.env.JWT_SECRET) {
-  fatalConfigError("JWT_SECRET is required.");
+const accessSecret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
+const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+
+if (!accessSecret || !refreshSecret) {
+  fatalConfigError("JWT_ACCESS_SECRET and JWT_REFRESH_SECRET are required. JWT_SECRET is accepted only for local backward compatibility.");
 }
 
-if (process.env.JWT_SECRET.length < 32) {
+if (accessSecret.length < 32 || refreshSecret.length < 32) {
   fatalConfigError("JWT_SECRET must be at least 32 characters long.");
 }
 
-if (weakJwtSecrets.has(process.env.JWT_SECRET)) {
-  fatalConfigError("JWT_SECRET is using a known weak/default value.");
+if (weakJwtSecrets.has(accessSecret) || weakJwtSecrets.has(refreshSecret)) {
+  fatalConfigError("JWT secrets are using known weak/default values.");
+}
+
+if (isProduction && accessSecret === refreshSecret) {
+  fatalConfigError("JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different in production.");
 }
 
 const express = require("express");
@@ -30,8 +37,13 @@ const socketIo = require("socket.io");
 const cors = require("cors");
 const morgan = require("morgan");
 const helmet = require("helmet");
+const cookieParser = require("cookie-parser");
+const rateLimit = require("express-rate-limit");
+const mongoSanitize = require("express-mongo-sanitize");
+const hpp = require("hpp");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
+const { getJwtSecret } = require("./utils/security");
 const {
   isValidMove: validateMove,
   applyMove,
@@ -110,7 +122,7 @@ function isAllowedOrigin(origin) {
 
 function corsOriginForRequest(req, origin, callback) {
   if (!origin) {
-    return callback(null, !isProduction || req.path === "/health");
+    return callback(null, !isProduction || req.path === "/health" || req.path === "/healthz");
   }
 
   if (isAllowedOrigin(origin)) {
@@ -136,7 +148,7 @@ function enforceProductionOrigin(req, res, next) {
 
   const origin = req.headers.origin;
   if (!origin) {
-    if (req.path === "/health") return next();
+    if (req.path === "/health" || req.path === "/healthz") return next();
     return res.status(403).json({ message: "Origin is required" });
   }
 
@@ -169,6 +181,7 @@ const cspConnectSources = [
 
 const io = socketIo(server, {
   cors: socketCorsOptions,
+  maxHttpBufferSize: 20_000,
 });
 
 const RECONNECTION_GRACE_MS = 60 * 1000;
@@ -184,12 +197,15 @@ const BLOCKED_WORDS = String(process.env.BLOCKED_WORDS || "")
 io.use(async (socket, next) => {
   try {
     const cookies = parseCookies(socket.handshake.headers.cookie || "");
-    const token = cookies.authToken;
+    const token = cookies.accessToken || cookies.authToken || socket.handshake.auth?.accessToken;
     if (!token) {
       return next(new Error("Authentication required"));
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret("access"));
+    if (decoded.type && decoded.type !== "access") {
+      return next(new Error("Invalid token type"));
+    }
     const user = await User.findById(decoded.userId);
     if (!user) {
       return next(new Error("User not found"));
@@ -211,8 +227,45 @@ const reconnectionTimers = new Map(); // `${roomId}:${color}` -> Timeout
 const matchmakingQueue = []; // { socketId, userId, playerName, ratingRange, rating }
 const chatRateLimits = new Map(); // socket.id -> { count, resetAt }
 
+const SOCKET_EVENT_LIMITS = {
+  makeMove: { count: 12, windowMs: 5000 },
+  joinRoom: { count: 8, windowMs: 60_000 },
+  createRoom: { count: 6, windowMs: 60_000 },
+  joinQueue: { count: 12, windowMs: 60_000 },
+  sendMessage: { count: 5, windowMs: 5000 },
+  default: { count: 40, windowMs: 10_000 },
+};
+const socketEventRateLimits = new Map();
+
+function exceedsSocketEventRateLimit(socketId, eventName) {
+  const now = Date.now();
+  const rule = SOCKET_EVENT_LIMITS[eventName] || SOCKET_EVENT_LIMITS.default;
+  const key = `${socketId}:${eventName}`;
+  const current = socketEventRateLimits.get(key);
+  const bucket = current && current.resetAt > now ? current : { count: 0, resetAt: now + rule.windowMs };
+  bucket.count += 1;
+  socketEventRateLimits.set(key, bucket);
+  return bucket.count > rule.count;
+}
+
+function isSafeSocketPayload(args) {
+  try {
+    return Buffer.byteLength(JSON.stringify(args), "utf8") <= 20_000;
+  } catch {
+    return false;
+  }
+}
+
 app.use((req, res, next) => cors(createCorsOptions(req))(req, res, next));
 app.use(enforceProductionOrigin);
+app.use(cookieParser());
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProduction ? 300 : 2000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests. Please slow down." },
+}));
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -224,7 +277,9 @@ app.use(
     },
   }),
 );
-app.use(express.json({ limit: "10kb" }));
+app.use(express.json({ limit: "20kb" }));
+app.use(mongoSanitize());
+app.use(hpp());
 if (process.env.NODE_ENV === "production") {
   app.use(morgan("combined"));
 }
@@ -262,6 +317,14 @@ app.get("/health", (req, res) => {
     status: "ok",
     rooms: rooms.size,
     players: players.size,
+  });
+});
+
+// Public platform health check for hosts that cannot attach secret headers.
+app.get("/healthz", (req, res) => {
+  res.json({
+    status: "ok",
+    service: "chessplay-backend",
   });
 });
 
@@ -511,6 +574,14 @@ io.on("connection", (socket) => {
 
   const onSafe = (eventName, handler) => {
     socket.on(eventName, (...args) => {
+      if (!isSafeSocketPayload(args)) {
+        socket.emit("serverError", { message: "Payload too large" });
+        return;
+      }
+      if (exceedsSocketEventRateLimit(socket.id, eventName)) {
+        socket.emit("serverError", { message: "Too many socket events. Please slow down." });
+        return;
+      }
       Promise.resolve(handler(...args)).catch((error) => {
         console.error(`${eventName} handler error:`, error);
         socket.emit("serverError", { message: "An unexpected server error occurred" });
@@ -606,14 +677,23 @@ io.on("connection", (socket) => {
       removeFromQueue(socket.id);
       cleanupSpectator(socket.id, true);
       const { roomId, playerName } = data;
+      const normalizedRoomId = String(roomId || "").trim().toUpperCase();
+      if (!/^[A-Z0-9]{6}$/.test(normalizedRoomId)) {
+        socket.emit("serverError", { message: "Invalid room code" });
+        return;
+      }
 
-      const roomData = rooms.get(roomId);
+      const roomData = rooms.get(normalizedRoomId);
       if (!roomData) {
         socket.emit("serverError", { message: "Room not found" });
         return;
       }
 
       const gameState = roomData;
+      if (["w", "b"].some((c) => String(gameState.players[c].userId) === String(socket.user._id))) {
+        socket.emit("serverError", { message: "You are already in this room" });
+        return;
+      }
 
       // Check if room is full
       if (gameState.players.w.userId && gameState.players.b.userId) {
@@ -631,7 +711,7 @@ io.on("connection", (socket) => {
       gameState.players[color].name = playerName;
       gameState.players[color].userId = socket.user._id;
       gameState.players[color].disconnected = false;
-      clearReconnectTimer(roomId, color);
+      clearReconnectTimer(normalizedRoomId, color);
 
       // Update game document
       await Game.findByIdAndUpdate(roomData.gameId, {
@@ -639,28 +719,28 @@ io.on("connection", (socket) => {
       });
 
       players.set(socket.id, {
-        roomId,
+        roomId: normalizedRoomId,
         color,
         playerName,
         userId: socket.user._id,
       });
-      socket.join(roomId);
+      socket.join(normalizedRoomId);
 
       // Notify the joining player directly with room info and assigned color
       socket.emit("joinedRoom", {
-        roomId,
+        roomId: normalizedRoomId,
         gameState,
         color,
         chatHistory: gameState.chatHistory,
       });
 
       // Notify both players that someone joined
-      io.to(roomId).emit("playerJoined", {
+      io.to(normalizedRoomId).emit("playerJoined", {
         gameState,
         newPlayer: { color, name: playerName },
       });
 
-      console.log(`${playerName} joined room ${roomId} as ${color}`);
+      console.log(`${playerName} joined room ${normalizedRoomId} as ${color}`);
     } catch (error) {
       console.error("Join room error:", error);
       socket.emit("serverError", { message: "Failed to join room" });
@@ -1125,6 +1205,9 @@ io.on("connection", (socket) => {
     markPlayerDisconnected(socket);
     cleanupSpectator(socket.id);
     chatRateLimits.delete(socket.id);
+    for (const key of socketEventRateLimits.keys()) {
+      if (key.startsWith(`${socket.id}:`)) socketEventRateLimits.delete(key);
+    }
     console.log(`Player disconnected: ${socket.id}`);
   });
 

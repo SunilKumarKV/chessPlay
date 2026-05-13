@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import GoldButton from "../components/GoldButton";
+import { BACKEND_URL } from "../config/runtime";
 import { useTheme } from "../hooks/useTheme";
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 
 export default function Leaderboard({ onBack }) {
   const { theme } = useTheme();

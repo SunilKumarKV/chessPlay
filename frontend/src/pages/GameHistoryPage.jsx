@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import GoldButton from "../components/GoldButton";
+import { BACKEND_URL } from "../config/runtime";
 import GameReplay from "../features/chess/components/GameReplay";
 import { useTheme } from "../hooks/useTheme";
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 
 export default function GameHistory({ onBack }) {
   const { theme } = useTheme();

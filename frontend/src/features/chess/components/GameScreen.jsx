@@ -52,6 +52,7 @@ export default function GameScreen({
   });
 
   const [showSettings, setShowSettings] = useState(false);
+  const [shareStatus, setShareStatus] = useState("");
   const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
 
   const isOver =
@@ -110,6 +111,14 @@ export default function GameScreen({
       ? Math.abs(materialAdvantage)
       : 0;
   const moves = pairMoveHistory(chessGame.history);
+  const sharePGN = async () => {
+    try {
+      await navigator.clipboard.writeText(chessGame.buildCurrentPGN());
+      setShareStatus("PGN copied");
+    } catch {
+      setShareStatus("Copy failed");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0e0e0e] text-[#e0e0e0] font-['Inter'] flex flex-col">
@@ -336,7 +345,7 @@ export default function GameScreen({
 
       {isOver && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#1a1a1a] rounded-lg p-8 border border-[#2a2a2a] max-w-md w-full mx-4">
+          <div className="bg-[#1a1a1a] rounded-lg p-8 border border-[#2a2a2a] max-w-md w-full mx-4 shadow-2xl shadow-black/40">
             <div className="text-center">
               <div className="text-4xl mb-4">
                 {chessGame.status === "checkmate" ? "♛" : "½"}
@@ -344,20 +353,48 @@ export default function GameScreen({
               <h2 className="text-2xl font-bold text-[#e0e0e0] mb-4 font-['Montserrat']">
                 {getGameOverMessage(chessGame.status, chessGame.turn)}
               </h2>
-              <div className="flex space-x-3">
+              <div className="mb-5 grid grid-cols-3 gap-2 text-xs text-slate-400">
+                <div className="rounded-lg bg-black/20 px-2 py-3">
+                  {chessGame.history.length} moves
+                </div>
+                <div className="rounded-lg bg-black/20 px-2 py-3">
+                  {chessGame.currentOpening?.name || "Opening saved"}
+                </div>
+                <div className="rounded-lg bg-black/20 px-2 py-3">
+                  PGN ready
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={chessGame.confirmReset}
-                  className="flex-1 py-3 px-4 bg-[#81b64c] hover:bg-[#6ba03d] text-[#0e0e0e] font-bold rounded-lg transition-colors font-['Montserrat']"
+                  className="py-3 px-4 bg-[#81b64c] hover:bg-[#6ba03d] text-[#0e0e0e] font-bold rounded-lg transition-colors font-['Montserrat']"
                 >
-                  New Game
+                  Rematch
                 </button>
                 <button
                   onClick={chessGame.handleExportPGN}
-                  className="flex-1 py-3 px-4 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#e0e0e0] rounded-lg transition-colors font-['Inter']"
+                  className="py-3 px-4 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#e0e0e0] rounded-lg transition-colors font-['Inter']"
                 >
                   Export PGN
                 </button>
+                <button
+                  onClick={() => chessGame.setAiEnabled(false)}
+                  className="py-3 px-4 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#e0e0e0] rounded-lg transition-colors font-['Inter']"
+                >
+                  Analyze
+                </button>
+                <button
+                  onClick={sharePGN}
+                  className="py-3 px-4 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#e0e0e0] rounded-lg transition-colors font-['Inter']"
+                >
+                  Share PGN
+                </button>
               </div>
+              {shareStatus && (
+                <p className="mt-4 text-sm font-bold text-[#81b64c]">
+                  {shareStatus}
+                </p>
+              )}
             </div>
           </div>
         </div>

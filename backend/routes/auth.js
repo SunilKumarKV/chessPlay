@@ -2,6 +2,20 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/User");
+const {
+  authUserPayload,
+  clearSessionCookies,
+  getCookie: getSecureCookie,
+  getJwtSecret,
+  hashToken,
+  issueSession: issueSecureSession,
+  randomToken,
+  sanitizeText,
+  signAccessToken,
+  validateProductionEmail: validateSecureEmail,
+  validateStrongPassword,
+} = require("../utils/security");
+const { sendSecurityEmail } = require("../utils/email");
 const auth = require("../middleware/auth");
 
 const router = express.Router();
@@ -28,30 +42,7 @@ function normalizeEmail(email) {
 }
 
 function validateProductionEmail(email) {
-  const normalized = normalizeEmail(email);
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(normalized)) {
-    return { ok: false, message: "Invalid email format" };
-  }
-
-  const domain = normalized.split("@").pop();
-  if (BLOCKED_EMAIL_DOMAINS.has(domain)) {
-    return { ok: false, message: "Temporary, demo, or placeholder emails are not allowed" };
-  }
-
-  const allowedDomains = String(process.env.AUTH_ALLOWED_EMAIL_DOMAINS || "")
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-
-  if (allowedDomains.length && !allowedDomains.includes(domain)) {
-    return {
-      ok: false,
-      message: `Only authorized email domains are allowed: ${allowedDomains.join(", ")}`,
-    };
-  }
-
-  return { ok: true, email: normalized };
+  return validateSecureEmail(email);
 }
 
 function parsePositiveInt(value, fallback, max = Number.MAX_SAFE_INTEGER) {
@@ -66,13 +57,15 @@ function escapeRegex(value) {
 
 function cookieOptions() {
   const isProduction = process.env.NODE_ENV === "production";
-  return {
+  const options = {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
-    maxAge: TOKEN_MAX_AGE_MS,
     path: "/",
+    maxAge: TOKEN_MAX_AGE_MS,
   };
+  if (process.env.COOKIE_DOMAIN) options.domain = process.env.COOKIE_DOMAIN;
+  return options;
 }
 
 function clearCookieOptions() {
@@ -86,33 +79,17 @@ function setAuthCookie(res, token) {
 }
 
 function getCookie(req, name) {
-  return String(req.headers.cookie || "")
-    .split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${name}=`))
-    ?.slice(name.length + 1);
+  return getSecureCookie(req, name);
 }
 
-function authUserPayload(user) {
-  return {
-    id: user._id,
-    username: user.username,
-    email: user.email,
-    gamesPlayed: user.gamesPlayed,
-    gamesWon: user.gamesWon,
-    rating: user.rating,
-    avatar: user.avatar || null,
-  };
+function authUserPayloadLocal(user) {
+  return authUserPayload(user);
 }
 
-function issueSession(res, user) {
-  const token = jwt.sign(
-    { userId: user._id, username: user.username },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" },
-  );
-  setAuthCookie(res, token);
+async function issueSession(res, user) {
+  await issueSecureSession(res, user);
 }
+
 
 async function buildUniqueUsername(seed) {
   const base =
@@ -244,8 +221,9 @@ router.post("/register", authLimiter, async (req, res) => {
     }
     const email = emailValidation.email;
 
-    if (!password || password.length < 8) {
-      return res.status(400).json({ message: "Password must be at least 8 characters long" });
+    const passwordError = validateStrongPassword(password);
+    if (passwordError) {
+      return res.status(400).json({ message: passwordError });
     }
 
     const usernameRegex = /^[a-zA-Z0-9]+$/;
@@ -271,7 +249,7 @@ router.post("/register", authLimiter, async (req, res) => {
     const user = new User({ username, email, password });
     await user.save();
 
-    issueSession(res, user);
+    await issueSession(res, user);
 
     res.status(201).json({
       message: "User created successfully",
@@ -305,7 +283,7 @@ router.post("/login", authLimiter, async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
-    issueSession(res, user);
+    await issueSession(res, user);
 
     res.json({
       message: "Login successful",
@@ -345,7 +323,7 @@ router.post("/google", authLimiter, async (req, res) => {
 
     user.lastLogin = new Date();
     await user.save();
-    issueSession(res, user);
+    await issueSession(res, user);
 
     res.json({
       message: "Google login successful",
@@ -359,29 +337,196 @@ router.post("/google", authLimiter, async (req, res) => {
 
 // Logout
 router.post("/logout", (req, res) => {
-  res.clearCookie("authToken", clearCookieOptions());
+  clearSessionCookies(res);
   res.json({ message: "Logged out" });
 });
 
 // Current session without noisy 401s for first page load
 router.get("/session", async (req, res) => {
   try {
-    const token = getCookie(req, "authToken");
+    const token = getCookie(req, "accessToken") || getCookie(req, "authToken");
     if (!token) {
       return res.json({ user: null });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret("access"));
     const user = await User.findById(decoded.userId).select("-password");
     if (!user) {
-      res.clearCookie("authToken", clearCookieOptions());
+      clearSessionCookies(res);
       return res.json({ user: null });
     }
 
     res.json({ user });
   } catch {
-    res.clearCookie("authToken", clearCookieOptions());
+    clearSessionCookies(res);
     res.json({ user: null });
+  }
+});
+
+
+// Refresh access token using a HttpOnly refresh cookie
+router.post("/refresh", async (req, res) => {
+  try {
+    const refreshToken = getCookie(req, "refreshToken");
+    if (!refreshToken) {
+      return res.status(401).json({ message: "Refresh token missing" });
+    }
+
+    const decoded = jwt.verify(refreshToken, getJwtSecret("refresh"));
+    if (decoded.type && decoded.type !== "refresh") {
+      return res.status(401).json({ message: "Invalid token type" });
+    }
+
+    const user = await User.findById(decoded.userId).select("+refreshTokenHash");
+    if (!user || user.deletedAt) {
+      clearSessionCookies(res);
+      return res.status(401).json({ message: "Invalid refresh session" });
+    }
+
+    if (user.refreshTokenHash !== hashToken(refreshToken)) {
+      user.tokenVersion = (user.tokenVersion || 0) + 1;
+      user.refreshTokenHash = null;
+      await user.save();
+      clearSessionCookies(res);
+      return res.status(401).json({ message: "Refresh session was revoked" });
+    }
+
+    const accessToken = signAccessToken(user);
+    res.cookie("accessToken", accessToken, cookieOptions());
+    res.cookie("authToken", accessToken, cookieOptions());
+    res.json({ user: authUserPayload(user) });
+  } catch (error) {
+    clearSessionCookies(res);
+    res.status(401).json({ message: "Invalid or expired refresh token" });
+  }
+});
+
+// Email verification token creation/resend
+router.post("/resend-verification", authLimiter, auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select("+emailVerificationTokenHash");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (user.emailVerified) return res.json({ message: "Email is already verified" });
+
+    const token = randomToken();
+    user.emailVerificationTokenHash = hashToken(token);
+    user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await user.save();
+
+    const verifyUrl = `${process.env.FRONTEND_ORIGINS?.split(",")[0] || "http://localhost:5173"}/verify-email?token=${token}`;
+    await sendSecurityEmail({
+      to: user.email,
+      subject: "Verify your ChessPlay account",
+      text: `Verify your email: ${verifyUrl}`,
+    });
+
+    res.json({ message: "Verification email sent" });
+  } catch (error) {
+    console.error("Resend verification error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/verify-email", authLimiter, async (req, res) => {
+  try {
+    const token = String(req.body.token || "");
+    if (!token) return res.status(400).json({ message: "Verification token is required" });
+
+    const user = await User.findOne({
+      emailVerificationTokenHash: hashToken(token),
+      emailVerificationExpires: { $gt: new Date() },
+    }).select("+emailVerificationTokenHash");
+
+    if (!user) return res.status(400).json({ message: "Invalid or expired verification token" });
+
+    user.emailVerified = true;
+    user.emailVerificationTokenHash = null;
+    user.emailVerificationExpires = null;
+    await user.save();
+
+    res.json({ message: "Email verified successfully" });
+  } catch (error) {
+    console.error("Verify email error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/forgot-password", authLimiter, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const user = await User.findOne({ email }).select("+passwordResetTokenHash");
+
+    // Avoid leaking account existence.
+    if (!user) return res.json({ message: "If the account exists, a reset email was sent" });
+
+    const token = randomToken();
+    user.passwordResetTokenHash = hashToken(token);
+    user.passwordResetExpires = new Date(Date.now() + 30 * 60 * 1000);
+    await user.save();
+
+    const resetUrl = `${process.env.FRONTEND_ORIGINS?.split(",")[0] || "http://localhost:5173"}/reset-password?token=${token}`;
+    await sendSecurityEmail({
+      to: user.email,
+      subject: "Reset your ChessPlay password",
+      text: `Reset your password: ${resetUrl}`,
+    });
+
+    res.json({ message: "If the account exists, a reset email was sent" });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/reset-password", authLimiter, async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    const passwordError = validateStrongPassword(password);
+    if (passwordError) return res.status(400).json({ message: passwordError });
+
+    const user = await User.findOne({
+      passwordResetTokenHash: hashToken(token),
+      passwordResetExpires: { $gt: new Date() },
+    }).select("+passwordResetTokenHash");
+
+    if (!user) return res.status(400).json({ message: "Invalid or expired reset token" });
+
+    user.password = password;
+    user.passwordResetTokenHash = null;
+    user.passwordResetExpires = null;
+    user.refreshTokenHash = null;
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    await user.save();
+
+    clearSessionCookies(res);
+    res.json({ message: "Password reset successful. Please log in again." });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.delete("/account", authLimiter, auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select("+refreshTokenHash");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const anonymized = `deleted-${user._id}@deleted.chessplay.local`;
+    user.username = `DeletedUser${String(user._id).slice(-6)}`;
+    user.email = anonymized;
+    user.bio = "";
+    user.avatar = null;
+    user.password = randomToken() + "A1";
+    user.refreshTokenHash = null;
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    user.deletedAt = new Date();
+    await user.save();
+
+    clearSessionCookies(res);
+    res.json({ message: "Account deleted" });
+  } catch (error) {
+    console.error("Delete account error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -646,9 +791,9 @@ router.put("/profile", auth, async (req, res) => {
     const updateData = {};
     if (username) updateData.username = username;
     if (email) updateData.email = email.toLowerCase();
-    if (bio !== undefined) updateData.bio = bio;
-    if (avatar !== undefined) updateData.avatar = avatar || null;
-    if (country !== undefined) updateData.country = country;
+    if (bio !== undefined) updateData.bio = sanitizeText(bio, 500);
+    if (avatar !== undefined) updateData.avatar = String(avatar || "").slice(0, 300) || null;
+    if (country !== undefined) updateData.country = String(country || "US").replace(/[^a-zA-Z -]/g, "").slice(0, 56) || "US";
     if (privacy && typeof privacy === "object") {
       updateData.privacy = {
         profileVisibility: privacy.profileVisibility !== false,
@@ -684,10 +829,9 @@ router.put("/password", authLimiter, auth, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
-    if (!newPassword || newPassword.length < 8) {
-      return res.status(400).json({
-        message: "New password must be at least 8 characters",
-      });
+    const passwordError = validateStrongPassword(newPassword);
+    if (passwordError) {
+      return res.status(400).json({ message: passwordError });
     }
 
     const user = await User.findById(req.user.userId);

@@ -15,6 +15,18 @@ import LanPlayPage from "../pages/LanPlayPage";
 import AppSplash from "../components/AppSplash";
 import DashboardLayout from "../layouts/DashboardLayout";
 import ErrorBoundary from "../components/ErrorBoundary";
+import PrivacyPolicyPage from "../pages/legal/PrivacyPolicyPage";
+import TermsPage from "../pages/legal/TermsPage";
+import DeleteAccountPage from "../pages/legal/DeleteAccountPage";
+import ForgotPasswordPage from "../pages/ForgotPasswordPage";
+import ResetPasswordPage from "../pages/ResetPasswordPage";
+import VerifyEmailPage from "../pages/VerifyEmailPage";
+
+function pageFromPathname(pathname) {
+  if (pathname === "/reset-password") return "reset-password";
+  if (pathname === "/verify-email") return "verify-email";
+  return "dashboard";
+}
 
 export default function App() {
   const [user, setUser] = useState(() => {
@@ -32,7 +44,9 @@ export default function App() {
   });
   const [authChecked, setAuthChecked] = useState(false);
   const [authTimedOut, setAuthTimedOut] = useState(false);
-  const [currentPage, setCurrentPage] = useState("dashboard");
+  const [currentPage, setCurrentPage] = useState(() =>
+    pageFromPathname(window.location.pathname),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -115,6 +129,22 @@ export default function App() {
 
   if (!authChecked) {
     return <AppSplash />;
+  }
+
+  if (currentPage === "reset-password") {
+    return (
+      <ErrorBoundary>
+        <ResetPasswordPage onBack={() => setCurrentPage("dashboard")} />
+      </ErrorBoundary>
+    );
+  }
+
+  if (currentPage === "verify-email") {
+    return (
+      <ErrorBoundary>
+        <VerifyEmailPage onBack={() => setCurrentPage("dashboard")} />
+      </ErrorBoundary>
+    );
   }
 
   if (!user) {
@@ -204,6 +234,14 @@ export default function App() {
             onPlay={() => handleStartGame("ai", "3+0")}
           />
         );
+      case "privacy":
+        return <PrivacyPolicyPage onBack={() => setCurrentPage("dashboard")} />;
+      case "terms":
+        return <TermsPage onBack={() => setCurrentPage("dashboard")} />;
+      case "delete-account":
+        return <DeleteAccountPage onBack={() => setCurrentPage("settings")} onDeleted={handleLogout} />;
+      case "forgot-password":
+        return <ForgotPasswordPage onBack={() => setCurrentPage("dashboard")} />;
       default:
         return (
           <div className="p-8">

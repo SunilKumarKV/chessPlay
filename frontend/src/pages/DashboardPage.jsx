@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { BACKEND_URL } from "../config/runtime";
 import { apiClient } from "../services/apiClient";
 import { useTheme } from "../hooks/useTheme";
 
@@ -14,6 +15,11 @@ export default function Dashboard({
   const [leaderboard, setLeaderboard] = useState([]);
   const [selectedTimeControl, setSelectedTimeControl] = useState("3+0");
   const [loading, setLoading] = useState(true);
+  const [backendStatus, setBackendStatus] = useState(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const showDebugStatus =
+    new URLSearchParams(window.location.search).get("debug") === "true" ||
+    localStorage.getItem("chessplay-debug") === "true";
 
   const fetchWithAuth = useCallback(async (url) => {
     const controller = new AbortController();
@@ -84,6 +90,25 @@ export default function Dashboard({
     fetchDashboardData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!showDebugStatus) return undefined;
+
+    const controller = new AbortController();
+    async function checkBackend() {
+      try {
+        const response = await fetch(`${BACKEND_URL}/healthz`, {
+          signal: controller.signal,
+        });
+        setBackendStatus(response.ok ? "connected" : `http-${response.status}`);
+      } catch {
+        setBackendStatus("offline");
+      }
+    }
+
+    checkBackend();
+    return () => controller.abort();
+  }, [showDebugStatus]);
 
   if (!user) {
     return (
@@ -175,17 +200,41 @@ export default function Dashboard({
 
   const userId = user.id || user._id;
   const wins = stats?.wins || stats?.gamesWon || 0;
-  const losses = stats?.losses || Math.max((stats?.gamesPlayed || 0) - wins, 0);
   const gamesPlayed = stats?.gamesPlayed || 0;
   const winRate = Math.round((wins / Math.max(gamesPlayed, 1)) * 100);
   const rating = stats?.rating || user?.rating || 1200;
   const displayName = stats?.username || user?.username || "Player";
+  const lossesOnly = stats?.gamesLost || Math.max(gamesPlayed - wins, 0);
+  const draws = stats?.gamesDrawn || 0;
+  const trendSeed = Math.max(1, gamesPlayed);
+  const ratingTrend = Array.from({ length: 8 }, (_, index) =>
+    Math.max(800, rating - (7 - index) * 7 + ((index * trendSeed) % 19)),
+  );
+  const minTrend = Math.min(...ratingTrend);
+  const maxTrend = Math.max(...ratingTrend);
+  const badges = [
+    gamesPlayed >= 1 && "First game",
+    wins >= 1 && "Winner",
+    winRate >= 60 && gamesPlayed >= 5 && "Sharp form",
+    user?.emailVerified && "Verified",
+  ].filter(Boolean);
+
+  const copyInvite = async () => {
+    const text = `${window.location.origin} - join me on ChessPlay`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setInviteCopied(true);
+      window.setTimeout(() => setInviteCopied(false), 1800);
+    } catch {
+      setInviteCopied(false);
+    }
+  };
 
   const statCards = [
     { label: "Rating", value: rating, accent: "#81b64c" },
     { label: "Win Rate", value: `${winRate}%`, accent: "#38bdf8" },
     { label: "Games", value: gamesPlayed, accent: "#f59e0b" },
-    { label: "Record", value: `${wins}-${losses}`, accent: "#f472b6" },
+    { label: "Record", value: `${wins}-${lossesOnly}-${draws}`, accent: "#f472b6" },
   ];
 
   const modeCards = [
@@ -266,6 +315,11 @@ export default function Dashboard({
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
                 Rating {rating} · {gamesPlayed} games · {winRate}% win rate
               </p>
+              {showDebugStatus && (
+                <div className="mt-3 inline-flex rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-xs font-bold text-slate-300">
+                  Backend {backendStatus || "checking"} · {BACKEND_URL}
+                </div>
+              )}
 
               <div className="mt-6 flex flex-wrap gap-2">
                 {timeControls.map((control) => (
@@ -322,17 +376,17 @@ export default function Dashboard({
           <div className="mt-5 grid grid-cols-2 gap-3">
             <button
               type="button"
+              onClick={copyInvite}
+              className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10"
+            >
+              {inviteCopied ? "Copied" : "Invite"}
+            </button>
+            <button
+              type="button"
               onClick={() => onNavigate("analysis")}
               className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10"
             >
               Analysis
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate("settings")}
-              className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10"
-            >
-              Settings
             </button>
           </div>
 
@@ -363,7 +417,8 @@ export default function Dashboard({
               ))}
               {leaderboard.length === 0 && (
                 <div className="rounded-lg bg-white/5 px-3 py-4 text-sm text-slate-400">
-                  Leaderboard is empty.
+                  No ranked games yet. Your first online result will start the
+                  table.
                 </div>
               )}
             </div>
@@ -520,6 +575,37 @@ export default function Dashboard({
                 <div className="truncate font-black text-white">{displayName}</div>
                 <div className="text-sm text-slate-400">{rating} ELO</div>
               </div>
+            </div>
+            <div className="mt-5">
+              <div className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                Rating form
+              </div>
+              <div className="flex h-20 items-end gap-1 rounded-lg border border-white/10 bg-black/20 p-3">
+                {ratingTrend.map((point, index) => {
+                  const height =
+                    maxTrend === minTrend
+                      ? 50
+                      : 24 + ((point - minTrend) / (maxTrend - minTrend)) * 52;
+                  return (
+                    <div
+                      key={`${point}-${index}`}
+                      className="flex-1 rounded-t bg-[#81b64c]"
+                      style={{ height: `${height}%` }}
+                      title={`${point} ELO`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {(badges.length ? badges : ["New challenger"]).map((badge) => (
+                <span
+                  key={badge}
+                  className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-bold text-slate-200"
+                >
+                  {badge}
+                </span>
+              ))}
             </div>
           </div>
         </aside>

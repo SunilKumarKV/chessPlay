@@ -1,26 +1,22 @@
-const jwt = require("jsonwebtoken");
-
-function getCookie(req, name) {
-  return String(req.headers.cookie || "")
-    .split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${name}=`))
-    ?.slice(name.length + 1);
-}
+const jwt = require('jsonwebtoken');
+const { getCookie, getJwtSecret } = require('../utils/security');
 
 const auth = (req, res, next) => {
   try {
-    const token = getCookie(req, "authToken");
+    const token = getCookie(req, "accessToken") || getCookie(req, "authToken");
 
     if (!token) {
-      return res.status(401).json({ message: "No token provided" });
+      return res.status(401).json({ message: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret('access'));
+    if (decoded.type && decoded.type !== 'access') {
+      return res.status(401).json({ message: 'Invalid token type' });
+    }
     req.user = decoded;
     next();
   } catch (error) {
-    res.status(401).json({ message: "Invalid token" });
+    res.status(401).json({ message: 'Invalid or expired token' });
   }
 };
 

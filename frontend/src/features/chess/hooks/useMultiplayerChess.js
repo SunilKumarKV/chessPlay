@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { io } from "socket.io-client";
+import { SOCKET_URL } from "../../../config/runtime";
 import { useSoundEffects } from "./useSoundEffects";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 const STORED_ROOM_ID_KEY = "chessPlay.roomId";
 const STORED_PLAYER_COLOR_KEY = "chessPlay.playerColor";
 const DRAW_STATUSES = new Set([
@@ -60,7 +60,7 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
 
   useEffect(() => {
     const targetUrl =
-      serverUrl || BACKEND_URL || `http://${window.location.hostname}:3001`;
+      serverUrl || SOCKET_URL || `http://${window.location.hostname}:3001`;
     const newSocket = io(targetUrl, {
       transports: ["polling", "websocket"],
       reconnectionAttempts: 5,

@@ -6,8 +6,9 @@ import {
   BOARD_THEME_STORAGE_KEY,
   normalizeBoardThemeId,
 } from "../features/chess/constants/boardThemes";
+import { BACKEND_URL } from "../config/runtime";
 
-const API_BASE = `${import.meta.env.VITE_BACKEND_URL || "http://localhost:3001"}/api`;
+const API_BASE = `${BACKEND_URL}/api`;
 
 // Default settings
 const DEFAULT_SETTINGS = {
