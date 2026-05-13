@@ -87,11 +87,11 @@ export default function Board(props) {
 
   const handleSquareClick = useCallback(
     (row, col) => {
-      if (gameState.isGameOver || gameState.aiThinking) return;
-      if (isExternalBoard && externalOnSquareClick) {
-        externalOnSquareClick(row, col);
+      if (isExternalBoard) {
+        externalOnSquareClick?.(row, col);
         return;
       }
+      if (gameState.isGameOver || gameState.aiThinking) return;
 
       const square = coordsToSquare(row, col);
       const piece = board[row][col];

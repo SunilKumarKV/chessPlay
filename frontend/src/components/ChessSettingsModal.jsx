@@ -18,6 +18,7 @@ import {
   resetSettings,
 } from "../store/slices/chessSettingsSlice";
 import { soundManager } from "../utils/sounds/soundManager";
+import { SOUND_THEMES, canUseSoundTheme } from "../utils/sounds/soundThemes";
 import { saveSettings } from "../utils/settingsPersistence";
 import { BOARD_THEME_OPTIONS } from "../features/chess/constants/boardThemes";
 
@@ -26,6 +27,10 @@ const ChessSettingsModal = ({ isOpen, onClose }) => {
   const settings = useAppSelector((state) => state.chessSettings);
 
   const [activeTab, setActiveTab] = useState("board");
+  const [premiumPrompt, setPremiumPrompt] = useState("");
+  const currentUser = (() => {
+    try { return JSON.parse(localStorage.getItem("user") || "null"); } catch { return null; }
+  })();
 
   // Save settings while the modal is in active use. This avoids overwriting
   // stored settings from a closed modal during initial app mount.
@@ -56,7 +61,7 @@ const ChessSettingsModal = ({ isOpen, onClose }) => {
   };
 
   const playTestSound = () => {
-    soundManager.playMove();
+    soundManager.preview(settings.soundTheme);
   };
 
   return (
@@ -320,18 +325,54 @@ const ChessSettingsModal = ({ isOpen, onClose }) => {
                     <label className="mb-1 block text-sm text-[#d9c8a5]">
                       Sound Theme
                     </label>
-                    <select
-                      value={settings.soundTheme}
-                      onChange={(e) => {
-                        dispatch(setSoundTheme(e.target.value));
-                        soundManager.setTheme(e.target.value);
-                      }}
-                      className="w-full rounded border border-white/10 bg-[#181614] px-3 py-2 text-sm text-[#efe5cf]"
-                    >
-                      <option value="default">Default</option>
-                      <option value="classic">Classic</option>
-                      <option value="modern">Modern</option>
-                    </select>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {Object.values(SOUND_THEMES).map((theme) => {
+                        const locked = !canUseSoundTheme(theme.id, currentUser);
+                        const active = settings.soundTheme === theme.id;
+                        return (
+                          <button
+                            key={theme.id}
+                            type="button"
+                            onClick={() => {
+                              if (locked) {
+                                setPremiumPrompt(`${theme.label} sound is a premium supporter sound. Upgrade to unlock tournament, luxury, neon, and cyber sound packs.`);
+                                return;
+                              }
+                              dispatch(setSoundTheme(theme.id));
+                              soundManager.setTheme(theme.id);
+                              soundManager.preview(theme.id);
+                            }}
+                            className={`rounded-lg border p-3 text-left transition ${
+                              active
+                                ? "border-[#c9a45c] bg-[#c9a45c]/15"
+                                : "border-white/10 bg-white/5 hover:bg-white/10"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-bold">{theme.label}</span>
+                              {theme.premium ? (
+                                <span className="rounded-full bg-[#c9a45c]/20 px-2 py-0.5 text-[10px] font-black text-[#f3d18a]">PRO</span>
+                              ) : (
+                                <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-[10px] font-black text-emerald-200">FREE</span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-xs text-[#d9c8a5]">{theme.note}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {premiumPrompt && (
+                      <div className="mt-3 rounded-lg border border-[#c9a45c]/30 bg-[#c9a45c]/10 p-3 text-sm text-[#f3e6c8]">
+                        <p>{premiumPrompt}</p>
+                        <button
+                          type="button"
+                          onClick={() => { window.location.hash = "pricing"; }}
+                          className="mt-2 rounded bg-[#c9a45c] px-3 py-1.5 text-xs font-black text-[#1d1b19]"
+                        >
+                          View supporter plans
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div>

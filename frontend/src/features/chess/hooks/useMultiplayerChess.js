@@ -62,24 +62,36 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
     let isMounted = true;
     let newSocket = null;
 
-    async function fetchSocketToken() {
+    async function fetchSocketToken({ forceRefresh = false } = {}) {
       const storedToken = sessionStorage.getItem("chessplay_socket_token");
-      if (storedToken) return storedToken;
+      if (storedToken && !forceRefresh) return storedToken;
 
-      try {
+      async function requestSocketToken() {
         const response = await fetch(`${BACKEND_URL}/api/auth/socket-token`, {
           credentials: "include",
         });
         const data = await response.json().catch(() => ({}));
-        if (response.ok && data.socketToken) {
+        if (!response.ok) throw new Error(data.message || "Socket token unavailable");
+        if (data.socketToken) {
           sessionStorage.setItem("chessplay_socket_token", data.socketToken);
           return data.socketToken;
         }
-      } catch {
-        // Keep cookie-only auth as the fallback.
+        return "";
       }
 
-      return "";
+      try {
+        return await requestSocketToken();
+      } catch {
+        try {
+          await fetch(`${BACKEND_URL}/api/auth/refresh`, {
+            method: "POST",
+            credentials: "include",
+          });
+          return await requestSocketToken();
+        } catch {
+          return "";
+        }
+      }
     }
 
     async function connectSocket() {
@@ -90,8 +102,13 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
 
       newSocket = io(targetUrl, {
         transports: ["websocket", "polling"],
-        reconnectionAttempts: 5,
-        timeout: 8000,
+        upgrade: true,
+        rememberUpgrade: false,
+        reconnection: true,
+        reconnectionAttempts: 8,
+        reconnectionDelay: 800,
+        reconnectionDelayMax: 4000,
+        timeout: 12000,
         withCredentials: true,
         auth: socketToken ? { accessToken: socketToken } : undefined,
       });
@@ -110,20 +127,37 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
       }
     });
 
-    newSocket.on("disconnect", () => {
+    newSocket.on("disconnect", (reason) => {
       setIsConnected(false);
+      if (reason !== "io client disconnect") {
+        setError("Connection lost. Refresh and retry.");
+      }
     });
 
-      newSocket.on("connect_error", (err) => {
+      newSocket.on("connect_error", async (err) => {
         const message = err.message || "Unable to connect to multiplayer server";
-        if (/auth|token|session/i.test(message)) {
+        if (/auth|token|session|jwt/i.test(message)) {
           sessionStorage.removeItem("chessplay_socket_token");
-          setError("Please login again to play multiplayer.");
+          const freshToken = await fetchSocketToken({ forceRefresh: true });
+          if (freshToken && newSocket) {
+            newSocket.auth = { accessToken: freshToken };
+            setError("Session refreshed. Reconnecting to multiplayer...");
+            newSocket.connect();
+            return;
+          }
+          setError("Connection lost. Refresh and retry.");
         } else {
-          setError(message);
+          setError("Connection lost. Refresh and retry.");
         }
         console.error("Socket.IO connect_error:", err);
       });
+
+      newSocket.io.on("reconnect_attempt", async () => {
+        const freshToken = await fetchSocketToken({ forceRefresh: true });
+        if (freshToken && newSocket) newSocket.auth = { accessToken: freshToken };
+      });
+
+      newSocket.on("pong", () => setError(null));
 
     newSocket.on("roomCreated", (data) => {
       updateRoomId(data.roomId);
