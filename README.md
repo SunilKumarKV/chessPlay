@@ -123,7 +123,7 @@ find backend -path backend/node_modules -prune -o -name '*.js' -exec node -c {} 
 - Set `VITE_BACKEND_URL` in the frontend environment to the deployed backend URL.
 - Set `VITE_SOCKET_URL` in the frontend environment to the deployed backend URL.
 - Set `FRONTEND_ORIGINS` on the backend to the deployed frontend origin.
-- Current production values: Vercel should use `VITE_BACKEND_URL=https://chessplay-b5ve.onrender.com` and `VITE_SOCKET_URL=https://chessplay-b5ve.onrender.com`; Render should use `FRONTEND_ORIGINS=https://getchessplay.vercel.app`.
+- Current production values: Vercel should use `VITE_BACKEND_URL=https://yourrenderlink.onrender.com` and `VITE_SOCKET_URL=https://yourrenderlink.onrender.com`; Render should use `FRONTEND_ORIGINS=https://yourdomain.com`.
 - Use MongoDB Atlas or another production MongoDB instance.
 - Use a real `JWT_SECRET` with at least 32 characters. The server refuses known placeholder secrets.
 - Leave `COOKIE_DOMAIN` empty for Render + Vercel unless both services are behind a shared custom parent domain.
