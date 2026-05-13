@@ -27,6 +27,7 @@ export default function Sidebar({
         { id: "analysis", label: "Analysis", icon: "∑" },
         { id: "pricing", label: "Support / Pricing", icon: "₹" },
         { id: "billing", label: "Billing", icon: "◈" },
+        { id: "help", label: "How it works", icon: "?" },
         { id: "leaderboard", label: "Leaderboard", icon: "★" },
         { id: "settings", label: "Settings", icon: "⚙" },
       ],

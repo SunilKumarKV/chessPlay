@@ -20,6 +20,7 @@ import ChessClock from "../components/ChessClock";
 import MoveHistory from "../components/MoveHistory";
 import ChessSettingsModal from "../../../components/ChessSettingsModal";
 import EvaluationBar from "../../../components/EvaluationBar";
+import MatchResultModal from "../../../components/MatchResultModal";
 import { useStockfish } from "../hooks/useStockfish";
 import { soundManager } from "../../../utils/sounds/soundManager";
 import { loadSettings } from "../../../utils/settingsPersistence";
@@ -49,6 +50,7 @@ export default function Chess({
   const settings = useAppSelector((state) => state.chessSettings);
 
   const [showSettings, setShowSettings] = useState(false);
+  const [resultPopupSeenFen, setResultPopupSeenFen] = useState(null);
   const humanColor = gameState.aiColor === "w" ? "b" : "w";
   const isHumanTurn =
     !gameState.isGameOver && gameState.game.turn() === humanColor;
@@ -212,6 +214,19 @@ export default function Chess({
     stockfish.evaluation?.type === "cp" ? stockfish.evaluation.value * 100 : null,
   );
 
+  const isWinForHuman = gameState.isGameOver && (gameState.result === "resigned" || gameState.result === "checkmate") && gameState.game.turn() === gameState.aiColor;
+  const resultType = gameState.result === "draw" || gameState.result === "stalemate" ? "draw" : isWinForHuman ? "win" : "loss";
+  const showResultPopup = gameState.isGameOver && resultPopupSeenFen !== gameState.fen;
+  const closeResultPopup = () => setResultPopupSeenFen(gameState.fen);
+  const shareResult = async () => {
+    const text = `I just played ChessPlay: ${resultType === "win" ? "Victory" : resultType === "draw" ? "Draw" : "Game over"} against ${opponentName}.`;
+    if (navigator.share) {
+      await navigator.share({ title: "ChessPlay result", text, url: window.location.origin }).catch(() => {});
+    } else {
+      await navigator.clipboard?.writeText(text);
+    }
+  };
+
   const statusLabel = gameState.isGameOver
     ? gameState.result === "checkmate"
       ? "Checkmate"
@@ -230,6 +245,16 @@ export default function Chess({
 
   return (
     <div className="relative min-h-full w-full p-4 text-white md:p-6 xl:p-8">
+      <MatchResultModal
+        open={showResultPopup}
+        result={resultType}
+        title={resultType === "win" ? "You won the match!" : resultType === "draw" ? "Draw game" : "Match finished"}
+        subtitle={`${statusLabel} · ${gameState.history.length} moves played.`}
+        onClose={closeResultPopup}
+        onRematch={() => { closeResultPopup(); handleNewGame(); }}
+        onReview={() => { closeResultPopup(); }}
+        onShare={shareResult}
+      />
       <div className="mx-auto grid w-full max-w-7xl gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="space-y-4">
           <header className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/10 p-4 shadow-xl shadow-black/20 backdrop-blur-xl md:flex-row md:items-center md:justify-between">

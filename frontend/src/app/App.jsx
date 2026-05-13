@@ -24,6 +24,7 @@ import VerifyEmailPage from "../pages/VerifyEmailPage";
 import PricingPage from "../pages/billing/PricingPage";
 import BillingPage from "../pages/billing/BillingPage";
 import AdminSupportersPage from "../pages/billing/AdminSupportersPage";
+import HelpCenterPage from "../pages/HelpCenterPage";
 
 function pageFromPathname(pathname) {
   if (pathname === "/reset-password") return "reset-password";
@@ -248,6 +249,8 @@ export default function App() {
         return (
           <AdminSupportersPage onBack={() => setCurrentPage("billing")} />
         );
+      case "help":
+        return <HelpCenterPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
       case "puzzles":
         return (
           <ComingSoonPage

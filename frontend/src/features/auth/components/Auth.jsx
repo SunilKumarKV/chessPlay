@@ -231,20 +231,23 @@ export default function Auth({
   };
 
   const formContent = (
-    <div className="space-y-5">
-      <div className="text-center">
-        <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-lg bg-[#c9a45c] text-2xl text-[#171512]">
+    <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/20 backdrop-blur-2xl space-y-5">
+      <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[#81b64c]/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-20 -left-16 h-44 w-44 rounded-full bg-amber-300/10 blur-3xl" />
+      <div className="relative text-center">
+        <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-[#81b64c] text-3xl text-[#07100a] shadow-lg shadow-[#81b64c]/20">
           ♟
         </div>
-        <h2 className="text-2xl font-semibold">
+        <div className="mb-2 inline-flex rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-200">Premium secure access</div>
+        <h2 className="text-2xl font-black text-white">
           {isLogin ? "Welcome back" : "Create your account"}
         </h2>
-        <p className="mt-1 text-sm text-gray-400">
-          Login security is required for multiplayer, friends, messages, and game history.
+        <p className="mt-2 text-sm leading-6 text-slate-400">
+          Login security is required for multiplayer, friends, messages, game history and supporter features.
         </p>
       </div>
 
-      <div className="grid gap-2">
+      <div className="relative grid gap-2">
         {GOOGLE_CLIENT_ID && !GOOGLE_AUTH_URL ? (
           <div className="min-h-11 w-full overflow-hidden rounded-lg bg-white">
             <div ref={googleButtonRef} className="w-full" />
@@ -253,7 +256,7 @@ export default function Auth({
           <button
             type="button"
             onClick={() => handleSocialLogin("google")}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-100"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white px-4 py-3 text-sm font-black text-gray-900 hover:bg-gray-100"
           >
             <span className="text-base font-bold">G</span>
             Continue with Google
@@ -262,7 +265,7 @@ export default function Auth({
         <button
           type="button"
           onClick={() => handleSocialLogin("facebook")}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#1877f2] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#166fe5]"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1877f2] px-4 py-3 text-sm font-black text-white hover:bg-[#166fe5]"
         >
           <span className="text-base font-bold">f</span>
           Continue with Facebook
@@ -273,7 +276,7 @@ export default function Auth({
             setShowEmailForm((value) => !value);
             setError("");
           }}
-          className="w-full rounded-lg border border-[#c9a45c]/40 bg-[#c9a45c]/10 px-4 py-2.5 text-sm font-semibold text-[#f5d78e] hover:bg-[#c9a45c]/20"
+          className="w-full rounded-xl border border-[#81b64c]/40 bg-[#81b64c]/10 px-4 py-3 text-sm font-black text-[#a8e36f] hover:bg-[#81b64c]/20"
         >
           Continue with email
         </button>
@@ -325,12 +328,12 @@ export default function Auth({
       )}
 
       {error && (
-        <div className="text-red-300 text-sm text-center bg-red-900/20 border border-red-800 rounded-lg p-3">
+        <div className="relative text-red-300 text-sm text-center bg-red-900/20 border border-red-800 rounded-lg p-3">
           {error}
         </div>
       )}
 
-      <div className="mt-6 text-center">
+      <div className="relative mt-6 text-center">
         <button
           onClick={handleToggleMode}
           className="text-blue-400 hover:text-blue-300 text-sm transition-colors"
