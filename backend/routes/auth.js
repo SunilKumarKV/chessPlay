@@ -90,6 +90,15 @@ async function issueSession(res, user) {
   await issueSecureSession(res, user);
 }
 
+function buildAuthResponse(message, user) {
+  return {
+    message,
+    user: authUserPayload(user),
+    // Short-lived token used only for Socket.IO handshake fallback when cross-site cookies are blocked.
+    socketToken: signAccessToken(user),
+  };
+}
+
 
 async function buildUniqueUsername(seed) {
   const base =
@@ -251,10 +260,7 @@ router.post("/register", authLimiter, async (req, res) => {
 
     await issueSession(res, user);
 
-    res.status(201).json({
-      message: "User created successfully",
-      user: authUserPayload(user),
-    });
+    res.status(201).json(buildAuthResponse("User created successfully", user));
   } catch (error) {
     console.error("Registration error:", error);
     res.status(500).json({ message: "Server error" });
@@ -285,10 +291,7 @@ router.post("/login", authLimiter, async (req, res) => {
 
     await issueSession(res, user);
 
-    res.json({
-      message: "Login successful",
-      user: authUserPayload(user),
-    });
+    res.json(buildAuthResponse("Login successful", user));
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ message: "Server error" });
@@ -304,10 +307,11 @@ router.post("/google", authLimiter, async (req, res) => {
     }
 
     const profile = await verifyGoogleCredential(credential);
-    const email = String(profile.email || "").toLowerCase();
-    if (!email) {
-      return res.status(400).json({ message: "Google account has no email" });
+    const emailValidation = validateProductionEmail(profile.email);
+    if (!emailValidation.ok) {
+      return res.status(400).json({ message: emailValidation.message });
     }
+    const email = emailValidation.email;
 
     let user = await User.findOne({ email });
     if (!user) {
@@ -325,10 +329,7 @@ router.post("/google", authLimiter, async (req, res) => {
     await user.save();
     await issueSession(res, user);
 
-    res.json({
-      message: "Google login successful",
-      user: authUserPayload(user),
-    });
+    res.json(buildAuthResponse("Google login successful", user));
   } catch (error) {
     console.error("Google login error:", error.message);
     res.status(401).json({ message: error.message || "Google login failed" });
@@ -364,6 +365,23 @@ router.get("/session", async (req, res) => {
 });
 
 
+// Short-lived Socket.IO handshake token. Keeps JWT out of long-term storage while
+// supporting browsers that block cross-site cookies on websocket upgrades.
+router.get("/socket-token", auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user || user.deletedAt) {
+      clearSessionCookies(res);
+      return res.status(401).json({ message: "Invalid session" });
+    }
+
+    res.json({ socketToken: signAccessToken(user) });
+  } catch (error) {
+    res.status(401).json({ message: "Unable to create socket token" });
+  }
+});
+
+
 // Refresh access token using a HttpOnly refresh cookie
 router.post("/refresh", async (req, res) => {
   try {
@@ -394,7 +412,7 @@ router.post("/refresh", async (req, res) => {
     const accessToken = signAccessToken(user);
     res.cookie("accessToken", accessToken, cookieOptions());
     res.cookie("authToken", accessToken, cookieOptions());
-    res.json({ user: authUserPayload(user) });
+    res.json(buildAuthResponse("Session refreshed", user));
   } catch (error) {
     clearSessionCookies(res);
     res.status(401).json({ message: "Invalid or expired refresh token" });

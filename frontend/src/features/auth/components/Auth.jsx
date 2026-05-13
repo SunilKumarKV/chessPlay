@@ -87,6 +87,7 @@ export default function Auth({
 
       localStorage.removeItem("token");
       localStorage.setItem("user", JSON.stringify(data.user));
+      if (data.socketToken) sessionStorage.setItem("chessplay_socket_token", data.socketToken);
 
       onLogin(data.user);
     } catch (error) {
@@ -139,6 +140,7 @@ export default function Auth({
 
         localStorage.removeItem("token");
         localStorage.setItem("user", JSON.stringify(data.user));
+      if (data.socketToken) sessionStorage.setItem("chessplay_socket_token", data.socketToken);
         onLogin(data.user);
       } catch (error) {
         setError(error.message);

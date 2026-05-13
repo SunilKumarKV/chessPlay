@@ -222,3 +222,42 @@ body {
 * {
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
+
+/* Light-theme contrast guard for legacy dark Tailwind utility classes.
+   Keeps text readable on pages/components that still use hardcoded gray/white classes. */
+html[data-theme="light"] .text-white,
+html[data-theme="newspaper"] .text-white {
+  color: var(--color-text-primary) !important;
+}
+
+html[data-theme="light"] .text-gray-100,
+html[data-theme="light"] .text-gray-200,
+html[data-theme="light"] .text-gray-300,
+html[data-theme="light"] .text-gray-400,
+html[data-theme="newspaper"] .text-gray-100,
+html[data-theme="newspaper"] .text-gray-200,
+html[data-theme="newspaper"] .text-gray-300,
+html[data-theme="newspaper"] .text-gray-400 {
+  color: var(--color-text-secondary) !important;
+}
+
+html[data-theme="light"] .bg-gray-900,
+html[data-theme="newspaper"] .bg-gray-900 {
+  background-color: var(--color-bg-primary) !important;
+}
+
+html[data-theme="light"] .bg-gray-800,
+html[data-theme="light"] .bg-gray-700,
+html[data-theme="light"] .bg-gray-700\/60,
+html[data-theme="newspaper"] .bg-gray-800,
+html[data-theme="newspaper"] .bg-gray-700,
+html[data-theme="newspaper"] .bg-gray-700\/60 {
+  background-color: var(--color-bg-secondary) !important;
+}
+
+html[data-theme="light"] .border-gray-700,
+html[data-theme="light"] .border-gray-600,
+html[data-theme="newspaper"] .border-gray-700,
+html[data-theme="newspaper"] .border-gray-600 {
+  border-color: var(--color-border-primary) !important;
+}

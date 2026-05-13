@@ -7,7 +7,10 @@ const BLOCKED_EMAIL_DOMAINS = new Set([
 ]);
 
 function parseCsvEnv(value) {
-  return String(value || '').split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase().replace(/^@+/, ''))
+    .filter(Boolean);
 }
 
 function normalizeEmail(email) {
@@ -25,7 +28,10 @@ function validateProductionEmail(email) {
   }
   const allowedDomains = parseCsvEnv(process.env.AUTH_ALLOWED_EMAIL_DOMAINS);
   if (allowedDomains.length && !allowedDomains.includes(domain)) {
-    return { ok: false, message: `Only authorized email domains are allowed: ${allowedDomains.join(', ')}` };
+    return {
+      ok: false,
+      message: `Only authorized email domains are allowed: ${allowedDomains.map((item) => '@' + item).join(', ')}`
+    };
   }
   return { ok: true, email: normalized, domain };
 }

@@ -9,9 +9,7 @@ export default function MultiplayerChess({ onBack }) {
   const { user } = useCurrentUser();
   const [playerName, setPlayerName] = useState("");
   const [roomCode, setRoomCode] = useState("");
-  const [serverUrl, setServerUrl] = useState(
-    SOCKET_URL || BACKEND_URL,
-  );
+  const [serverUrl] = useState(SOCKET_URL || BACKEND_URL);
   const [selectedTimeControlIndex, setSelectedTimeControlIndex] = useState(3);
   const [connectionCheck, setConnectionCheck] = useState(null);
 
@@ -150,34 +148,25 @@ export default function MultiplayerChess({ onBack }) {
 
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <h3 className="text-lg font-semibold mb-4 text-blue-400">
-                Server Connection
+                Multiplayer Server
               </h3>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-300">
-                    Server URL
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="http://192.168.1.100:3001"
-                    value={serverUrl}
-                    onChange={(e) => setServerUrl(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-                  />
-                </div>
+                <p className="text-sm text-gray-400">
+                  Server URL is loaded from environment variables and hidden from players in production.
+                </p>
                 <button
                   onClick={testServerConnection}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                 >
-                  Test Connection
+                  Test Server
                 </button>
                 <div className="text-center">
                   <div
                     className={`text-sm ${isConnected ? "text-green-400" : "text-red-400"}`}
                   >
                     {isConnected
-                      ? "🟢 Connected to server"
-                      : "🔴 Connecting to server..."}
+                      ? "🟢 Connected to multiplayer server"
+                      : "🔴 Connecting to multiplayer server..."}
                   </div>
                   {error && (
                     <div className="text-red-400 text-sm mt-2">{error}</div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { io } from "socket.io-client";
-import { SOCKET_URL } from "../../../config/runtime";
+import { BACKEND_URL, SOCKET_URL } from "../../../config/runtime";
 import { useSoundEffects } from "./useSoundEffects";
 
 const STORED_ROOM_ID_KEY = "chessPlay.roomId";
@@ -59,15 +59,43 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
   };
 
   useEffect(() => {
-    const targetUrl =
-      serverUrl || SOCKET_URL || `http://${window.location.hostname}:3001`;
-    const newSocket = io(targetUrl, {
-      transports: ["polling", "websocket"],
-      reconnectionAttempts: 5,
-      timeout: 5000,
-      withCredentials: true,
-    });
-    socketRef.current = newSocket;
+    let isMounted = true;
+    let newSocket = null;
+
+    async function fetchSocketToken() {
+      const storedToken = sessionStorage.getItem("chessplay_socket_token");
+      if (storedToken) return storedToken;
+
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/socket-token`, {
+          credentials: "include",
+        });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && data.socketToken) {
+          sessionStorage.setItem("chessplay_socket_token", data.socketToken);
+          return data.socketToken;
+        }
+      } catch {
+        // Keep cookie-only auth as the fallback.
+      }
+
+      return "";
+    }
+
+    async function connectSocket() {
+      const targetUrl =
+        serverUrl || SOCKET_URL || `http://${window.location.hostname}:3001`;
+      const socketToken = await fetchSocketToken();
+      if (!isMounted) return;
+
+      newSocket = io(targetUrl, {
+        transports: ["websocket", "polling"],
+        reconnectionAttempts: 5,
+        timeout: 8000,
+        withCredentials: true,
+        auth: socketToken ? { accessToken: socketToken } : undefined,
+      });
+      socketRef.current = newSocket;
 
     newSocket.on("connect", () => {
       setIsConnected(true);
@@ -86,10 +114,16 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
       setIsConnected(false);
     });
 
-    newSocket.on("connect_error", (err) => {
-      setError(err.message || "Unable to connect to server");
-      console.error("Socket.IO connect_error:", err);
-    });
+      newSocket.on("connect_error", (err) => {
+        const message = err.message || "Unable to connect to multiplayer server";
+        if (/auth|token|session/i.test(message)) {
+          sessionStorage.removeItem("chessplay_socket_token");
+          setError("Please login again to play multiplayer.");
+        } else {
+          setError(message);
+        }
+        console.error("Socket.IO connect_error:", err);
+      });
 
     newSocket.on("roomCreated", (data) => {
       updateRoomId(data.roomId);
@@ -325,8 +359,13 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
       setChatMessages(history || []);
     });
 
+    }
+
+    connectSocket();
+
     return () => {
-      newSocket.close();
+      isMounted = false;
+      newSocket?.close();
       socketRef.current = null;
     };
   }, [serverUrl]);
