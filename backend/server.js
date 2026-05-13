@@ -122,7 +122,7 @@ function isAllowedOrigin(origin) {
 
 function corsOriginForRequest(req, origin, callback) {
   if (!origin) {
-    return callback(null, !isProduction || req.path === "/health");
+    return callback(null, !isProduction || req.path === "/health" || req.path === "/healthz");
   }
 
   if (isAllowedOrigin(origin)) {
@@ -148,7 +148,7 @@ function enforceProductionOrigin(req, res, next) {
 
   const origin = req.headers.origin;
   if (!origin) {
-    if (req.path === "/health") return next();
+    if (req.path === "/health" || req.path === "/healthz") return next();
     return res.status(403).json({ message: "Origin is required" });
   }
 
@@ -317,6 +317,14 @@ app.get("/health", (req, res) => {
     status: "ok",
     rooms: rooms.size,
     players: players.size,
+  });
+});
+
+// Public platform health check for hosts that cannot attach secret headers.
+app.get("/healthz", (req, res) => {
+  res.json({
+    status: "ok",
+    service: "chessplay-backend",
   });
 });
 

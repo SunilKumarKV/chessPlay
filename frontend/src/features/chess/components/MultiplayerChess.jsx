@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMultiplayerChess } from "../hooks/useMultiplayerChess";
 import { TIME_CONTROLS } from "../hooks/useChessClock";
 import { useCurrentUser } from "../../../hooks/useCurrentUser";
+import { BACKEND_URL, SOCKET_URL } from "../../../config/runtime";
 import MultiplayerGameScreen from "./MultiplayerGameScreen";
 
 export default function MultiplayerChess({ onBack }) {
@@ -9,7 +10,7 @@ export default function MultiplayerChess({ onBack }) {
   const [playerName, setPlayerName] = useState("");
   const [roomCode, setRoomCode] = useState("");
   const [serverUrl, setServerUrl] = useState(
-    import.meta.env.VITE_BACKEND_URL || "http://localhost:3001",
+    SOCKET_URL || BACKEND_URL,
   );
   const [selectedTimeControlIndex, setSelectedTimeControlIndex] = useState(3);
   const [connectionCheck, setConnectionCheck] = useState(null);
@@ -62,7 +63,7 @@ export default function MultiplayerChess({ onBack }) {
     setConnectionCheck({ tone: "info", message: "Checking server..." });
 
     try {
-      const response = await fetch(`${serverUrl}/health`);
+      const response = await fetch(`${serverUrl}/healthz`);
       if (!response.ok) {
         throw new Error(`Health check returned ${response.status}`);
       }

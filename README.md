@@ -93,6 +93,7 @@ Default local URLs:
 - Frontend: `http://localhost:5173`
 - Backend: `http://localhost:3001`
 - Health check: `http://localhost:3001/health`
+- Public host health check: `http://localhost:3001/healthz`
 
 ## Quality Checks
 
@@ -120,9 +121,12 @@ find backend -path backend/node_modules -prune -o -name '*.js' -exec node -c {} 
 - Deploy `frontend/dist` to a static host such as Vercel or Netlify.
 - Deploy `backend` to a Node host such as Render, Railway, or Fly.io.
 - Set `VITE_BACKEND_URL` in the frontend environment to the deployed backend URL.
+- Set `VITE_SOCKET_URL` in the frontend environment to the deployed backend URL.
 - Set `FRONTEND_ORIGINS` on the backend to the deployed frontend origin.
+- Current production values: Vercel should use `VITE_BACKEND_URL=https://chessplay-b5ve.onrender.com` and `VITE_SOCKET_URL=https://chessplay-b5ve.onrender.com`; Render should use `FRONTEND_ORIGINS=https://getchessplay.vercel.app`.
 - Use MongoDB Atlas or another production MongoDB instance.
 - Use a real `JWT_SECRET` with at least 32 characters. The server refuses known placeholder secrets.
+- Leave `COOKIE_DOMAIN` empty for Render + Vercel unless both services are behind a shared custom parent domain.
 - In production, auth cookies are Secure and SameSite=None, so frontend-to-backend calls must use HTTPS.
 - If Google Sign-In is enabled, configure the same client ID as `VITE_GOOGLE_CLIENT_ID` on the frontend and `GOOGLE_CLIENT_ID` on the backend.
 

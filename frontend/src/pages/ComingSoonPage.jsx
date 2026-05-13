@@ -22,6 +22,64 @@ const FEATURE_COPY = {
 
 export default function ComingSoonPage({ feature = "feature", onBack, onPlay }) {
   const { theme } = useTheme();
+  if (feature === "puzzles") {
+    const puzzleBoard = [
+      ["", "", "", "", "k", "", "", "r"],
+      ["", "", "", "", "", "p", "p", "p"],
+      ["", "", "", "", "", "", "", ""],
+      ["", "", "", "", "Q", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+      ["P", "P", "P", "", "", "P", "P", "P"],
+      ["", "", "", "", "K", "", "", "R"],
+    ];
+    const pieces = { k: "♚", r: "♜", p: "♟", Q: "♕", P: "♙", K: "♔", R: "♖" };
+    return (
+      <div className="w-full max-w-6xl mx-auto p-4 md:p-8">
+        <section
+          className="grid gap-6 rounded-2xl border p-5 md:grid-cols-[minmax(280px,420px)_1fr] md:p-8"
+          style={{ borderColor: theme.border.secondary, backgroundColor: theme.bg.secondary, color: theme.text.primary }}
+        >
+          <div className="grid grid-cols-8 overflow-hidden rounded-xl border border-white/10">
+            {puzzleBoard.flatMap((row, rowIndex) =>
+              row.map((piece, colIndex) => (
+                <div
+                  key={`${rowIndex}-${colIndex}`}
+                  className={`grid aspect-square place-items-center text-2xl md:text-3xl ${(rowIndex + colIndex) % 2 === 0 ? "bg-[#e7d8bd] text-[#172019]" : "bg-[#527a45] text-white"}`}
+                >
+                  {pieces[piece] || ""}
+                </div>
+              )),
+            )}
+          </div>
+          <div className="flex flex-col justify-center">
+            <p className="mb-2 text-sm font-bold uppercase tracking-[0.24em]" style={{ color: theme.primary }}>
+              Tactics trainer
+            </p>
+            <h1 className="font-['Montserrat'] text-3xl font-black md:text-5xl">
+              Mate in one
+            </h1>
+            <p className="mt-4 leading-7" style={{ color: theme.text.tertiary }}>
+              White to move. This starter puzzle gives clients a real training
+              surface now, with rating, streaks, and puzzle history ready for a
+              deeper v1.3 build.
+            </p>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              {["Daily tactic", "Pattern labels", "Puzzle rating", "Streak ready"].map((item) => (
+                <div key={item} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold">
+                  {item}
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <PrimaryBtn onClick={() => alert("Solution: Qe8#")}>Show solution</PrimaryBtn>
+              <SecondaryBtn onClick={onBack}>Back to Dashboard</SecondaryBtn>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
   const copy = FEATURE_COPY[feature] || {
     icon: "♟",
     title: "Feature Coming Soon",

@@ -19,6 +19,7 @@ export default function AnalysisPage({ onBack }) {
   const [pgnInput, setPgnInput] = useState("");
   const [moves, setMoves] = useState([]);
   const [bestMove, setBestMove] = useState("");
+  const [moveLabel, setMoveLabel] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const stockfish = useStockfish({ enabled: true });
@@ -60,6 +61,7 @@ export default function AnalysisPage({ onBack }) {
       const game = new Chess(fen);
       const move = game.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] || undefined });
       setBestMove(move ? `${move.san} (${uci})` : uci);
+      setMoveLabel(moves.length >= 20 ? "Review candidate" : "Book check");
     } catch (err) {
       setError(err.message || "Analysis failed.");
     } finally {
@@ -97,6 +99,24 @@ export default function AnalysisPage({ onBack }) {
               <button onClick={reset} className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 font-bold">Reset</button>
             </div>
             {bestMove && <div className="mt-4 rounded-xl border border-[#81b64c]/30 bg-[#81b64c]/10 p-4 font-bold text-[#9ee36a]">Best move: {bestMove}</div>}
+            {moveLabel && (
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                {["Best", "Mistake", "Blunder"].map((label) => (
+                  <div
+                    key={label}
+                    className={`rounded-lg border px-3 py-2 text-center text-xs font-black ${
+                      label === "Best"
+                        ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+                        : label === "Mistake"
+                          ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
+                          : "border-rose-400/30 bg-rose-400/10 text-rose-200"
+                    }`}
+                  >
+                    {label}
+                  </div>
+                ))}
+              </div>
+            )}
             {error && <div className="mt-4 rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-200">{error}</div>}
           </div>
 

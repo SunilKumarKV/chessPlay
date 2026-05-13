@@ -19,6 +19,14 @@ import PrivacyPolicyPage from "../pages/legal/PrivacyPolicyPage";
 import TermsPage from "../pages/legal/TermsPage";
 import DeleteAccountPage from "../pages/legal/DeleteAccountPage";
 import ForgotPasswordPage from "../pages/ForgotPasswordPage";
+import ResetPasswordPage from "../pages/ResetPasswordPage";
+import VerifyEmailPage from "../pages/VerifyEmailPage";
+
+function pageFromPathname(pathname) {
+  if (pathname === "/reset-password") return "reset-password";
+  if (pathname === "/verify-email") return "verify-email";
+  return "dashboard";
+}
 
 export default function App() {
   const [user, setUser] = useState(() => {
@@ -36,7 +44,9 @@ export default function App() {
   });
   const [authChecked, setAuthChecked] = useState(false);
   const [authTimedOut, setAuthTimedOut] = useState(false);
-  const [currentPage, setCurrentPage] = useState("dashboard");
+  const [currentPage, setCurrentPage] = useState(() =>
+    pageFromPathname(window.location.pathname),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -119,6 +129,22 @@ export default function App() {
 
   if (!authChecked) {
     return <AppSplash />;
+  }
+
+  if (currentPage === "reset-password") {
+    return (
+      <ErrorBoundary>
+        <ResetPasswordPage onBack={() => setCurrentPage("dashboard")} />
+      </ErrorBoundary>
+    );
+  }
+
+  if (currentPage === "verify-email") {
+    return (
+      <ErrorBoundary>
+        <VerifyEmailPage onBack={() => setCurrentPage("dashboard")} />
+      </ErrorBoundary>
+    );
   }
 
   if (!user) {

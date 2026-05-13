@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FormInput, PasswordInput, PrimaryBtn } from "../../../components/ui";
+import {
+  BACKEND_URL,
+  FACEBOOK_AUTH_URL,
+  GOOGLE_AUTH_URL,
+  GOOGLE_CLIENT_ID,
+} from "../../../config/runtime";
 import { validateProductionEmail } from "../../../utils/emailValidation";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
-const GOOGLE_AUTH_URL = import.meta.env.VITE_GOOGLE_AUTH_URL || "";
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
-const FACEBOOK_AUTH_URL = import.meta.env.VITE_FACEBOOK_AUTH_URL || "";
 let googleInitializedClientId = "";
 let googleCredentialHandler = null;
 

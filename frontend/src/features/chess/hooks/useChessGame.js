@@ -20,8 +20,7 @@ import {
 import { useStockfish } from "./useStockfish";
 import { useChessClock, TIME_CONTROLS } from "./useChessClock";
 import { useSoundEffects } from "./useSoundEffects";
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
+import { BACKEND_URL } from "../../../config/runtime";
 
 function toSquareName([row, col]) {
   return `${String.fromCharCode(97 + col)}${8 - row}`;
@@ -474,7 +473,7 @@ export function useChessGame({
     [promotion, commitMove, clock, turn],
   );
 
-  const handleExportPGN = useCallback(() => {
+  const buildCurrentPGN = useCallback(() => {
     const meta = {
       white:
         aiEnabled && aiColor === "w" ? `Stockfish Lv${aiDifficulty}` : "Player",
@@ -492,11 +491,15 @@ export function useChessGame({
             : "*",
     };
 
+    return exportPGN(history, meta, currentOpening);
+  }, [history, status, aiEnabled, aiColor, aiDifficulty, turn, currentOpening]);
+
+  const handleExportPGN = useCallback(() => {
     downloadPGN(
-      exportPGN(history, meta, currentOpening),
+      buildCurrentPGN(),
       `chess-${Date.now()}.pgn`,
     );
-  }, [history, status, aiEnabled, aiColor, aiDifficulty, turn, currentOpening]);
+  }, [buildCurrentPGN]);
 
   const resetGame = useCallback(() => {
     setBoard(INITIAL_BOARD.map((rank) => [...rank]));
@@ -665,6 +668,7 @@ export function useChessGame({
     offerDraw,
     acceptDraw,
     declineDraw,
+    buildCurrentPGN,
     handleExportPGN,
 
     toggleFlip: () => setFlipped((f) => !f),

@@ -3,8 +3,9 @@ import { useSettings } from "../hooks/useSettings";
 import { useTheme } from "../hooks/useTheme";
 import { notifyUserChanged } from "../hooks/useCurrentUser";
 import { BOARD_THEME_OPTIONS } from "../features/chess/constants/boardThemes";
+import { BACKEND_URL } from "../config/runtime";
 
-const API_BASE = `${import.meta.env.VITE_BACKEND_URL || "http://localhost:3001"}/api`;
+const API_BASE = `${BACKEND_URL}/api`;
 
 const SECTIONS = [
   { id: "account", label: "Account", hint: "Profile and sign-in" },
