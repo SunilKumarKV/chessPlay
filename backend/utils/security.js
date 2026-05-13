@@ -99,6 +99,15 @@ function authUserPayload(user) {
     gamesWon: user.gamesWon,
     rating: user.rating,
     avatar: user.avatar || null,
+    plan: user.plan || "free",
+    planStatus: user.planStatus || "active",
+    planExpiresAt: user.planExpiresAt || null,
+    isSupporter: Boolean(user.isSupporter),
+    isPremium: Boolean(user.isPremium),
+    supporterPlan: user.supporterPlan || "none",
+    supporterExpiresAt: user.supporterExpiresAt || null,
+    adsDisabled: Boolean(user.adsDisabled),
+    isAdmin: Boolean(user.isAdmin),
     isGuest: false,
   };
 }

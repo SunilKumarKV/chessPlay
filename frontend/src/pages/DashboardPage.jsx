@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { BACKEND_URL } from "../config/runtime";
 import { apiClient } from "../services/apiClient";
 import { useTheme } from "../hooks/useTheme";
+import PlanBadge from "../components/billing/PlanBadge";
+import AdSlot from "../components/billing/AdSlot";
 
 export default function Dashboard({
   user,
@@ -306,8 +308,11 @@ export default function Dashboard({
           />
           <div className="relative z-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-end">
             <div>
-              <div className="mb-3 inline-flex rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-[#81b64c]">
-                v1.1.0-beta
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="inline-flex rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-[#81b64c]">
+                  v1.2.1 SaaS Ready
+                </span>
+                <PlanBadge user={user} />
               </div>
               <h1 className="font-['Montserrat'] text-3xl font-black tracking-normal text-white md:text-5xl">
                 {displayName}'s Chess Hub
@@ -610,6 +615,10 @@ export default function Dashboard({
           </div>
         </aside>
       </section>
+
+      <div className="mt-6">
+        <AdSlot user={user} />
+      </div>
 
       <div className="fixed bottom-5 right-5 z-20 flex flex-col gap-3">
         <button

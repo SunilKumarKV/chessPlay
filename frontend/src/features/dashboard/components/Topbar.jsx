@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useTheme } from "../../../hooks/useTheme";
 import { apiClient } from "../../../services/apiClient";
+import PlanBadge from "../../../components/billing/PlanBadge";
 
 const STORAGE_KEYS = {
   messages: "chessplay.topbar.messages",
@@ -950,6 +951,7 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout }) {
                 >
                   {user?.email || "No email linked"}
                 </p>
+                <div className="mt-2"><PlanBadge user={user} compact /></div>
               </div>
               <button
                 onClick={() => onNavigate?.("profile")}
@@ -985,6 +987,42 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout }) {
                 }}
               >
                 <span className="text-lg">🏆</span> Achievements
+              </button>
+              <button
+                onClick={() => onNavigate?.("pricing")}
+                className="w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-3"
+                style={{
+                  color: theme.text.secondary,
+                  backgroundColor: "transparent",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.hover;
+                  e.currentTarget.style.color = theme.text.primary;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = theme.text.secondary;
+                }}
+              >
+                <span className="text-lg">₹</span> Support / Pricing
+              </button>
+              <button
+                onClick={() => onNavigate?.("billing")}
+                className="w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-3"
+                style={{
+                  color: theme.text.secondary,
+                  backgroundColor: "transparent",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.hover;
+                  e.currentTarget.style.color = theme.text.primary;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = theme.text.secondary;
+                }}
+              >
+                <span className="text-lg">💳</span> Billing
               </button>
               <button
                 onClick={() => onNavigate?.("settings")}

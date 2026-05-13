@@ -56,6 +56,7 @@ const {
 } = require("./gameState");
 const authRoutes = require("./routes/auth");
 const gameRoutes = require("./routes/games");
+const billingRoutes = require("./routes/billing");
 const User = require("./models/User");
 const Game = require("./models/Game");
 const { updatePlayerStats } = require("./utils/elo");
@@ -305,6 +306,7 @@ mongoose
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/games", gameRoutes);
+app.use("/api/billing", billingRoutes);
 
 // Basic health check
 app.get("/health", (req, res) => {

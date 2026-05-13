@@ -21,6 +21,9 @@ import DeleteAccountPage from "../pages/legal/DeleteAccountPage";
 import ForgotPasswordPage from "../pages/ForgotPasswordPage";
 import ResetPasswordPage from "../pages/ResetPasswordPage";
 import VerifyEmailPage from "../pages/VerifyEmailPage";
+import PricingPage from "../pages/billing/PricingPage";
+import BillingPage from "../pages/billing/BillingPage";
+import AdminSupportersPage from "../pages/billing/AdminSupportersPage";
 
 function pageFromPathname(pathname) {
   if (pathname === "/reset-password") return "reset-password";
@@ -226,6 +229,25 @@ export default function App() {
         );
       case "analysis":
         return <AnalysisPage onBack={() => setCurrentPage("dashboard")} />;
+      case "pricing":
+        return (
+          <PricingPage
+            onBack={() => setCurrentPage("dashboard")}
+            onNavigate={setCurrentPage}
+          />
+        );
+      case "billing":
+        return (
+          <BillingPage
+            user={user}
+            onBack={() => setCurrentPage("dashboard")}
+            onNavigate={setCurrentPage}
+          />
+        );
+      case "admin-supporters":
+        return (
+          <AdminSupportersPage onBack={() => setCurrentPage("billing")} />
+        );
       case "puzzles":
         return (
           <ComingSoonPage

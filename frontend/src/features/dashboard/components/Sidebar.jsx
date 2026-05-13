@@ -1,6 +1,7 @@
 import React from "react";
 import SidebarItem from "./SidebarItem";
 import { useTheme } from "../../../hooks/useTheme";
+import PlanBadge from "../../../components/billing/PlanBadge";
 
 export default function Sidebar({
   isOpen,
@@ -24,6 +25,8 @@ export default function Sidebar({
         { id: "lan", label: "Same WiFi", icon: "⇄" },
         { id: "puzzles", label: "Puzzles", icon: "◇" },
         { id: "analysis", label: "Analysis", icon: "∑" },
+        { id: "pricing", label: "Support / Pricing", icon: "₹" },
+        { id: "billing", label: "Billing", icon: "◈" },
         { id: "leaderboard", label: "Leaderboard", icon: "★" },
         { id: "settings", label: "Settings", icon: "⚙" },
       ],
@@ -217,6 +220,7 @@ export default function Sidebar({
                 >
                   {user?.rating || 1200} ELO
                 </span>
+                <PlanBadge user={user} compact />
               </div>
             )}
           </div>

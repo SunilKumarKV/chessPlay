@@ -59,6 +59,31 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+
+  // v1.2.1 SaaS / supporter plan fields
+  plan: {
+    type: String,
+    enum: ["free", "supporter_monthly", "supporter_yearly", "pro"],
+    default: "free",
+  },
+  planStatus: {
+    type: String,
+    enum: ["active", "expired", "pending", "cancelled"],
+    default: "active",
+  },
+  planStartedAt: { type: Date, default: null },
+  planExpiresAt: { type: Date, default: null },
+  isSupporter: { type: Boolean, default: false },
+  isPremium: { type: Boolean, default: false },
+  supporterSince: { type: Date, default: null },
+  supporterPlan: {
+    type: String,
+    enum: ["none", "supporter_monthly", "supporter_yearly", "pro"],
+    default: "none",
+  },
+  supporterExpiresAt: { type: Date, default: null },
+  adsDisabled: { type: Boolean, default: false },
+  isAdmin: { type: Boolean, default: false },
   bio: {
     type: String,
     maxlength: 500,

@@ -3,10 +3,7 @@ const { getCookie, getJwtSecret } = require('../utils/security');
 
 const auth = (req, res, next) => {
   try {
-    const bearerToken = req.headers.authorization?.startsWith('Bearer ')
-      ? req.headers.authorization.slice('Bearer '.length)
-      : null;
-    const token = getCookie(req, "accessToken") || getCookie(req, "authToken") || bearerToken;
+    const token = getCookie(req, "accessToken") || getCookie(req, "authToken");
 
     if (!token) {
       return res.status(401).json({ message: 'No token provided' });
