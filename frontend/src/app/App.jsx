@@ -33,36 +33,53 @@ import CommunityPage from "../pages/CommunityPage";
 import MessagesPage from "../pages/MessagesPage";
 import AutomationPage from "../pages/AutomationPage";
 
+const routeMap = {
+  admin: "/admin",
+  "admin-supporters": "/admin/supporters",
+  ai: "/play",
+  multi: "/play/online",
+  local: "/play/local",
+  lan: "/lan",
+  dashboard: "/dashboard",
+  history: "/history",
+  leaderboard: "/leaderboard",
+  profile: "/profile",
+  settings: "/settings",
+  analysis: "/analysis",
+  pricing: "/pricing",
+  billing: "/billing",
+  monetization: "/premium",
+  referral: "/referral",
+  tournaments: "/tournaments",
+  community: "/community",
+  messages: "/messages",
+  automation: "/admin/automation",
+  help: "/help",
+  puzzles: "/puzzles",
+  privacy: "/privacy",
+  terms: "/terms",
+  "delete-account": "/delete-account",
+  "forgot-password": "/forgot-password",
+  "reset-password": "/reset-password",
+  "verify-email": "/verify-email",
+};
+
 function pageFromPathname(pathname) {
-  if (pathname === "/admin" || pathname === "/admin/" || pathname === "/admin/dashboard") return "admin";
-  if (pathname === "/play") return "ai";
-  if (pathname === "/dashboard") return "dashboard";
-  if (pathname === "/leaderboard") return "leaderboard";
-  if (pathname === "/help") return "help";
-  if (pathname === "/pricing") return "pricing";
-  if (pathname === "/forgot-password") return "forgot-password";
-  if (pathname === "/reset-password") return "reset-password";
-  if (pathname === "/verify-email") return "verify-email";
-  return "dashboard";
+  const normalized = pathname.replace(/\/$/, "") || "/";
+  if (normalized === "/") return "dashboard";
+  if (normalized === "/admin" || normalized === "/admin/dashboard") return "admin";
+  const entry = Object.entries(routeMap).find(([, path]) => path === normalized);
+  return entry ? entry[0] : "dashboard";
 }
 
-function navigateToAppPage(page, setCurrentPage) {
-  const routeMap = {
-    admin: "/admin",
-    ai: "/play",
-    dashboard: "/dashboard",
-    leaderboard: "/leaderboard",
-    help: "/help",
-    pricing: "/pricing",
-    "forgot-password": "/forgot-password",
-    "reset-password": "/reset-password",
-    "verify-email": "/verify-email",
-  };
-  const nextPath = routeMap[page] || "/dashboard";
+function navigateToAppPage(page, setCurrentPage, replace = false) {
+  const nextPage = routeMap[page] ? page : "dashboard";
+  const nextPath = routeMap[nextPage] || "/dashboard";
   if (window.location.pathname !== nextPath) {
-    window.history.pushState({}, "", nextPath);
+    const method = replace ? "replaceState" : "pushState";
+    window.history[method]({}, "", nextPath);
   }
-  setCurrentPage(page);
+  setCurrentPage(nextPage);
 }
 
 export default function App() {
@@ -100,7 +117,7 @@ export default function App() {
     async function restoreSession() {
       try {
         localStorage.removeItem("token");
-        const data = await apiClient("/api/auth/session");
+        const data = await apiClient("/api/auth/session", { skipAuthRefresh: true });
         if (cancelled) return;
         const nextUser = data.user || null;
         if (nextUser) {
@@ -135,9 +152,8 @@ export default function App() {
 
   const handleLogin = (userData) => {
     localStorage.removeItem("guestMode");
-    window.history.replaceState({}, "", "/dashboard");
     setUser(userData);
-    setCurrentPage("dashboard");
+    navigateToAppPage("dashboard", setCurrentPage, true);
     notifyUserChanged();
   };
 
@@ -151,10 +167,7 @@ export default function App() {
     localStorage.setItem("guestMode", "true");
     localStorage.setItem("selectedTimeControl", "3+0");
     setUser(guestUser);
-    if (window.location.pathname !== "/play") {
-      window.history.pushState({}, "", "/play");
-    }
-    setCurrentPage("ai");
+    navigateToAppPage("ai", setCurrentPage);
     notifyUserChanged();
   };
 
@@ -170,7 +183,7 @@ export default function App() {
     sessionStorage.removeItem("chessplay_access_token");
     sessionStorage.removeItem("chessplay_socket_token");
     setUser(null);
-    setCurrentPage("dashboard");
+    navigateToAppPage("dashboard", setCurrentPage, true);
     notifyUserChanged();
   };
 
@@ -211,16 +224,12 @@ export default function App() {
   }
 
   const handleStartGame = (gameType, timeControl) => {
-    if (gameType === "ai") {
-      setCurrentPage("ai");
-    } else if (gameType === "multi") {
-      setCurrentPage("multi");
-    } else if (gameType === "local") {
-      setCurrentPage("local");
-    }
-    // Store time control for later use
+    const nextPage = gameType === "multi" ? "multi" : gameType === "local" ? "local" : "ai";
     localStorage.setItem("selectedTimeControl", timeControl);
+    navigateToAppPage(nextPage, setCurrentPage);
   };
+
+  const goDashboard = () => navigateToAppPage("dashboard", setCurrentPage);
 
   const renderContent = () => {
     switch (currentPage) {
@@ -238,7 +247,7 @@ export default function App() {
           localStorage.getItem("selectedTimeControl") || "3+0";
         return (
           <Chess
-            onBack={() => setCurrentPage("dashboard")}
+            onBack={goDashboard}
             onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
             initialAiEnabled
             timeControl={selectedTimeControl}
@@ -246,13 +255,13 @@ export default function App() {
         );
       }
       case "multi":
-        return <MultiplayerChess onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
+        return <MultiplayerChess onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "local": {
         const selectedTimeControl =
           localStorage.getItem("selectedTimeControl") || "3+0";
         return (
           <Chess
-            onBack={() => setCurrentPage("dashboard")}
+            onBack={goDashboard}
             onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
             initialAiEnabled={false}
             timeControl={selectedTimeControl}
@@ -265,28 +274,28 @@ export default function App() {
       case "lan":
         return (
           <LanPlayPage
-            onBack={() => setCurrentPage("dashboard")}
-            onStartLocal={() => setCurrentPage("local")}
+            onBack={goDashboard}
+            onStartLocal={() => navigateToAppPage("local", setCurrentPage)}
           />
         );
       case "history":
-        return <GameHistory onBack={() => setCurrentPage("dashboard")} />;
+        return <GameHistory onBack={goDashboard} />;
       case "leaderboard":
-        return <Leaderboard onBack={() => setCurrentPage("dashboard")} />;
+        return <Leaderboard onBack={goDashboard} />;
       case "profile":
         return (
-          <Profile user={user} onBack={() => setCurrentPage("dashboard")} />
+          <Profile user={user} onBack={goDashboard} />
         );
       case "settings":
         return (
-          <Settings user={user} onBack={() => setCurrentPage("dashboard")} />
+          <Settings user={user} onBack={goDashboard} />
         );
       case "analysis":
-        return <AnalysisPage onBack={() => setCurrentPage("dashboard")} />;
+        return <AnalysisPage onBack={goDashboard} />;
       case "pricing":
         return (
           <PricingPage
-            onBack={() => setCurrentPage("dashboard")}
+            onBack={goDashboard}
             onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
           />
         );
@@ -294,7 +303,7 @@ export default function App() {
         return (
           <BillingPage
             user={user}
-            onBack={() => setCurrentPage("dashboard")}
+            onBack={goDashboard}
             onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
           />
         );
@@ -305,53 +314,53 @@ export default function App() {
           return (
             <ComingSoonPage
               feature="Admin area"
-              onBack={() => setCurrentPage("billing")}
+              onBack={() => navigateToAppPage("billing", setCurrentPage)}
               onPlay={() => handleStartGame("ai", "3+0")}
             />
           );
         }
         return (
-          <AdminSupportersPage onBack={() => setCurrentPage("billing")} />
+          <AdminSupportersPage onBack={() => navigateToAppPage("billing", setCurrentPage)} />
         );
       case "community":
-        return <CommunityPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
+        return <CommunityPage onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "messages":
-        return <MessagesPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
+        return <MessagesPage onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "automation":
         if (!user?.isAdmin) {
           return (
             <ComingSoonPage
               feature="Admin automation"
-              onBack={() => setCurrentPage("dashboard")}
+              onBack={goDashboard}
               onPlay={() => handleStartGame("ai", "3+0")}
             />
           );
         }
-        return <AutomationPage onBack={() => setCurrentPage("dashboard")} />;
+        return <AutomationPage onBack={goDashboard} />;
       case "help":
-        return <HelpCenterPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
+        return <HelpCenterPage onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "monetization":
-        return <MonetizationPage user={user} onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
+        return <MonetizationPage user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "referral":
-        return <ReferralPage onBack={() => setCurrentPage("dashboard")} />;
+        return <ReferralPage onBack={goDashboard} />;
       case "tournaments":
-        return <TournamentsPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
+        return <TournamentsPage onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "puzzles":
         return (
           <ComingSoonPage
             feature={currentPage}
-            onBack={() => setCurrentPage("dashboard")}
+            onBack={goDashboard}
             onPlay={() => handleStartGame("ai", "3+0")}
           />
         );
       case "privacy":
-        return <PrivacyPolicyPage onBack={() => setCurrentPage("dashboard")} />;
+        return <PrivacyPolicyPage onBack={goDashboard} />;
       case "terms":
-        return <TermsPage onBack={() => setCurrentPage("dashboard")} />;
+        return <TermsPage onBack={goDashboard} />;
       case "delete-account":
-        return <DeleteAccountPage onBack={() => setCurrentPage("settings")} onDeleted={handleLogout} />;
+        return <DeleteAccountPage onBack={() => navigateToAppPage("settings", setCurrentPage)} onDeleted={handleLogout} />;
       case "forgot-password":
-        return <ForgotPasswordPage onBack={() => setCurrentPage("dashboard")} />;
+        return <ForgotPasswordPage onBack={goDashboard} />;
       default:
         return (
           <div className="p-8">
