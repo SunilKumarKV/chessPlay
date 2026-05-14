@@ -6,9 +6,7 @@ import {
   BOARD_THEME_STORAGE_KEY,
   normalizeBoardThemeId,
 } from "../features/chess/constants/boardThemes";
-import { BACKEND_URL } from "../config/runtime";
-
-const API_BASE = `${BACKEND_URL}/api`;
+import { apiClient } from "../services/apiClient";
 
 // Default settings
 const DEFAULT_SETTINGS = {
@@ -141,33 +139,32 @@ export function useSettings() {
       setOriginalSettings(localSettings);
 
       // Try to load from API (user profile data)
-      {
-        const response = await fetch(`${API_BASE}/auth/profile`, {
-          credentials: "include",
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const userData = data.user;
+      try {
+        const data = await apiClient("/api/auth/profile");
+        const userData = data.user;
 
-          // Merge user data with settings
-          const updatedSettings = {
-            ...localSettings,
-            account: {
-              ...localSettings.account,
-              username: userData.username || "",
-              email: userData.email || "",
-              bio: userData.bio || "",
-              avatar: userData.avatar || null,
-              country: userData.country || "US",
-            },
-            privacy: {
-              ...localSettings.privacy,
-              ...(userData.privacy || {}),
-            },
-          };
+        // Merge user data with settings
+        const updatedSettings = {
+          ...localSettings,
+          account: {
+            ...localSettings.account,
+            username: userData.username || "",
+            email: userData.email || "",
+            bio: userData.bio || "",
+            avatar: userData.avatar || null,
+            country: userData.country || "US",
+          },
+          privacy: {
+            ...localSettings.privacy,
+            ...(userData.privacy || {}),
+          },
+        };
 
-          setSettings(updatedSettings);
-          setOriginalSettings(updatedSettings);
+        setSettings(updatedSettings);
+        setOriginalSettings(updatedSettings);
+      } catch (error) {
+        if (error.status !== 401) {
+          throw error;
         }
       }
     } catch (error) {
@@ -266,21 +263,12 @@ export function useSettings() {
           privacy: settings.privacy,
         };
 
-        const response = await fetch(`${API_BASE}/auth/profile`, {
+        const userResponse = await apiClient("/api/auth/profile", {
           method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify(accountData),
         });
 
-        if (!response.ok) {
-          throw new Error("Failed to save account settings");
-        }
-
         // Update stored user data
-        const userResponse = await response.json();
         const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
         localStorage.setItem(
           "user",

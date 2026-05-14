@@ -3,12 +3,10 @@ import { useSettings } from "../hooks/useSettings";
 import { useTheme } from "../hooks/useTheme";
 import { notifyUserChanged } from "../hooks/useCurrentUser";
 import { BOARD_THEME_OPTIONS } from "../features/chess/constants/boardThemes";
-import { BACKEND_URL } from "../config/runtime";
+import { apiClient } from "../services/apiClient";
 import AvatarUploader from "../components/profile/AvatarUploader";
 import { LANGUAGES } from "../i18n/languages";
 import { useI18n } from "../i18n/useI18n";
-
-const API_BASE = `${BACKEND_URL}/api`;
 
 const SECTIONS = [
   { id: "account", label: "Account", hint: "Profile and sign-in" },
@@ -375,21 +373,13 @@ function AccountSection({ user, settings, updateAccount, updateAppearance, theme
 
     setPasswordSaving(true);
     try {
-      const response = await fetch(`${API_BASE}/auth/password`, {
+      await apiClient("/api/auth/password", {
         method: "PUT",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           currentPassword: passwordForm.currentPassword,
           newPassword: passwordForm.newPassword,
         }),
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to update password.");
-      }
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
       setStatus("Password updated.");
     } catch (error) {

@@ -37,7 +37,6 @@ const supporterRequestSchema = new mongoose.Schema(
       uppercase: true,
       minlength: 6,
       maxlength: 40,
-      index: true,
     },
     bankReference: { type: String, trim: true, maxlength: 80, default: "" },
     payerEmail: { type: String, trim: true, maxlength: 120, default: "" },
