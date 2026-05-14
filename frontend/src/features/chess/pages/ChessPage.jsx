@@ -9,6 +9,7 @@ import {
   setFlipped,
   setHint,
   setTimeControl,
+  setAiDifficulty,
   undoLastTurn,
   updateClock,
   TIME_CONTROLS,
@@ -23,6 +24,7 @@ import { useStockfish } from "../hooks/useStockfish";
 import { soundManager } from "../../../utils/sounds/soundManager";
 import { loadSettings } from "../../../utils/settingsPersistence";
 import { Chess as ChessEngine } from "chess.js";
+import { AI_LEVEL_ORDER, classifyMoveByCentipawn, getAiLevelConfig } from "../constants/aiLevels";
 
 const TIME_CONTROL_KEY_BY_SETUP = {
   "1+0": "bullet",
@@ -59,6 +61,7 @@ export default function Chess({
 
   const initialTimeControlKey = TIME_CONTROL_KEY_BY_SETUP[timeControl] || null;
 
+  const aiLevel = getAiLevelConfig(gameState.aiDifficulty);
   const stockfish = useStockfish({
     enabled: gameState.aiEnabled,
   });
@@ -120,10 +123,8 @@ export default function Chess({
       return;
     }
 
-    const thinkingTime = 300 + settings.evaluationDepth * 90;
-
     stockfish
-      .getBestMove(gameState.fen, { movetime: thinkingTime })
+      .getBestMove(gameState.fen, { depth: aiLevel.depth, skill: aiLevel.skill })
       .then((uci) => {
         if (!uci) return;
         const from = uci.slice(0, 2);
@@ -152,7 +153,7 @@ export default function Chess({
         console.warn("Stockfish getBestMove:", error.message);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState.fen, gameState.aiEnabled, stockfish.ready]);
+  }, [gameState.fen, gameState.aiEnabled, stockfish.ready, aiLevel.depth, aiLevel.skill]);
 
   const moveHistoryPairs = [];
   for (
@@ -167,7 +168,7 @@ export default function Chess({
   }
 
   const opponentName = opponentNameProp || (gameState.aiEnabled
-    ? `Stockfish Lv ${gameState.aiDifficulty}`
+    ? `Stockfish ${aiLevel.label}`
     : "Player 2");
   const playerName = playerNameProp || "Player 1";
 
@@ -184,7 +185,8 @@ export default function Chess({
 
     try {
       const uci = await stockfish.getBestMove(gameState.fen, {
-        movetime: 700 + settings.evaluationDepth * 60,
+        depth: Math.max(aiLevel.depth, settings.evaluationDepth),
+        skill: aiLevel.skill,
       });
       if (!uci) return;
 
@@ -199,6 +201,16 @@ export default function Chess({
       console.warn("Hint unavailable:", error.message);
     }
   };
+
+
+  const evaluationLabel = stockfish.evaluation
+    ? stockfish.evaluation.type === "mate"
+      ? `Mate ${stockfish.evaluation.value}`
+      : `${stockfish.evaluation.value > 0 ? "+" : ""}${stockfish.evaluation.value.toFixed(2)}`
+    : "0.00";
+  const moveQualityLabel = classifyMoveByCentipawn(
+    stockfish.evaluation?.type === "cp" ? stockfish.evaluation.value * 100 : null,
+  );
 
   const statusLabel = gameState.isGameOver
     ? gameState.result === "checkmate"
@@ -291,7 +303,7 @@ export default function Chess({
                 <Board />
                 {settings.showEvaluationBar && (
                   <div className="absolute -right-10 top-0 hidden h-full md:block">
-                    <EvaluationBar evaluation={0} isThinking={stockfish.thinking} />
+                    <EvaluationBar evaluation={stockfish.evaluation?.type === "cp" ? stockfish.evaluation.value : 0} isThinking={stockfish.thinking} />
                   </div>
                 )}
               </div>
@@ -396,6 +408,49 @@ export default function Chess({
                   <option value="rapid">Rapid · 10+0</option>
                 </select>
               </label>
+
+              <div>
+                <span className="mb-1 block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                  AI Difficulty
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {AI_LEVEL_ORDER.map((levelId) => {
+                    const level = getAiLevelConfig(levelId);
+                    const active = aiLevel.id === levelId;
+                    return (
+                      <button
+                        key={levelId}
+                        type="button"
+                        onClick={() => dispatch(setAiDifficulty(levelId))}
+                        className={`rounded-lg px-3 py-2 text-left text-xs font-bold transition ${
+                          active
+                            ? "bg-[#81b64c] text-[#07100a]"
+                            : "border border-white/10 bg-black/20 text-slate-200 hover:bg-white/10"
+                        }`}
+                        title={`${level.label}: depth ${level.depth}, skill ${level.skill}`}
+                      >
+                        <span className="block text-sm">{level.label}</span>
+                        <span className="block opacity-75">D{level.depth} · S{level.skill}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-slate-300">
+                <div className="flex justify-between gap-2">
+                  <span>Engine depth</span>
+                  <strong className="text-slate-100">{stockfish.depth || aiLevel.depth}</strong>
+                </div>
+                <div className="mt-1 flex justify-between gap-2">
+                  <span>Evaluation</span>
+                  <strong className="text-slate-100">{evaluationLabel}</strong>
+                </div>
+                <div className="mt-1 flex justify-between gap-2">
+                  <span>Move quality</span>
+                  <strong className="text-slate-100">{moveQualityLabel}</strong>
+                </div>
+              </div>
 
               <div>
                 <span className="mb-1 block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">

@@ -88,10 +88,13 @@ function parseCookies(cookieHeader = "") {
 }
 
 // Configure CORS for the frontend
-const configuredOrigins = [
+const configuredOrigins = Array.from(new Set([
   ...parseCsvEnv(process.env.FRONTEND_ORIGINS),
   ...parseCsvEnv(process.env.FRONTEND_URL),
-];
+  "https://getchessplay.com",
+  "https://www.getchessplay.com",
+  "https://getchessplay.vercel.app",
+].filter(Boolean)));
 
 if (isProduction && configuredOrigins.length === 0) {
   fatalConfigError("FRONTEND_ORIGINS or FRONTEND_URL must be configured in production.");
@@ -183,6 +186,10 @@ const cspConnectSources = [
 const io = socketIo(server, {
   cors: socketCorsOptions,
   maxHttpBufferSize: 20_000,
+  transports: ["websocket", "polling"],
+  pingInterval: 25_000,
+  pingTimeout: 20_000,
+  allowEIO3: false,
 });
 
 const RECONNECTION_GRACE_MS = 60 * 1000;
@@ -198,7 +205,7 @@ const BLOCKED_WORDS = String(process.env.BLOCKED_WORDS || "")
 io.use(async (socket, next) => {
   try {
     const cookies = parseCookies(socket.handshake.headers.cookie || "");
-    const token = cookies.accessToken || cookies.authToken || socket.handshake.auth?.accessToken;
+    const token = socket.handshake.auth?.accessToken || cookies.accessToken || cookies.authToken;
     if (!token) {
       return next(new Error("Authentication required"));
     }
@@ -215,7 +222,8 @@ io.use(async (socket, next) => {
     socket.user = user;
     next();
   } catch (error) {
-    next(new Error("Invalid token"));
+    const message = error?.name === "TokenExpiredError" ? "Invalid token: expired" : "Invalid token";
+    next(new Error(message));
   }
 });
 

@@ -26,14 +26,14 @@ const initialState = {
 
   // Sound
   playSounds: true,
-  soundTheme: "default", // 'default' | 'classic' | 'modern'
+  soundTheme: "classic", // classic | modern | tournament | luxury | neon | cyber
   soundVolume: 0.7,
 
   // Analysis
   showEvaluationBar: true,
   showThreatArrows: false,
   showSuggestionArrows: true,
-  evaluationDepth: 15,
+  evaluationDepth: 8,
 
   // AI
   aiPersonality: "default", // 'default' | 'aggressive' | 'defensive'

@@ -1,29 +1,27 @@
 // Sound Manager for Chess Game
+import { SOUND_THEMES } from "./soundThemes";
+
 class SoundManager {
   constructor() {
     this.audioContext = null;
     this.sounds = {};
     this.volume = 0.7;
-    this.theme = "default";
+    this.theme = "classic";
     this.enabled = true;
     this.preloaded = false;
     this.initializing = null;
   }
 
-  // Initialize audio context (required for Web Audio API)
   async init() {
     if (this.preloaded) return;
     if (this.initializing) return this.initializing;
-
     this.initializing = this.initAudio();
     return this.initializing;
   }
 
   async initAudio() {
     try {
-      this.audioContext = new (
-        window.AudioContext || window.webkitAudioContext
-      )();
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
       await this.preloadSounds();
       this.preloaded = true;
     } catch (error) {
@@ -33,169 +31,117 @@ class SoundManager {
     }
   }
 
-  // Preload all sound effects
   async preloadSounds() {
+    const soundNames = ["move", "capture", "check", "castle", "promote", "gameStart", "gameEnd"];
     const appBaseUrl = new URL(import.meta.env.BASE_URL || "/", window.location.origin);
-    const soundFiles = {
-      default: {
-        move: "/sounds/default/move.mp3",
-        capture: "/sounds/default/capture.mp3",
-        check: "/sounds/default/check.mp3",
-        castle: "/sounds/default/castle.mp3",
-        promote: "/sounds/default/promote.mp3",
-        gameStart: "/sounds/default/game-start.mp3",
-        gameEnd: "/sounds/default/game-end.mp3",
-      },
-      classic: {
-        move: "/sounds/classic/move.wav",
-        capture: "/sounds/classic/capture.wav",
-        check: "/sounds/classic/check.wav",
-        castle: "/sounds/classic/castle.wav",
-        promote: "/sounds/classic/promote.wav",
-        gameStart: "/sounds/classic/game-start.wav",
-        gameEnd: "/sounds/classic/game-end.wav",
-      },
-      modern: {
-        move: "/sounds/modern/move.ogg",
-        capture: "/sounds/modern/capture.ogg",
-        check: "/sounds/modern/check.ogg",
-        castle: "/sounds/modern/castle.ogg",
-        promote: "/sounds/modern/promote.ogg",
-        gameStart: "/sounds/modern/game-start.ogg",
-        gameEnd: "/sounds/modern/game-end.ogg",
-      },
-    };
 
-    for (const [theme, files] of Object.entries(soundFiles)) {
-      this.sounds[theme] = {};
-      for (const [soundName, filePath] of Object.entries(files)) {
-        const soundUrl = new URL(filePath.replace(/^\/+/, ""), appBaseUrl).href;
+    for (const themeId of Object.keys(SOUND_THEMES)) {
+      this.sounds[themeId] = {};
+      for (const soundName of soundNames) {
+        const extension = themeId === "classic" ? "wav" : themeId === "modern" ? "ogg" : "mp3";
+        const soundUrl = new URL(`sounds/${themeId}/${soundName.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}.${extension}`, appBaseUrl).href;
         try {
           const response = await fetch(soundUrl);
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-          }
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const arrayBuffer = await response.arrayBuffer();
-          const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-          this.sounds[theme][soundName] = audioBuffer;
-        } catch (error) {
-          console.debug(
-            `Falling back to generated sound for ${theme}/${soundName} (${soundUrl}):`,
-            error,
-          );
-          this.sounds[theme][soundName] = this.createFallbackSound(soundName);
+          this.sounds[themeId][soundName] = await this.audioContext.decodeAudioData(arrayBuffer);
+        } catch {
+          this.sounds[themeId][soundName] = this.createFallbackSound(soundName, themeId);
         }
       }
     }
   }
 
-  // Create fallback beep sounds using Web Audio API
-  createFallbackSound(type) {
+  createFallbackSound(type, themeId = "classic") {
     if (!this.audioContext) return null;
-
-    const duration = 0.1;
+    const themeOffset = {
+      classic: 0,
+      modern: 80,
+      tournament: -80,
+      luxury: 140,
+      neon: 220,
+      cyber: 320,
+    }[themeId] || 0;
+    const duration = type === "gameEnd" || type === "gameStart" ? 0.22 : 0.1;
     const sampleRate = this.audioContext.sampleRate;
-    const numSamples = duration * sampleRate;
+    const numSamples = Math.floor(duration * sampleRate);
     const buffer = this.audioContext.createBuffer(1, numSamples, sampleRate);
     const channelData = buffer.getChannelData(0);
 
-    let frequency = 440; // A4 note
+    const base = {
+      move: 523,
+      capture: 659,
+      check: 784,
+      castle: 988,
+      promote: 1319,
+      gameStart: 440,
+      gameEnd: 220,
+    }[type] || 440;
+    const frequency = Math.max(120, base + themeOffset);
 
-    switch (type) {
-      case "move":
-        frequency = 523; // C5
-        break;
-      case "capture":
-        frequency = 659; // E5
-        break;
-      case "check":
-        frequency = 784; // G5
-        break;
-      case "castle":
-        frequency = 988; // B5
-        break;
-      case "promote":
-        frequency = 1319; // E6
-        break;
-      case "gameStart":
-        frequency = 440; // A4
-        break;
-      case "gameEnd":
-        frequency = 220; // A3
-        break;
-    }
-
-    for (let i = 0; i < numSamples; i++) {
-      channelData[i] =
-        Math.sin((2 * Math.PI * frequency * i) / sampleRate) * 0.3;
+    for (let i = 0; i < numSamples; i += 1) {
+      const fade = 1 - i / numSamples;
+      channelData[i] = Math.sin((2 * Math.PI * frequency * i) / sampleRate) * 0.28 * fade;
     }
 
     return buffer;
   }
 
-  // Play a sound
+  async unlock() {
+    await this.init();
+    if (this.audioContext?.state === "suspended") {
+      await this.audioContext.resume();
+    }
+  }
+
   play(soundName) {
-    if (!this.enabled || !this.preloaded || !this.audioContext) return;
-
-    const soundBuffer = this.sounds[this.theme]?.[soundName];
-    if (!soundBuffer) return;
-
-    try {
-      const source = this.audioContext.createBufferSource();
-      const gainNode = this.audioContext.createGain();
-
-      source.buffer = soundBuffer;
-      gainNode.gain.value = this.volume;
-
-      source.connect(gainNode);
-      gainNode.connect(this.audioContext.destination);
-
-      source.start();
-    } catch (error) {
-      console.warn("Failed to play sound:", error);
-    }
+    if (!this.enabled) return;
+    this.unlock().then(() => {
+      const soundBuffer = this.sounds[this.theme]?.[soundName] || this.sounds.classic?.[soundName];
+      if (!soundBuffer || !this.audioContext) return;
+      try {
+        const source = this.audioContext.createBufferSource();
+        const gainNode = this.audioContext.createGain();
+        source.buffer = soundBuffer;
+        gainNode.gain.value = this.volume;
+        source.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+        source.start();
+      } catch (error) {
+        console.warn("Failed to play sound:", error);
+      }
+    });
   }
 
-  // Set volume (0.0 to 1.0)
   setVolume(volume) {
-    this.volume = Math.max(0, Math.min(1, volume));
+    this.volume = Math.max(0, Math.min(1, Number(volume)));
   }
 
-  // Set sound theme
   setTheme(theme) {
-    if (["default", "classic", "modern"].includes(theme)) {
-      this.theme = theme;
-    }
+    this.theme = SOUND_THEMES[theme] ? theme : "classic";
   }
 
-  // Enable/disable sounds
   setEnabled(enabled) {
-    this.enabled = enabled;
+    this.enabled = Boolean(enabled);
   }
 
-  // Specific sound methods
-  playMove() {
-    this.play("move");
+  preview(theme = this.theme) {
+    const previous = this.theme;
+    this.setTheme(theme);
+    this.playMove();
+    window.setTimeout(() => this.playCheck(), 140);
+    window.setTimeout(() => {
+      this.theme = previous;
+    }, 300);
   }
-  playCapture() {
-    this.play("capture");
-  }
-  playCheck() {
-    this.play("check");
-  }
-  playCastle() {
-    this.play("castle");
-  }
-  playPromote() {
-    this.play("promote");
-  }
-  playGameStart() {
-    this.play("gameStart");
-  }
-  playGameEnd() {
-    this.play("gameEnd");
-  }
+
+  playMove() { this.play("move"); }
+  playCapture() { this.play("capture"); }
+  playCheck() { this.play("check"); }
+  playCastle() { this.play("castle"); }
+  playPromote() { this.play("promote"); }
+  playGameStart() { this.play("gameStart"); }
+  playGameEnd() { this.play("gameEnd"); }
 }
 
-// Create singleton instance
 export const soundManager = new SoundManager();

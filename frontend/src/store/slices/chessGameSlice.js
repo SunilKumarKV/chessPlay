@@ -1,5 +1,6 @@
 import { createSlice } from "@reduxjs/toolkit";
 import { Chess } from "chess.js";
+import { normalizeAiLevel } from "../../features/chess/constants/aiLevels";
 
 const initialState = {
   // Game state
@@ -17,7 +18,7 @@ const initialState = {
   aiEnabled: true,
   aiColor: "b", // 'w' or 'b'
   aiThinking: false,
-  aiDifficulty: 10, // 0-20 scale
+  aiDifficulty: "medium", // easy | medium | hard | pro
   hint: null,
 
   // UI state
@@ -263,7 +264,7 @@ const chessGameSlice = createSlice({
     },
 
     setAiDifficulty: (state, action) => {
-      state.aiDifficulty = action.payload;
+      state.aiDifficulty = normalizeAiLevel(action.payload);
     },
 
     setFlipped: (state, action) => {
