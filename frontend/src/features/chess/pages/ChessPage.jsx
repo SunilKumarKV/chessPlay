@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 import {
   resetGame,
@@ -52,6 +52,8 @@ export default function Chess({
 
   const [showSettings, setShowSettings] = useState(false);
   const [resultPopupSeenFen, setResultPopupSeenFen] = useState(null);
+  const [pageNotice, setPageNotice] = useState(null);
+  const [hintLoading, setHintLoading] = useState(false);
   const humanColor = gameState.aiColor === "w" ? "b" : "w";
   const isHumanTurn =
     !gameState.isGameOver && gameState.game.turn() === humanColor;
@@ -68,6 +70,14 @@ export default function Chess({
   const stockfish = useStockfish({
     enabled: gameState.aiEnabled,
   });
+  const isAiTurn =
+    gameState.aiEnabled && !gameState.isGameOver && gameState.game.turn() === gameState.aiColor;
+  const controlsDisabled = stockfish.thinking || Boolean(stockfish.error);
+  const canUseEngine = stockfish.ready && !stockfish.error;
+  const sideOptions = useMemo(() => [
+    { label: "Play as White", value: "b" },
+    { label: "Play as Black", value: "w" },
+  ], []);
 
   useEffect(() => {
     loadSettings();
@@ -120,6 +130,8 @@ export default function Chess({
     if (
       !gameState.aiEnabled ||
       !stockfish.ready ||
+      stockfish.thinking ||
+      stockfish.error ||
       gameState.isGameOver ||
       gameState.game.turn() !== gameState.aiColor
     ) {
@@ -148,15 +160,15 @@ export default function Chess({
               }
             }
           }
-        } catch (error) {
-          console.error("AI move failed:", error);
+        } catch {
+          setPageNotice({ type: "error", text: "AI move could not be applied. Start a new game or try again." });
         }
       })
       .catch((error) => {
-        console.warn("Stockfish getBestMove:", error.message);
+        setPageNotice({ type: "error", text: error?.message || "AI engine is unavailable. Please retry." });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState.fen, gameState.aiEnabled, stockfish.ready, aiLevel.depth, aiLevel.skill]);
+  }, [gameState.fen, gameState.aiEnabled, gameState.isGameOver, gameState.aiColor, stockfish.ready, stockfish.thinking, stockfish.error, aiLevel.depth, aiLevel.skill, dispatch, settings.playSounds]);
 
   const moveHistoryPairs = [];
   for (
@@ -176,6 +188,8 @@ export default function Chess({
   const playerName = playerNameProp || "Player 1";
 
   const handleNewGame = () => {
+    setPageNotice(null);
+    setResultPopupSeenFen(null);
     dispatch(resetGame());
     if (settings.playSounds) {
       soundManager.playGameStart();
@@ -183,7 +197,9 @@ export default function Chess({
   };
 
   const handleHint = async () => {
-    if (!isHumanTurn || !stockfish.ready) return;
+    if (!isHumanTurn || !canUseEngine || hintLoading || stockfish.thinking) return;
+    setHintLoading(true);
+    setPageNotice(null);
     dispatch(setHint(null));
 
     try {
@@ -199,9 +215,12 @@ export default function Chess({
       const move = testGame.move({ from, to, promotion: uci[4] || undefined });
       if (move) {
         dispatch(setHint({ from, to, san: move.san }));
+        setPageNotice({ type: "success", text: `Hint ready: ${move.san}` });
       }
     } catch (error) {
-      console.warn("Hint unavailable:", error.message);
+      setPageNotice({ type: "error", text: error?.message || "Hint is unavailable right now." });
+    } finally {
+      setHintLoading(false);
     }
   };
 
@@ -240,8 +259,10 @@ export default function Chess({
             : gameState.result === "timeout"
               ? "Time out"
               : "Game over"
-    : stockfish.thinking
-      ? "AI thinking"
+    : stockfish.error
+      ? "Engine unavailable"
+      : stockfish.thinking
+      ? "AI thinking..."
       : `${gameState.game.turn() === "w" ? "White" : "Black"} to move`;
 
   return (
@@ -275,6 +296,9 @@ export default function Chess({
               <p className="mt-1 text-sm text-slate-400">
                 {opponentName} · {statusLabel}
               </p>
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                {stockfish.error ? "Engine unavailable — retry below." : stockfish.ready ? `Stockfish ready · ${aiLevel.label}` : "Starting chess engine..."}
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <BoardThemeSelector compact />
@@ -287,6 +311,32 @@ export default function Chess({
               </button>
             </div>
           </header>
+
+          {(pageNotice || stockfish.error || (!stockfish.ready && gameState.aiEnabled)) && (
+            <div
+              role="status"
+              className={`rounded-xl border p-3 text-sm font-semibold ${
+                pageNotice?.type === "success"
+                  ? "border-[#81b64c]/30 bg-[#81b64c]/10 text-[#b9f18d]"
+                  : stockfish.error || pageNotice?.type === "error"
+                    ? "border-rose-300/25 bg-rose-400/10 text-rose-100"
+                    : "border-cyan-300/25 bg-cyan-400/10 text-cyan-100"
+              }`}
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span>{pageNotice?.text || stockfish.error || "Starting chess engine..."}</span>
+                {stockfish.error && (
+                  <button
+                    type="button"
+                    onClick={() => { setPageNotice(null); stockfish.retry(); }}
+                    className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15"
+                  >
+                    Retry engine
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-4">
             <div className="rounded-xl border border-white/10 bg-white/10 p-3 shadow-xl shadow-black/20 backdrop-blur-xl">
@@ -326,7 +376,7 @@ export default function Chess({
               </div>
 
               <div className="relative mx-auto max-w-[min(72vh,680px)]">
-                <Board />
+                <Board disabled={isAiTurn || controlsDisabled} />
                 {settings.showEvaluationBar && (
                   <div className="absolute -right-10 top-0 hidden h-full md:block">
                     <EvaluationBar evaluation={stockfish.evaluation?.type === "cp" ? stockfish.evaluation.value : 0} isThinking={stockfish.thinking} />
@@ -377,14 +427,15 @@ export default function Chess({
               <button
                 type="button"
                 onClick={handleNewGame}
-                className="rounded-lg bg-[#81b64c] px-4 py-3 text-sm font-black text-[#07100a] transition hover:bg-[#93c85f]"
+                disabled={stockfish.thinking}
+                className="rounded-lg bg-[#81b64c] px-4 py-3 text-sm font-black text-[#07100a] transition hover:bg-[#93c85f] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 New Game
               </button>
               <button
                 type="button"
                 onClick={() => dispatch(undoLastTurn())}
-                disabled={gameState.history.length === 0 || gameState.isGameOver}
+                disabled={gameState.history.length === 0 || gameState.isGameOver || stockfish.thinking}
                 className="rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-sm font-bold text-slate-100 transition hover:bg-white/10 disabled:opacity-40"
               >
                 Undo
@@ -392,15 +443,15 @@ export default function Chess({
               <button
                 type="button"
                 onClick={handleHint}
-                disabled={!isHumanTurn || !stockfish.ready}
+                disabled={!isHumanTurn || !canUseEngine || hintLoading || stockfish.thinking}
                 className="rounded-lg border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-bold text-cyan-100 transition hover:bg-cyan-300/15 disabled:opacity-40"
               >
-                Hint
+                {hintLoading ? "Finding..." : "Hint"}
               </button>
               <button
                 type="button"
                 onClick={() => dispatch(resignGame())}
-                disabled={gameState.isGameOver || gameState.history.length === 0}
+                disabled={gameState.isGameOver || gameState.history.length === 0 || stockfish.thinking}
                 className="rounded-lg border border-rose-300/20 bg-rose-400/10 px-4 py-3 text-sm font-bold text-rose-100 transition hover:bg-rose-400/15 disabled:opacity-40"
               >
                 Resign
@@ -426,6 +477,7 @@ export default function Chess({
                 <select
                   value={selectedTimeControlKey}
                   onChange={(e) => dispatch(setTimeControl(e.target.value))}
+                  disabled={stockfish.thinking}
                   className="w-full rounded-lg border border-white/10 bg-[#111827] px-3 py-2 text-sm font-semibold text-white outline-none focus:border-[#81b64c]"
                 >
                   <option value="none">No timer</option>
@@ -448,7 +500,8 @@ export default function Chess({
                         key={levelId}
                         type="button"
                         onClick={() => dispatch(setAiDifficulty(levelId))}
-                        className={`rounded-lg px-3 py-2 text-left text-xs font-bold transition ${
+                        disabled={stockfish.thinking}
+                        className={`rounded-lg px-3 py-2 text-left text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
                           active
                             ? "bg-[#81b64c] text-[#07100a]"
                             : "border border-white/10 bg-black/20 text-slate-200 hover:bg-white/10"
@@ -465,6 +518,10 @@ export default function Chess({
 
               <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-slate-300">
                 <div className="flex justify-between gap-2">
+                  <span>Engine status</span>
+                  <strong className="text-slate-100">{stockfish.error ? "Unavailable" : stockfish.ready ? "Ready" : "Loading"}</strong>
+                </div>
+                <div className="mt-1 flex justify-between gap-2">
                   <span>Engine depth</span>
                   <strong className="text-slate-100">{stockfish.depth || aiLevel.depth}</strong>
                 </div>
@@ -482,17 +539,15 @@ export default function Chess({
                 <span className="mb-1 block text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
                   Play As
                 </span>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    ["b", "White"],
-                    ["w", "Black"],
-                  ].map(([color, label]) => (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {sideOptions.map(({ value, label }) => (
                     <button
-                      key={color}
+                      key={value}
                       type="button"
-                      onClick={() => dispatch(setAiColor(color))}
-                      className={`rounded-lg px-3 py-2 text-sm font-bold transition ${
-                        gameState.aiColor === color
+                      onClick={() => { setPageNotice(null); dispatch(setAiColor(value)); }}
+                      disabled={stockfish.thinking}
+                      className={`rounded-lg px-3 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                        gameState.aiColor === value
                           ? "bg-[#81b64c] text-[#07100a]"
                           : "border border-white/10 bg-black/20 text-slate-200 hover:bg-white/10"
                       }`}
@@ -500,6 +555,14 @@ export default function Chess({
                       {label}
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => { setPageNotice(null); dispatch(setAiColor(Math.random() > 0.5 ? "w" : "b")); }}
+                    disabled={stockfish.thinking}
+                    className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Random
+                  </button>
                 </div>
               </div>
             </div>
@@ -528,6 +591,7 @@ export default function Chess({
         <button
           type="button"
           onClick={handleNewGame}
+          disabled={stockfish.thinking}
           className="grid h-12 w-12 place-items-center rounded-full bg-[#81b64c] text-sm font-black text-[#07100a] shadow-2xl shadow-[#81b64c]/25 transition hover:-translate-y-1"
           aria-label="New game"
         >

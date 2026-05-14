@@ -14,6 +14,12 @@ function parseEvaluation(message) {
   return null;
 }
 
+function safeErrorMessage(error) {
+  if (error?.message) return error.message;
+  if (typeof error === "string") return error;
+  return "Chess engine is temporarily unavailable.";
+}
+
 export function useStockfish({ enabled = true } = {}) {
   const workerRef = useRef(null);
   const movePromiseRef = useRef(null);
@@ -23,6 +29,8 @@ export function useStockfish({ enabled = true } = {}) {
   const [depth, setDepth] = useState(0);
   const [evaluation, setEvaluation] = useState(null);
   const [lastBestMove, setLastBestMove] = useState(null);
+  const [error, setError] = useState(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   const sendCommand = useCallback((command) => {
     if (workerRef.current && command) {
@@ -30,24 +38,57 @@ export function useStockfish({ enabled = true } = {}) {
     }
   }, []);
 
+  const retry = useCallback(() => {
+    setError(null);
+    setReady(false);
+    setThinking(false);
+    setDepth(0);
+    setEvaluation(null);
+    setLastBestMove(null);
+    setRetryKey((value) => value + 1);
+  }, []);
+
   useEffect(() => {
     if (!enabled) return undefined;
 
     const workerPath = `${import.meta.env.BASE_URL}workers/stockfish-worker.js`;
     let worker;
+    let mounted = true;
 
     try {
       worker = new Worker(workerPath);
-    } catch (error) {
-      console.error("[Stockfish] Failed to create worker:", error, workerPath);
+    } catch (creationError) {
+      if (mounted) {
+        setError(`Unable to start chess engine: ${safeErrorMessage(creationError)}`);
+        setReady(false);
+        setThinking(false);
+      }
       return undefined;
     }
 
     workerRef.current = worker;
+    setError(null);
+    setReady(false);
+    setThinking(false);
+    setDepth(0);
+    setEvaluation(null);
+    setLastBestMove(null);
 
     worker.onmessage = (event) => {
+      if (!mounted) return;
       const msg = typeof event.data === "string" ? event.data.trim() : "";
       if (!msg) return;
+
+      if (msg.startsWith("error")) {
+        setError("Chess engine failed to load. Please refresh or try again.");
+        setThinking(false);
+        if (movePromiseRef.current) {
+          clearTimeout(movePromiseRef.current.timeoutId);
+          movePromiseRef.current.resolve(null);
+          movePromiseRef.current = null;
+        }
+        return;
+      }
 
       if (msg === "uciok") {
         setReady(true);
@@ -71,17 +112,25 @@ export function useStockfish({ enabled = true } = {}) {
       }
     };
 
-    worker.onerror = (error) => {
-      console.error("[Stockfish] Worker error:", error);
+    worker.onerror = () => {
+      if (!mounted) return;
+      setError("Chess engine stopped unexpectedly. Please retry.");
+      setReady(false);
       setThinking(false);
+      if (movePromiseRef.current) {
+        clearTimeout(movePromiseRef.current.timeoutId);
+        movePromiseRef.current.resolve(null);
+        movePromiseRef.current = null;
+      }
     };
 
     worker.postMessage("uci");
 
     return () => {
+      mounted = false;
       if (movePromiseRef.current) {
         clearTimeout(movePromiseRef.current.timeoutId);
-        movePromiseRef.current.reject(new Error("Stockfish worker disconnected"));
+        movePromiseRef.current.resolve(null);
         movePromiseRef.current = null;
       }
       worker.terminate();
@@ -89,19 +138,20 @@ export function useStockfish({ enabled = true } = {}) {
       setReady(false);
       setThinking(false);
     };
-  }, [enabled]);
+  }, [enabled, retryKey]);
 
   const getBestMove = useCallback(
     (fen, options = 10) => {
       return new Promise((resolve, reject) => {
-        if (!workerRef.current || !ready) {
-          reject(new Error("Stockfish not ready"));
+        if (!workerRef.current || !ready || error) {
+          reject(new Error(error || "Stockfish not ready"));
           return;
         }
 
         if (movePromiseRef.current) {
           clearTimeout(movePromiseRef.current.timeoutId);
-          movePromiseRef.current.reject(new Error("Previous Stockfish move canceled"));
+          movePromiseRef.current.resolve(null);
+          movePromiseRef.current = null;
         }
 
         let goCommand = "";
@@ -131,7 +181,9 @@ export function useStockfish({ enabled = true } = {}) {
           if (movePromiseRef.current) {
             workerRef.current?.postMessage("stop");
             setThinking(false);
-            movePromiseRef.current.reject(new Error("Stockfish move timeout"));
+            const timeoutError = "Chess engine took too long to respond. Please retry.";
+            setError(timeoutError);
+            movePromiseRef.current.reject(new Error(timeoutError));
             movePromiseRef.current = null;
           }
         }, Math.max(timeoutMs, 2500));
@@ -149,7 +201,7 @@ export function useStockfish({ enabled = true } = {}) {
         workerRef.current.postMessage(goCommand);
       });
     },
-    [ready],
+    [ready, error],
   );
 
   return {
@@ -158,6 +210,8 @@ export function useStockfish({ enabled = true } = {}) {
     depth,
     evaluation,
     lastBestMove,
+    error,
+    retry,
     sendCommand,
     getBestMove,
   };
