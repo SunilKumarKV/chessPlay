@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { notifyUserChanged } from "../hooks/useCurrentUser";
 import { apiClient } from "../services/apiClient";
 import Chess from "../features/chess/pages/ChessPage";
+import LocalChessPage from "../features/chess/pages/LocalChessPage";
 import MultiplayerChess from "../features/chess/components/MultiplayerChess";
 import Leaderboard from "../pages/LeaderboardPage";
 import GameHistory from "../pages/GameHistoryPage";
@@ -68,6 +69,7 @@ function pageFromPathname(pathname) {
   const normalized = pathname.replace(/\/$/, "") || "/";
   if (normalized === "/") return "dashboard";
   if (normalized === "/admin" || normalized === "/admin/dashboard") return "admin";
+  if (normalized === "/play-player" || normalized === "/play/local") return "local";
   const entry = Object.entries(routeMap).find(([, path]) => path === normalized);
   return entry ? entry[0] : "dashboard";
 }
@@ -215,6 +217,19 @@ export default function App() {
     );
   }
 
+  if (!user && currentPage === "local") {
+    const selectedTimeControl = localStorage.getItem("selectedTimeControl") || "3+0";
+    return (
+      <ErrorBoundary>
+        <LocalChessPage
+          timeControl={selectedTimeControl}
+          onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
+          onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+        />
+      </ErrorBoundary>
+    );
+  }
+
   if (!user) {
     return (
       <ErrorBoundary>
@@ -260,14 +275,10 @@ export default function App() {
         const selectedTimeControl =
           localStorage.getItem("selectedTimeControl") || "3+0";
         return (
-          <Chess
+          <LocalChessPage
             onBack={goDashboard}
             onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
-            initialAiEnabled={false}
             timeControl={selectedTimeControl}
-            title="Play vs Player"
-            opponentName="Player 2"
-            playerName="Player 1"
           />
         );
       }
