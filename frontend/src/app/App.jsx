@@ -40,7 +40,7 @@ const routeMap = {
   ai: "/play",
   multi: "/play/online",
   local: "/play/local",
-  lan: "/lan",
+  lan: "/wifi",
   dashboard: "/dashboard",
   history: "/history",
   leaderboard: "/leaderboard",
@@ -69,7 +69,8 @@ function pageFromPathname(pathname) {
   const normalized = pathname.replace(/\/$/, "") || "/";
   if (normalized === "/") return "dashboard";
   if (normalized === "/admin" || normalized === "/admin/dashboard") return "admin";
-  if (normalized === "/play-player" || normalized === "/play/local") return "local";
+  if (["/play-player", "/play/local"].includes(normalized)) return "local";
+  if (["/lan", "/wifi", "/play-wifi"].includes(normalized)) return "lan";
   const entry = Object.entries(routeMap).find(([, path]) => path === normalized);
   return entry ? entry[0] : "dashboard";
 }
@@ -285,8 +286,9 @@ export default function App() {
       case "lan":
         return (
           <LanPlayPage
+            user={user}
             onBack={goDashboard}
-            onStartLocal={() => navigateToAppPage("local", setCurrentPage)}
+            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
           />
         );
       case "history":
