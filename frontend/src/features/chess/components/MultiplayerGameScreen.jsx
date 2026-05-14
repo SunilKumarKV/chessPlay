@@ -47,6 +47,7 @@ export default function MultiplayerGameScreen({
   isSpectating = false,
   spectatorCount = 0,
   resign,
+  onNavigate,
 }) {
   const [selected, setSelected] = useState(null);
   const [legalMoves, setLegalMoves] = useState([]);
@@ -245,7 +246,7 @@ export default function MultiplayerGameScreen({
         subtitle={`Status: ${gameState?.status || "game over"}.`}
         onClose={closeResultPopup}
         onRematch={() => { closeResultPopup(); leaveRoom?.(); onBack?.(); }}
-        onReview={closeResultPopup}
+        onReview={() => { closeResultPopup(); onNavigate?.("analysis"); }}
         onShare={shareResult}
       />
       {pendingMove && (

@@ -44,6 +44,7 @@ export default function Chess({
   title = initialAiEnabled ? "Play AI" : "Play vs Player",
   opponentName: opponentNameProp,
   playerName: playerNameProp,
+  onNavigate,
 }) {
   const dispatch = useAppDispatch();
   const gameState = useAppSelector((state) => state.chessGame);
@@ -252,7 +253,7 @@ export default function Chess({
         subtitle={`${statusLabel} · ${gameState.history.length} moves played.`}
         onClose={closeResultPopup}
         onRematch={() => { closeResultPopup(); handleNewGame(); }}
-        onReview={() => { closeResultPopup(); }}
+        onReview={() => { closeResultPopup(); onNavigate?.("analysis"); }}
         onShare={shareResult}
       />
       <div className="mx-auto grid w-full max-w-7xl gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
