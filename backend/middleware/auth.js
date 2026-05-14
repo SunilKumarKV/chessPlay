@@ -1,9 +1,9 @@
 const jwt = require('jsonwebtoken');
-const { getCookie, getJwtSecret } = require('../utils/security');
+const { getJwtSecret, getRequestAccessToken } = require('../utils/security');
 
 const auth = (req, res, next) => {
   try {
-    const token = getCookie(req, "accessToken") || getCookie(req, "authToken");
+    const token = getRequestAccessToken(req);
 
     if (!token) {
       return res.status(401).json({ message: 'No token provided' });

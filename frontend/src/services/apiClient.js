@@ -12,8 +12,10 @@ function clearSessionTokens() {
 async function request(endpoint, options = {}) {
   const hasBody = Boolean(options.body);
   const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+  const fallbackAccessToken = sessionStorage.getItem("chessplay_access_token") || sessionStorage.getItem("chessplay_socket_token");
   const headers = {
     ...(hasBody && !isFormData ? { "Content-Type": "application/json" } : {}),
+    ...(fallbackAccessToken ? { Authorization: `Bearer ${fallbackAccessToken}` } : {}),
     ...options.headers,
   };
 

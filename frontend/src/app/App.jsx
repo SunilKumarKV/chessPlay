@@ -278,6 +278,15 @@ export default function App() {
           />
         );
       case "admin-supporters":
+        if (!user?.isAdmin) {
+          return (
+            <ComingSoonPage
+              feature="Admin area"
+              onBack={() => setCurrentPage("billing")}
+              onPlay={() => handleStartGame("ai", "3+0")}
+            />
+          );
+        }
         return (
           <AdminSupportersPage onBack={() => setCurrentPage("billing")} />
         );
@@ -286,6 +295,15 @@ export default function App() {
       case "messages":
         return <MessagesPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
       case "automation":
+        if (!user?.isAdmin) {
+          return (
+            <ComingSoonPage
+              feature="Admin automation"
+              onBack={() => setCurrentPage("dashboard")}
+              onPlay={() => handleStartGame("ai", "3+0")}
+            />
+          );
+        }
         return <AutomationPage onBack={() => setCurrentPage("dashboard")} />;
       case "help":
         return <HelpCenterPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
