@@ -111,7 +111,7 @@ Implemented:
    - `JWT_REFRESH_SECRET`
 3. Deploy frontend on Vercel.
 4. Set Vercel env variables:
-   - `VITE_BACKEND_URL=https://yourdomain.onrender.com`
-   - `VITE_SOCKET_URL=https://yourdomain.onrender.com`
+   - `VITE_BACKEND_URL=https://chessplay-b5ve.onrender.com`
+   - `VITE_SOCKET_URL=https://chessplay-b5ve.onrender.com`
    - `VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com`
 5. Clear browser cache and test login/multiplayer in a fresh incognito window.

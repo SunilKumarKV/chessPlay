@@ -57,6 +57,7 @@ const {
 const authRoutes = require("./routes/auth");
 const gameRoutes = require("./routes/games");
 const billingRoutes = require("./routes/billing");
+const socialRoutes = require("./routes/social");
 const User = require("./models/User");
 const Game = require("./models/Game");
 const { updatePlayerStats } = require("./utils/elo");
@@ -315,6 +316,7 @@ mongoose
 app.use("/api/auth", authRoutes);
 app.use("/api/games", gameRoutes);
 app.use("/api/billing", billingRoutes);
+app.use("/api/social", socialRoutes);
 
 // Basic health check
 app.get("/health", (req, res) => {
@@ -588,6 +590,10 @@ async function awardAbandonmentWin(roomId, abandonedColor) {
 }
 io.on("connection", (socket) => {
   console.log(`Player connected: ${socket.id}`);
+
+  socket.join(`user:${socket.user._id}`);
+  socket.broadcast.emit("socialUserStatus", { userId: socket.user._id, status: "online" });
+
 
   const onSafe = (eventName, handler) => {
     socket.on(eventName, (...args) => {
@@ -1227,6 +1233,7 @@ io.on("connection", (socket) => {
     for (const key of socketEventRateLimits.keys()) {
       if (key.startsWith(`${socket.id}:`)) socketEventRateLimits.delete(key);
     }
+    socket.broadcast.emit("socialUserStatus", { userId: socket.user._id, status: "offline" });
     console.log(`Player disconnected: ${socket.id}`);
   });
 
@@ -1281,6 +1288,59 @@ io.on("connection", (socket) => {
       io.to(activeRoomId).emit("chatMessage", chatMessage);
     } catch (error) {
       console.error("Chat message error:", error);
+      socket.emit("serverError", { message: "Failed to send message" });
+    }
+  });
+
+
+  onSafe("socialTyping", (data = {}) => {
+    const conversationId = String(data.conversationId || "");
+    if (!conversationId) return;
+    socket.to(`conversation:${conversationId}`).emit("socialTyping", {
+      conversationId,
+      userId: socket.user._id,
+      username: socket.user.username,
+      isTyping: Boolean(data.isTyping),
+    });
+  });
+
+  onSafe("joinConversation", (data = {}) => {
+    const conversationId = String(data.conversationId || "").trim();
+    if (!conversationId) return;
+    socket.join(`conversation:${conversationId}`);
+  });
+
+  onSafe("leaveConversation", (data = {}) => {
+    const conversationId = String(data.conversationId || "").trim();
+    if (!conversationId) return;
+    socket.leave(`conversation:${conversationId}`);
+  });
+
+  onSafe("socialMessage", async (data = {}) => {
+    try {
+      const Conversation = require("./models/Conversation");
+      const conversationId = String(data.conversationId || "").trim();
+      const text = stripHtmlTags(String(data.text || "")).trim().slice(0, 1000);
+      if (!conversationId || !text) return;
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation) {
+        socket.emit("serverError", { message: "Conversation not found" });
+        return;
+      }
+      const isAllowed = conversation.type === "public" || conversation.participants.some((id) => String(id) === String(socket.user._id));
+      if (!isAllowed) {
+        socket.emit("serverError", { message: "Not allowed" });
+        return;
+      }
+      const message = { sender: socket.user._id, senderName: socket.user.username, text, readBy: [socket.user._id] };
+      conversation.messages.push(message);
+      if (conversation.messages.length > 300) conversation.messages = conversation.messages.slice(-300);
+      conversation.lastMessageAt = new Date();
+      await conversation.save();
+      const savedMessage = conversation.messages[conversation.messages.length - 1];
+      io.to(`conversation:${conversationId}`).emit("socialMessage", { conversationId, message: savedMessage });
+    } catch (error) {
+      console.error("Social message error:", error);
       socket.emit("serverError", { message: "Failed to send message" });
     }
   });

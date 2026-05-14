@@ -25,6 +25,11 @@ import PricingPage from "../pages/billing/PricingPage";
 import BillingPage from "../pages/billing/BillingPage";
 import AdminSupportersPage from "../pages/billing/AdminSupportersPage";
 import HelpCenterPage from "../pages/HelpCenterPage";
+import MonetizationPage from "../pages/billing/MonetizationPage";
+import ReferralPage from "../pages/billing/ReferralPage";
+import TournamentsPage from "../pages/billing/TournamentsPage";
+import CommunityPage from "../pages/CommunityPage";
+import MessagesPage from "../pages/MessagesPage";
 
 function pageFromPathname(pathname) {
   if (pathname === "/reset-password") return "reset-password";
@@ -188,19 +193,21 @@ export default function App() {
         return (
           <Chess
             onBack={() => setCurrentPage("dashboard")}
+            onNavigate={setCurrentPage}
             initialAiEnabled
             timeControl={selectedTimeControl}
           />
         );
       }
       case "multi":
-        return <MultiplayerChess onBack={() => setCurrentPage("dashboard")} />;
+        return <MultiplayerChess onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
       case "local": {
         const selectedTimeControl =
           localStorage.getItem("selectedTimeControl") || "3+0";
         return (
           <Chess
             onBack={() => setCurrentPage("dashboard")}
+            onNavigate={setCurrentPage}
             initialAiEnabled={false}
             timeControl={selectedTimeControl}
             title="Play vs Player"
@@ -249,8 +256,18 @@ export default function App() {
         return (
           <AdminSupportersPage onBack={() => setCurrentPage("billing")} />
         );
+      case "community":
+        return <CommunityPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
+      case "messages":
+        return <MessagesPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
       case "help":
         return <HelpCenterPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
+      case "monetization":
+        return <MonetizationPage user={user} onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
+      case "referral":
+        return <ReferralPage onBack={() => setCurrentPage("dashboard")} />;
+      case "tournaments":
+        return <TournamentsPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
       case "puzzles":
         return (
           <ComingSoonPage

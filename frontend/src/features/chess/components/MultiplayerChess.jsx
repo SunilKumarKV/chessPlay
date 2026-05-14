@@ -15,7 +15,7 @@ const MATCH_MODES = [
   { id: "advanced", label: "Advanced", icon: "♛", ratingRange: "advanced", copy: "Stronger players" },
 ];
 
-export default function MultiplayerChess({ onBack }) {
+export default function MultiplayerChess({ onBack, onNavigate }) {
   const { user } = useCurrentUser();
   const [playerName, setPlayerName] = useState(user?.username || "");
   const [roomCode, setRoomCode] = useState("");
@@ -249,6 +249,7 @@ export default function MultiplayerChess({ onBack }) {
         error={error}
         isSpectating={isSpectating}
         spectatorCount={spectatorCount}
+        onNavigate={onNavigate}
       />
     );
   }

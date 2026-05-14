@@ -636,7 +636,7 @@ export default function Dashboard({
       </section>
 
       <div className="mt-6">
-        <AdSlot user={user} />
+        <AdSlot user={user} placement="dashboard_banner" onUpgrade={openUpgradeModal} />
       </div>
 
       <div className="fixed bottom-5 right-5 z-20 flex flex-col gap-3">
