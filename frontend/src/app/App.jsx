@@ -188,7 +188,7 @@ export default function App() {
   if (!user) {
     return (
       <ErrorBoundary>
-        <LandingPage onLogin={handleLogin} onGuestPlay={handleGuestPlay} />
+        <LandingPage onLogin={handleLogin} onGuestPlay={handleGuestPlay} onNavigatePath={(path) => { window.history.pushState({}, "", path); setCurrentPage(pageFromPathname(path)); }} />
       </ErrorBoundary>
     );
   }

@@ -54,7 +54,7 @@ const TRACKING_ITEMS = [
 
 const PRODUCT_POINTS = ["Stockfish AI", "Live multiplayer", "Same WiFi play", "Game history", "Community posts", "Premium options"];
 
-export default function LandingPage({ onLogin, onGuestPlay }) {
+export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
   const [showAuth, setShowAuth] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [loadingAction, setLoadingAction] = useState("");
@@ -199,7 +199,7 @@ export default function LandingPage({ onLogin, onGuestPlay }) {
       <footer className="relative z-10 border-t border-white/10 px-4 py-8 text-center text-sm text-slate-500 md:px-8">© {new Date().getFullYear()} ChessPlay · Built for players, learners, and supporters.</footer>
 
       <Modal isOpen={showAuth} onClose={() => setShowAuth(false)} title={isLogin ? "Log In" : "Sign Up"} className="max-w-md">
-        <Auth onLogin={handleAuthSuccess} isModal={true} initialIsLogin={isLogin} onToggleMode={() => setIsLogin(!isLogin)} />
+        <Auth onLogin={handleAuthSuccess} isModal={true} initialIsLogin={isLogin} onToggleMode={() => setIsLogin(!isLogin)} onNavigatePath={onNavigatePath} />
       </Modal>
     </div>
   );

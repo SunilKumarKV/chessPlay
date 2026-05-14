@@ -275,8 +275,9 @@ router.post("/register", authLimiter, async (req, res) => {
     await user.save();
 
     await issueSession(res, user);
+    await recordSecurityEvent(req, { type: "register_success", email: user.email, user: user._id });
 
-    res.status(201).json(buildAuthResponse("User created successfully", user));
+    res.status(201).json(buildAuthResponse("Account created successfully", user));
   } catch (error) {
     console.error("Registration error:", error);
     res.status(500).json({ message: "Server error" });

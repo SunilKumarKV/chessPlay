@@ -4,7 +4,7 @@ const securityEventSchema = new mongoose.Schema(
   {
     type: {
       type: String,
-      enum: ["login_success", "login_failed", "admin_login", "token_rejected", "admin_denied"],
+      enum: ["register_success", "login_success", "login_failed", "admin_login", "token_rejected", "admin_denied"],
       required: true,
       index: true,
     },

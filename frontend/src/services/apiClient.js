@@ -34,7 +34,7 @@ async function request(endpoint, options = {}) {
 export const apiClient = async (endpoint, options = {}) => {
   let response = await request(endpoint, options);
 
-  if (response.status === 401 && endpoint !== "/api/auth/refresh") {
+  if (response.status === 401 && endpoint !== "/api/auth/refresh" && !options.skipAuthRefresh) {
     const refreshResponse = await request("/api/auth/refresh", { method: "POST" });
     if (refreshResponse.ok) {
       const refreshData = await readJson(refreshResponse);
