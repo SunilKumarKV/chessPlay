@@ -7,6 +7,7 @@ import {
 } from "../../../config/runtime";
 import { validateProductionEmail } from "../../../utils/emailValidation";
 
+const GOOGLE_CLIENT_ID_ENV_NAME = "VITE_GOOGLE_CLIENT_ID";
 let googleInitializedClientId = "";
 let googleCredentialHandler = null;
 
@@ -178,8 +179,6 @@ export default function Auth({
             callback: (response) => {
               googleCredentialHandler?.(response);
             },
-            ux_mode: "popup",
-            use_fedcm_for_prompt: false,
           });
           googleInitializedClientId = GOOGLE_CLIENT_ID;
         }
@@ -208,11 +207,10 @@ export default function Auth({
 
   const handleGoogleRedirect = () => {
     if (!GOOGLE_CLIENT_ID) {
-      setError("Google login needs VITE_GOOGLE_CLIENT_ID.");
+      setError("Google login is not configured yet. Please use email login.");
       return;
     }
-
-    setError("Use the Google button above to continue. If it does not appear, disable popup blockers and refresh the page.");
+    setError("Use the Google button above to continue.");
   };
 
   const handleSocialLogin = (provider) => {

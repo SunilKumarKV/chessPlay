@@ -32,7 +32,7 @@ export default function Sidebar({
         { id: "tournaments", label: "Tournaments", icon: "🏆" },
         { id: "community", label: "Community", icon: "☷" },
         { id: "messages", label: "Messages", icon: "✉" },
-        ...(user?.isAdmin ? [{ id: "admin", label: "Admin Panel", icon: "🛡️" }] : []),
+        ...(user?.isAdmin ? [{ id: "admin", label: "Admin Panel", icon: "🛡" }, { id: "automation", label: "Admin Automation", icon: "🤖" }] : []),
         { id: "help", label: "How it works", icon: "?" },
         { id: "leaderboard", label: "Leaderboard", icon: "★" },
         { id: "settings", label: "Settings", icon: "⚙" },

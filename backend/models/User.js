@@ -59,6 +59,13 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  isBanned: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  bannedAt: { type: Date, default: null },
+  bannedReason: { type: String, trim: true, maxlength: 300, default: "" },
 
   // v1.2.1 SaaS / supporter plan fields
   plan: {

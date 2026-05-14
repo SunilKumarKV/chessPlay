@@ -10,8 +10,9 @@ export const SOCKET_URL =
 export const GOOGLE_CLIENT_ID =
   import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
-// Google sign-in uses Google Identity Services on the frontend and POSTs the returned credential to /api/auth/google.
-// Do not configure a VITE_GOOGLE_AUTH_URL redirect for this backend.
+export const GOOGLE_AUTH_URL =
+  import.meta.env.VITE_GOOGLE_AUTH_URL || "";
+
 export const FACEBOOK_AUTH_URL =
   import.meta.env.VITE_FACEBOOK_AUTH_URL || "";
 

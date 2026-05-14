@@ -2,6 +2,7 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/User");
+const SecurityEvent = require("../models/SecurityEvent");
 const { storeAvatar, safeExternalImageUrl } = require("../utils/avatarStorage");
 const {
   authUserPayload,
@@ -142,6 +143,19 @@ async function verifyGoogleCredential(credential) {
   return profile;
 }
 
+
+async function recordSecurityEvent(req, payload) {
+  try {
+    await SecurityEvent.create({
+      ...payload,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"] || "",
+    });
+  } catch {
+    // Security event logging must never block authentication.
+  }
+}
+
 function isFriend(user, otherUserId) {
   return Boolean(
     user?.friends?.some((friendId) => String(friendId) === String(otherUserId)),
@@ -278,12 +292,19 @@ router.post("/login", authLimiter, async (req, res) => {
     // Find user
     const user = await User.findOne({ email });
     if (!user) {
+      await recordSecurityEvent(req, { type: "login_failed", email, reason: "user_not_found" });
       return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    if (user.isBanned) {
+      await recordSecurityEvent(req, { type: "login_failed", email, user: user._id, reason: "banned_account" });
+      return res.status(403).json({ message: "This account is temporarily restricted. Contact support if you believe this is a mistake." });
     }
 
     // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      await recordSecurityEvent(req, { type: "login_failed", email, user: user._id, reason: "wrong_password" });
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
@@ -292,6 +313,7 @@ router.post("/login", authLimiter, async (req, res) => {
     await user.save();
 
     await issueSession(res, user);
+    await recordSecurityEvent(req, { type: user.isAdmin ? "admin_login" : "login_success", email: user.email, user: user._id });
 
     res.json(buildAuthResponse("Login successful", user));
   } catch (error) {
@@ -327,9 +349,15 @@ router.post("/google", authLimiter, async (req, res) => {
       user.avatar = profile.picture;
     }
 
+    if (user.isBanned) {
+      await recordSecurityEvent(req, { type: "login_failed", email: user.email, user: user._id, reason: "banned_account_google" });
+      return res.status(403).json({ message: "This account is temporarily restricted. Contact support if you believe this is a mistake." });
+    }
+
     user.lastLogin = new Date();
     await user.save();
     await issueSession(res, user);
+    await recordSecurityEvent(req, { type: user.isAdmin ? "admin_login" : "login_success", email: user.email, user: user._id });
 
     res.json(buildAuthResponse("Google login successful", user));
   } catch (error) {

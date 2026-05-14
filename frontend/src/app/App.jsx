@@ -24,6 +24,7 @@ import VerifyEmailPage from "../pages/VerifyEmailPage";
 import PricingPage from "../pages/billing/PricingPage";
 import BillingPage from "../pages/billing/BillingPage";
 import AdminSupportersPage from "../pages/billing/AdminSupportersPage";
+import AdminPanelPage from "../pages/admin/AdminPanelPage";
 import HelpCenterPage from "../pages/HelpCenterPage";
 import MonetizationPage from "../pages/billing/MonetizationPage";
 import ReferralPage from "../pages/billing/ReferralPage";
@@ -31,33 +32,22 @@ import TournamentsPage from "../pages/billing/TournamentsPage";
 import CommunityPage from "../pages/CommunityPage";
 import MessagesPage from "../pages/MessagesPage";
 import AutomationPage from "../pages/AutomationPage";
-import AdminDashboardPage from "../pages/AdminDashboardPage";
-
-const PAGE_PATHS = {
-  dashboard: "/",
-  admin: "/admin",
-  "admin-supporters": "/admin/supporters",
-  automation: "/admin/automation",
-  "forgot-password": "/forgot-password",
-  "reset-password": "/reset-password",
-  "verify-email": "/verify-email",
-};
 
 function pageFromPathname(pathname) {
-  const normalizedPath = pathname.replace(/\/+$/, "") || "/";
-  if (normalizedPath === "/admin" || normalizedPath === "/admin/dashboard") return "admin";
-  if (normalizedPath === "/admin/supporters") return "admin-supporters";
-  if (normalizedPath === "/admin/automation") return "automation";
-  if (normalizedPath === "/forgot-password") return "forgot-password";
-  if (normalizedPath === "/reset-password") return "reset-password";
-  if (normalizedPath === "/verify-email") return "verify-email";
+  if (pathname === "/admin" || pathname === "/admin/" || pathname === "/admin/dashboard") return "admin";
+  if (pathname === "/forgot-password") return "forgot-password";
+  if (pathname === "/reset-password") return "reset-password";
+  if (pathname === "/verify-email") return "verify-email";
   return "dashboard";
 }
 
 function navigateToAppPage(page, setCurrentPage) {
-  const targetPath = PAGE_PATHS[page] || "/";
-  if (window.location.pathname !== targetPath) {
-    window.history.pushState({}, "", targetPath);
+  if (["forgot-password", "reset-password", "verify-email"].includes(page)) {
+    window.history.pushState({}, "", `/${page}`);
+  } else if (page === "admin") {
+    window.history.pushState({}, "", "/admin");
+  } else if (window.location.pathname !== "/") {
+    window.history.pushState({}, "", "/");
   }
   setCurrentPage(page);
 }
@@ -292,13 +282,7 @@ export default function App() {
           />
         );
       case "admin":
-        return (
-          <AdminDashboardPage
-            user={user}
-            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
-            onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
-          />
-        );
+        return <AdminPanelPage user={user} onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />;
       case "admin-supporters":
         if (!user?.isAdmin) {
           return (
@@ -310,7 +294,7 @@ export default function App() {
           );
         }
         return (
-          <AdminSupportersPage onBack={() => navigateToAppPage("admin", setCurrentPage)} />
+          <AdminSupportersPage onBack={() => setCurrentPage("billing")} />
         );
       case "community":
         return <CommunityPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
@@ -326,7 +310,7 @@ export default function App() {
             />
           );
         }
-        return <AutomationPage onBack={() => navigateToAppPage("admin", setCurrentPage)} />;
+        return <AutomationPage onBack={() => setCurrentPage("dashboard")} />;
       case "help":
         return <HelpCenterPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
       case "monetization":
