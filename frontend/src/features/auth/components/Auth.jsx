@@ -3,7 +3,6 @@ import { FormInput, PasswordInput, PrimaryBtn } from "../../../components/ui";
 import {
   BACKEND_URL,
   FACEBOOK_AUTH_URL,
-  GOOGLE_AUTH_URL,
   GOOGLE_CLIENT_ID,
 } from "../../../config/runtime";
 import { validateProductionEmail } from "../../../utils/emailValidation";
@@ -160,7 +159,7 @@ export default function Auth({
   useEffect(() => {
     googleCredentialHandler = handleGoogleCredential;
 
-    if (!GOOGLE_CLIENT_ID || GOOGLE_AUTH_URL || !googleButtonRef.current) {
+    if (!GOOGLE_CLIENT_ID || !googleButtonRef.current) {
       return () => {
         googleCredentialHandler = null;
       };
@@ -179,6 +178,8 @@ export default function Auth({
             callback: (response) => {
               googleCredentialHandler?.(response);
             },
+            ux_mode: "popup",
+            use_fedcm_for_prompt: false,
           });
           googleInitializedClientId = GOOGLE_CLIENT_ID;
         }
@@ -206,20 +207,12 @@ export default function Auth({
   }, [handleGoogleCredential]);
 
   const handleGoogleRedirect = () => {
-    try {
-      if (GOOGLE_AUTH_URL) {
-        window.location.href = GOOGLE_AUTH_URL;
-        return;
-      }
-
-      if (!GOOGLE_CLIENT_ID) {
-        throw new Error("Google login needs VITE_GOOGLE_CLIENT_ID.");
-      }
-
-      setError("Use the Google button above to continue.");
-    } catch (error) {
-      setError(error.message);
+    if (!GOOGLE_CLIENT_ID) {
+      setError("Google login needs VITE_GOOGLE_CLIENT_ID.");
+      return;
     }
+
+    setError("Use the Google button above to continue. If it does not appear, disable popup blockers and refresh the page.");
   };
 
   const handleSocialLogin = (provider) => {
@@ -254,7 +247,7 @@ export default function Auth({
       </div>
 
       <div className="relative grid gap-2">
-        {GOOGLE_CLIENT_ID && !GOOGLE_AUTH_URL ? (
+        {GOOGLE_CLIENT_ID ? (
           <div className="min-h-11 w-full overflow-hidden rounded-lg bg-white">
             <div ref={googleButtonRef} className="w-full" />
           </div>
