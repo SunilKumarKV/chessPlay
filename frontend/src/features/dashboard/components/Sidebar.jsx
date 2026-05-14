@@ -27,12 +27,12 @@ export default function Sidebar({
         { id: "analysis", label: "Analysis", icon: "∑" },
         { id: "pricing", label: "Support / Pricing", icon: "₹" },
         { id: "billing", label: "Billing", icon: "◈" },
-        { id: "monetization", label: "Monetization", icon: "$" },
+        { id: "monetization", label: "Premium", icon: "$" },
         { id: "referral", label: "Referral", icon: "↗" },
         { id: "tournaments", label: "Tournaments", icon: "🏆" },
         { id: "community", label: "Community", icon: "☷" },
         { id: "messages", label: "Messages", icon: "✉" },
-        { id: "automation", label: "Automation Bot", icon: "🤖" },
+        ...(user?.isAdmin ? [{ id: "automation", label: "Admin Automation", icon: "🤖" }] : []),
         { id: "help", label: "How it works", icon: "?" },
         { id: "leaderboard", label: "Leaderboard", icon: "★" },
         { id: "settings", label: "Settings", icon: "⚙" },
@@ -60,9 +60,9 @@ export default function Sidebar({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 flex-shrink-0 z-50 shadow-2xl transition-all duration-300 ease-in-out transform ${
-          isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-        } ${isCollapsed ? "w-20" : "w-72"} flex flex-col backdrop-blur-2xl`}
+        className={`fixed lg:static inset-y-0 left-0 flex-shrink-0 z-50 shadow-2xl transition-all duration-300 ease-in-out transform ${
+          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        } ${isCollapsed ? "w-20" : "w-72 max-w-[86vw]"} flex flex-col backdrop-blur-2xl`}
         style={{
           background: `linear-gradient(180deg, ${theme.bg.secondary}, ${theme.bg.primary})`,
           borderRightColor: theme.border.secondary,
@@ -89,7 +89,7 @@ export default function Sidebar({
           </div>
           {!isCollapsed && (
             <button
-              className="md:hidden p-2 transition-colors"
+              className="lg:hidden p-2 transition-colors"
               style={{
                 color: theme.text.secondary,
                 backgroundColor: "transparent",
@@ -156,7 +156,7 @@ export default function Sidebar({
         >
           <button
             onClick={onToggleCollapse}
-            className={`w-full hidden md:flex items-center gap-4 px-4 py-3 rounded-lg font-bold transition-colors text-left ${
+            className={`w-full hidden lg:flex items-center gap-4 px-4 py-3 rounded-lg font-bold transition-colors text-left ${
               isCollapsed ? "justify-center !px-0" : ""
             }`}
             style={{

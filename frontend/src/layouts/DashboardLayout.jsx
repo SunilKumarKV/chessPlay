@@ -26,7 +26,7 @@ export default function DashboardLayout({
 
   return (
     <div
-      className="flex h-screen font-['Inter'] w-full overflow-hidden transition-colors duration-300"
+      className="flex h-[100dvh] min-h-screen font-['Inter'] w-full overflow-hidden transition-colors duration-300"
       style={{
         background: `linear-gradient(135deg, ${theme.bg.primary} 0%, ${theme.bg.secondary} 48%, ${theme.bg.tertiary} 100%)`,
         color: theme.text.primary,
@@ -65,7 +65,7 @@ export default function DashboardLayout({
               background: theme.bg.primary,
             }}
           >
-            <div className="w-full h-full max-w-7xl mx-auto">{children}</div>
+            <div className="w-full min-h-full max-w-7xl mx-auto">{children}</div>
           </main>
 
           {/* Right Panel (Optional Game Info, Chat, Moves) */}

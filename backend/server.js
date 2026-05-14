@@ -282,7 +282,11 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        connectSrc: cspConnectSources,
+        connectSrc: [...cspConnectSources, "https://accounts.google.com", "https://oauth2.googleapis.com"],
+        scriptSrc: ["'self'", "https://accounts.google.com"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com"],
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
+        fontSrc: ["'self'", "data:"],
         workerSrc: ["'self'", "blob:"],
       },
     },

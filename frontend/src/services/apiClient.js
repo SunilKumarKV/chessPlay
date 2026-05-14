@@ -10,10 +10,17 @@ function getSessionAccessToken() {
     "";
 }
 
+function clearSessionTokens() {
+  sessionStorage.removeItem("chessplay_access_token");
+  sessionStorage.removeItem("chessplay_socket_token");
+}
+
 async function request(endpoint, options = {}) {
   const token = getSessionAccessToken();
+  const hasBody = Boolean(options.body);
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const headers = {
-    "Content-Type": "application/json",
+    ...(hasBody && !isFormData ? { "Content-Type": "application/json" } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
@@ -42,6 +49,8 @@ export const apiClient = async (endpoint, options = {}) => {
         sessionStorage.setItem("chessplay_socket_token", refreshData.socketToken);
       }
       response = await request(endpoint, options);
+    } else {
+      clearSessionTokens();
     }
   }
 
