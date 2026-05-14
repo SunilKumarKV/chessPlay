@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useCurrentUser } from "../hooks/useCurrentUser";
 import Sidebar from "../features/dashboard/components/Sidebar";
 import Topbar from "../features/dashboard/components/Topbar";
 import { useTheme } from "../hooks/useTheme";
@@ -10,18 +11,9 @@ export default function DashboardLayout({
   onNavigate,
   onLogout,
 }) {
-  const initialUser = (() => {
-    try {
-      const storedUser = localStorage.getItem("user");
-      return storedUser ? JSON.parse(storedUser) : null;
-    } catch (e) {
-      console.error("Could not parse user", e);
-      return null;
-    }
-  })();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [user] = useState(initialUser);
+  const { user } = useCurrentUser();
   const { theme } = useTheme();
 
   return (
