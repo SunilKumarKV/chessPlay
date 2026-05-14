@@ -16,13 +16,14 @@ const MATCH_MODES = [
 ];
 
 export default function MultiplayerChess({ onBack, onNavigate }) {
-  const { user } = useCurrentUser();
+  const { user, isLoggedIn } = useCurrentUser();
   const [playerName, setPlayerName] = useState(user?.username || "");
   const [roomCode, setRoomCode] = useState("");
   const [serverUrl] = useState(SOCKET_URL || BACKEND_URL);
   const [selectedTimeControlIndex, setSelectedTimeControlIndex] = useState(3);
   const [selectedMode, setSelectedMode] = useState("casual");
   const [connectionCheck, setConnectionCheck] = useState(null);
+  const [uiNotice, setUiNotice] = useState(null);
   const [searchStartedAt, setSearchStartedAt] = useState(null);
   const [searchSeconds, setSearchSeconds] = useState(0);
 
@@ -55,7 +56,9 @@ export default function MultiplayerChess({ onBack, onNavigate }) {
     isSpectating,
     spectatorCount,
     getRooms,
-  } = useMultiplayerChess(serverUrl);
+    connectionStatus,
+    retryConnection,
+  } = useMultiplayerChess(serverUrl, true, { enabled: isLoggedIn && !user?.isGuest });
 
   const displayName = playerName.trim() || user?.username || "Player";
   const showRoomSetup = !gameState;
@@ -85,6 +88,22 @@ export default function MultiplayerChess({ onBack, onNavigate }) {
     }
   }, [isSearching]);
 
+  if (!isLoggedIn || user?.isGuest) {
+    return (
+      <div className="min-h-screen bg-[#07100d] px-4 py-10 text-white">
+        <div className="mx-auto max-w-2xl rounded-[2rem] border border-amber-300/30 bg-amber-300/10 p-6 text-center shadow-2xl">
+          <p className="text-sm font-black uppercase tracking-[0.25em] text-amber-200">Login required</p>
+          <h1 className="mt-3 text-3xl font-black">Play Online needs a secure account</h1>
+          <p className="mt-3 text-sm leading-6 text-amber-50/80">Online games use authenticated sockets to protect rooms, ratings, game history, chat, and opponent matching.</p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <button onClick={() => onNavigate?.("dashboard")} className="rounded-xl border border-white/15 px-5 py-3 font-bold text-white hover:bg-white/10">Back</button>
+            <button onClick={() => onNavigate?.("pricing")} className="rounded-xl bg-amber-300 px-5 py-3 font-black text-black hover:bg-amber-200">Support ChessPlay</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const testServerConnection = async () => {
     setConnectionCheck({ tone: "info", message: "Checking multiplayer server..." });
     try {
@@ -97,6 +116,10 @@ export default function MultiplayerChess({ onBack, onNavigate }) {
   };
 
   const startMatchmaking = () => {
+    if (!isConnected) {
+      setUiNotice({ tone: "error", message: "Multiplayer is not connected yet. Try Retry connection." });
+      return;
+    }
     const nextTimeIndex = typeof activeMode.timeIndex === "number" ? activeMode.timeIndex : selectedTimeControlIndex;
     setSelectedTimeControlIndex(nextTimeIndex);
     setSearchStartedAt(Date.now());
@@ -119,7 +142,7 @@ export default function MultiplayerChess({ onBack, onNavigate }) {
         <header className="border-b border-white/10 bg-white/[0.04] px-6 py-4 backdrop-blur-xl">
           <div className="mx-auto flex max-w-7xl items-center justify-between">
             <button onClick={onBack} className="text-sm font-bold text-slate-400 transition hover:text-white">← Back to Dashboard</button>
-            <div className={`rounded-full px-3 py-1 text-xs font-black ${isConnected ? "bg-emerald-400/15 text-emerald-300" : "bg-red-400/15 text-red-300"}`}>{isConnected ? "🟢 Server connected" : "🔴 Connecting..."}</div>
+            <div className={`rounded-full px-3 py-1 text-xs font-black ${isConnected ? "bg-emerald-400/15 text-emerald-300" : "bg-red-400/15 text-red-300"}`}>{isConnected ? "🟢 Connected" : connectionStatus === "reconnecting" ? "🟡 Reconnecting" : connectionStatus === "login-required" ? "🔒 Login required" : "🔴 Disconnected"}</div>
           </div>
         </header>
 
@@ -127,7 +150,20 @@ export default function MultiplayerChess({ onBack, onNavigate }) {
           <section className="mb-8 rounded-[2rem] border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
             <p className="text-sm font-black uppercase tracking-[0.25em] text-[#81b64c]">Play Online</p>
             <h1 className="mt-2 font-['Montserrat'] text-3xl font-black md:text-5xl">Find an opponent automatically or invite a friend.</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">Choose a mode, start searching, or create a private room. If multiplayer disconnects, ChessPlay will show: “Connection lost. Refresh and retry.”</p>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">Choose a mode, start searching, or create a private room. Connection is protected by your ChessPlay session. If multiplayer disconnects, use Retry connection without refreshing the page.</p>
+          </section>
+
+          <section className="mb-6 grid gap-3 md:grid-cols-3">
+            {[
+              ["Play vs AI", "Practice safely against the engine.", "ai"],
+              ["Play Online", "Create or join real-time rooms.", "multi"],
+              ["Support ChessPlay", "Pay with PayPal, UPI, or Bank and get supporter benefits after admin verification.", "pricing"],
+            ].map(([title, text, page]) => (
+              <button key={title} type="button" onClick={() => onNavigate?.(page)} className="rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-left hover:bg-white/[0.08]">
+                <div className="font-black text-white">{title}</div>
+                <p className="mt-1 text-sm text-slate-400">{text}</p>
+              </button>
+            ))}
           </section>
 
           <div className="grid gap-6 xl:grid-cols-[1.25fr_.75fr]">
@@ -171,7 +207,7 @@ export default function MultiplayerChess({ onBack, onNavigate }) {
                       <h3 className="text-xl font-black">Ready for {activeMode.label}</h3>
                       <p className="mt-1 text-sm text-slate-400">Auto pairing uses your rating and selected mode. Timeout fallback keeps you in queue until you cancel.</p>
                     </div>
-                    <button onClick={startMatchmaking} disabled={!isConnected} className="rounded-xl bg-[#81b64c] px-6 py-4 font-black text-[#07100a] hover:bg-[#93c85f] disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400">Find Opponent</button>
+                    <button onClick={startMatchmaking} disabled={!isConnected} aria-label="Find an online chess opponent" className="rounded-xl bg-[#81b64c] px-6 py-4 font-black text-[#07100a] hover:bg-[#93c85f] disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400">Find Opponent</button>
                   </div>
                 )}
               </div>
@@ -181,8 +217,9 @@ export default function MultiplayerChess({ onBack, onNavigate }) {
               <section className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl">
                 <h3 className="text-lg font-black text-cyan-300">Multiplayer Server</h3>
                 <p className="mt-2 text-sm text-slate-400">Server URL is protected by environment variables and hidden from players.</p>
-                <button onClick={testServerConnection} className="mt-4 w-full rounded-xl bg-cyan-500 px-4 py-3 font-black text-[#07100a] hover:bg-cyan-400">Test Server</button>
-                {error && <div className="mt-3 rounded-xl border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-200">{error}</div>}
+                <div className="mt-4 grid gap-2 sm:grid-cols-2"><button onClick={testServerConnection} className="rounded-xl bg-cyan-500 px-4 py-3 font-black text-[#07100a] hover:bg-cyan-400">Test Server</button><button onClick={retryConnection} className="rounded-xl border border-white/10 px-4 py-3 font-black text-white hover:bg-white/10">Retry connection</button></div>
+                {error && <div role="alert" className="mt-3 rounded-xl border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-200">{error}</div>}
+                {uiNotice && <div role="status" className={`mt-3 rounded-xl border p-3 text-sm ${uiNotice.tone === "error" ? "border-red-400/20 bg-red-400/10 text-red-200" : "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"}`}>{uiNotice.message}</div>}
                 {connectionCheck && <div className={`mt-3 rounded-xl border p-3 text-sm ${connectionCheck.tone === "success" ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200" : connectionCheck.tone === "error" ? "border-red-400/20 bg-red-400/10 text-red-200" : "border-cyan-400/20 bg-cyan-400/10 text-cyan-200"}`}>{connectionCheck.message}</div>}
               </section>
 
@@ -191,7 +228,7 @@ export default function MultiplayerChess({ onBack, onNavigate }) {
                 <label className="mt-4 block text-sm font-bold text-slate-300">Your Name
                   <input value={playerName} onChange={(e) => setPlayerName(e.target.value)} placeholder="Enter your name" className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none focus:border-[#81b64c]" />
                 </label>
-                <button onClick={() => createRoom(playerNameForRoom)} disabled={!isConnected || !playerNameForRoom} className="mt-4 w-full rounded-xl bg-[#81b64c] px-4 py-3 font-black text-[#07100a] hover:bg-[#93c85f] disabled:bg-slate-700 disabled:text-slate-400">Host Private Room</button>
+                <button onClick={() => { createRoom(playerNameForRoom); setUiNotice({ tone: "success", message: "Room request sent. Share the room code after it appears." }); }} disabled={!isConnected || !playerNameForRoom} className="mt-4 w-full rounded-xl bg-[#81b64c] px-4 py-3 font-black text-[#07100a] hover:bg-[#93c85f] disabled:bg-slate-700 disabled:text-slate-400">Host Private Room</button>
                 <label className="mt-4 block text-sm font-bold text-slate-300">Room Code
                   <input value={roomCode} onChange={(e) => setRoomCode(e.target.value.toUpperCase())} placeholder="ABC123" maxLength={6} className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none focus:border-amber-300" />
                 </label>

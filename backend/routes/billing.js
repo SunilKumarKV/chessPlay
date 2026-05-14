@@ -101,7 +101,7 @@ function paymentMethodsFor(plan) {
       { id: "bank", label: "Bank Transfer", bank, amount: selected.amount, currency: "INR", configured: bankConfigured },
     ],
     global: [
-      { id: "paypal", label: "PayPal", checkoutUrl: process.env.PAYPAL_CHECKOUT_URL || "", amount: selected.usdAmount, currency: "USD", configured: Boolean(process.env.PAYPAL_CHECKOUT_URL) },
+      { id: "paypal", label: "PayPal", checkoutUrl: process.env.PAYPAL_CHECKOUT_URL || "", paypalEmail: process.env.PAYPAL_EMAIL || "", amount: selected.usdAmount, currency: "USD", configured: Boolean(process.env.PAYPAL_CHECKOUT_URL || process.env.PAYPAL_EMAIL) },
       { id: "stripe", label: "Stripe", checkoutUrl: process.env.STRIPE_PAYMENT_LINK || "", amount: selected.usdAmount, currency: "USD", configured: Boolean(process.env.STRIPE_PAYMENT_LINK) },
     ],
     manualFallback: { enabled: true, label: "Manual approval fallback" },
@@ -204,7 +204,7 @@ router.post("/payment-intents", auth, async (req, res) => {
     if (!config) return res.status(400).json({ message: "Invalid plan" });
     if (!["upi", "bank", "qr", "paypal", "stripe", "manual"].includes(provider)) return res.status(400).json({ message: "Invalid payment provider" });
     const configuredMethod = [...paymentMethodsFor(plan).india, ...paymentMethodsFor(plan).global].find((method) => method.id === provider);
-    if (configuredMethod && configuredMethod.configured === false) return res.status(503).json({ message: "This payment method is not active yet" });
+    if (configuredMethod && configuredMethod.configured === false) return res.status(503).json({ message: "This payment method is not active yet. Please choose an active method or contact support." });
 
     const amount = ["paypal", "stripe"].includes(provider) ? config.usdAmount : config.amount;
     const currency = ["paypal", "stripe"].includes(provider) ? "USD" : "INR";
@@ -257,7 +257,7 @@ router.post("/upi-request", auth, async (req, res) => {
     const paymentMethod = String(req.body.paymentMethod || "upi").toLowerCase();
     if (!["upi", "bank", "qr", "paypal", "stripe", "manual"].includes(paymentMethod)) return res.status(400).json({ message: "Invalid payment method" });
     const configuredMethod = [...paymentMethodsFor(plan).india, ...paymentMethodsFor(plan).global].find((method) => method.id === paymentMethod);
-    if (configuredMethod && configuredMethod.configured === false) return res.status(503).json({ message: "This payment method is not active yet" });
+    if (configuredMethod && configuredMethod.configured === false) return res.status(503).json({ message: "This payment method is not active yet. Please choose an active method or contact support." });
 
     const amount = Number(req.body.amount);
     const minAmount = ["paypal", "stripe"].includes(paymentMethod) ? config.usdAmount : config.amount;

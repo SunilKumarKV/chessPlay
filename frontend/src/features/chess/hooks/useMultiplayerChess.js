@@ -22,7 +22,7 @@ function forgetRoom() {
   sessionStorage.removeItem(STORED_PLAYER_COLOR_KEY);
 }
 
-export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
+export function useMultiplayerChess(serverUrl = null, soundEnabled = true, options = {}) {
   const socketRef = useRef(null);
   const sound = useSoundEffects({ enabled: soundEnabled });
   const soundRef = useRef(sound);
@@ -41,6 +41,9 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
   const [rooms, setRooms] = useState([]);
   const [isSpectating, setIsSpectating] = useState(false);
   const [spectatorCount, setSpectatorCount] = useState(0);
+  const [connectionStatus, setConnectionStatus] = useState("idle");
+  const [connectNonce, setConnectNonce] = useState(0);
+  const enabled = options?.enabled !== false;
   const playerColorRef = useRef(null);
   const roomIdRef = useRef(null);
 
@@ -59,6 +62,13 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
   };
 
   useEffect(() => {
+    if (!enabled) {
+      setIsConnected(false);
+      setConnectionStatus("login-required");
+      setError("Login is required for Play Online.");
+      return undefined;
+    }
+
     let isMounted = true;
     let newSocket = null;
 
@@ -97,8 +107,15 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
     async function connectSocket() {
       const targetUrl =
         serverUrl || SOCKET_URL || `http://${window.location.hostname}:3001`;
+      setConnectionStatus("connecting");
       const socketToken = await fetchSocketToken();
       if (!isMounted) return;
+      if (!socketToken) {
+        setIsConnected(false);
+        setConnectionStatus("login-required");
+        setError("Your session expired. Please login again to play online.");
+        return;
+      }
 
       newSocket = io(targetUrl, {
         transports: ["websocket", "polling"],
@@ -110,12 +127,13 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
         reconnectionDelayMax: 4000,
         timeout: 12000,
         withCredentials: true,
-        auth: socketToken ? { accessToken: socketToken } : undefined,
+        auth: { accessToken: socketToken },
       });
       socketRef.current = newSocket;
 
     newSocket.on("connect", () => {
       setIsConnected(true);
+      setConnectionStatus("connected");
       setError(null);
 
       const storedRoomId = sessionStorage.getItem(STORED_ROOM_ID_KEY);
@@ -130,7 +148,8 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
     newSocket.on("disconnect", (reason) => {
       setIsConnected(false);
       if (reason !== "io client disconnect") {
-        setError("Connection lost. Refresh and retry.");
+        setConnectionStatus("disconnected");
+        setError("Connection lost. Use Retry to reconnect.");
       }
     });
 
@@ -141,15 +160,17 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
           const freshToken = await fetchSocketToken({ forceRefresh: true });
           if (freshToken && newSocket) {
             newSocket.auth = { accessToken: freshToken };
-            setError("Session refreshed. Reconnecting to multiplayer...");
+            setConnectionStatus("reconnecting");
+          setError("Session refreshed. Reconnecting to multiplayer...");
             newSocket.connect();
             return;
           }
-          setError("Connection lost. Refresh and retry.");
+          setConnectionStatus("login-required");
+          setError("Your session expired. Please login again to play online.");
         } else {
-          setError("Connection lost. Refresh and retry.");
+          setConnectionStatus("disconnected");
+          setError("Connection lost. Use Retry to reconnect.");
         }
-        console.error("Socket.IO connect_error:", err);
       });
 
       newSocket.io.on("reconnect_attempt", async () => {
@@ -402,12 +423,21 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
       newSocket?.close();
       socketRef.current = null;
     };
-  }, [serverUrl]);
+  }, [serverUrl, enabled, connectNonce]);
+
+  const retryConnection = useCallback(() => {
+    sessionStorage.removeItem("chessplay_socket_token");
+    setError(null);
+    setConnectionStatus("connecting");
+    setConnectNonce((value) => value + 1);
+  }, []);
 
   const createRoom = useCallback(
     (playerName) => {
       if (socketRef.current && isConnected) {
         socketRef.current.emit("createRoom", { playerName });
+      } else {
+        setError("Connect to the multiplayer server before creating a room.");
       }
     },
     [isConnected],
@@ -415,8 +445,15 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
 
   const joinRoom = useCallback(
     (roomId, playerName) => {
+      const normalizedRoomId = String(roomId || "").trim().toUpperCase();
+      if (!/^[A-Z0-9]{6}$/.test(normalizedRoomId)) {
+        setError("Enter a valid 6-character room code.");
+        return;
+      }
       if (socketRef.current && isConnected) {
-        socketRef.current.emit("joinRoom", { roomId, playerName });
+        socketRef.current.emit("joinRoom", { roomId: normalizedRoomId, playerName });
+      } else {
+        setError("Connect to the multiplayer server before joining a room.");
       }
     },
     [isConnected],
@@ -544,7 +581,9 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
     rooms,
     isSpectating,
     spectatorCount,
+    connectionStatus,
 
+    retryConnection,
     createRoom,
     joinRoom,
     spectateRoom,
