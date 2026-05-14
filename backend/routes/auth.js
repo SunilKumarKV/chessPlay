@@ -2,6 +2,7 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/User");
+const { storeAvatar, safeExternalImageUrl } = require("../utils/avatarStorage");
 const {
   authUserPayload,
   clearSessionCookies,
@@ -768,6 +769,49 @@ router.post("/friends/respond", auth, async (req, res) => {
   }
 });
 
+
+// Upload or update avatar. Uses Cloudinary when configured; otherwise keeps a safe development fallback.
+router.post("/avatar", auth, async (req, res) => {
+  try {
+    const { imageDataUrl, imageUrl } = req.body || {};
+    const stored = await storeAvatar({ imageDataUrl, imageUrl });
+
+    const user = await User.findByIdAndUpdate(
+      req.user.userId,
+      { avatar: stored.url },
+      { new: true, runValidators: true },
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+      message: "Avatar updated",
+      avatar: user.avatar,
+      storage: stored.storage,
+    });
+  } catch (error) {
+    console.error("Avatar upload error:", error);
+    res.status(400).json({ message: error.message || "Avatar upload failed" });
+  }
+});
+
+router.delete("/avatar", auth, async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user.userId,
+      { avatar: null },
+      { new: true, runValidators: true },
+    ).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ message: "Avatar removed", user });
+  } catch (error) {
+    console.error("Avatar delete error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 // Update user profile
 router.put("/profile", auth, async (req, res) => {
   try {
@@ -810,7 +854,7 @@ router.put("/profile", auth, async (req, res) => {
     if (username) updateData.username = username;
     if (email) updateData.email = email.toLowerCase();
     if (bio !== undefined) updateData.bio = sanitizeText(bio, 500);
-    if (avatar !== undefined) updateData.avatar = String(avatar || "").slice(0, 300) || null;
+    if (avatar !== undefined) updateData.avatar = safeExternalImageUrl(avatar) || (String(avatar || "").startsWith("data:image/") ? String(avatar).slice(0, 950000) : null);
     if (country !== undefined) updateData.country = String(country || "US").replace(/[^a-zA-Z -]/g, "").slice(0, 56) || "US";
     if (privacy && typeof privacy === "object") {
       updateData.privacy = {

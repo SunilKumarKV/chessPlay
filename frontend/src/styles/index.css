@@ -266,3 +266,8 @@ html[data-theme="newspaper"] .border-gray-600 {
   0%, 100% { transform: translateY(0) rotate(0deg); }
   50% { transform: translateY(-22px) rotate(8deg); }
 }
+
+@keyframes floatPiece {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(0, -22px, 0) rotate(5deg); }
+}

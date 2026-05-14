@@ -30,6 +30,7 @@ import ReferralPage from "../pages/billing/ReferralPage";
 import TournamentsPage from "../pages/billing/TournamentsPage";
 import CommunityPage from "../pages/CommunityPage";
 import MessagesPage from "../pages/MessagesPage";
+import AutomationPage from "../pages/AutomationPage";
 
 function pageFromPathname(pathname) {
   if (pathname === "/reset-password") return "reset-password";
@@ -260,6 +261,8 @@ export default function App() {
         return <CommunityPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
       case "messages":
         return <MessagesPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
+      case "automation":
+        return <AutomationPage onBack={() => setCurrentPage("dashboard")} />;
       case "help":
         return <HelpCenterPage onBack={() => setCurrentPage("dashboard")} onNavigate={setCurrentPage} />;
       case "monetization":

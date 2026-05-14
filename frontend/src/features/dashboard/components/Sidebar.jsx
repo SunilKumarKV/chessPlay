@@ -32,6 +32,7 @@ export default function Sidebar({
         { id: "tournaments", label: "Tournaments", icon: "🏆" },
         { id: "community", label: "Community", icon: "☷" },
         { id: "messages", label: "Messages", icon: "✉" },
+        { id: "automation", label: "Automation Bot", icon: "🤖" },
         { id: "help", label: "How it works", icon: "?" },
         { id: "leaderboard", label: "Leaderboard", icon: "★" },
         { id: "settings", label: "Settings", icon: "⚙" },

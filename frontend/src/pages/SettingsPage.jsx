@@ -4,6 +4,9 @@ import { useTheme } from "../hooks/useTheme";
 import { notifyUserChanged } from "../hooks/useCurrentUser";
 import { BOARD_THEME_OPTIONS } from "../features/chess/constants/boardThemes";
 import { BACKEND_URL } from "../config/runtime";
+import AvatarUploader from "../components/profile/AvatarUploader";
+import { LANGUAGES } from "../i18n/languages";
+import { useI18n } from "../i18n/useI18n";
 
 const API_BASE = `${BACKEND_URL}/api`;
 
@@ -15,16 +18,6 @@ const SECTIONS = [
   { id: "privacy", label: "Privacy", hint: "Visibility and requests" },
 ];
 
-const LANGUAGES = [
-  { id: "en", label: "English" },
-  { id: "hi", label: "Hindi" },
-  { id: "ta", label: "Tamil" },
-  { id: "te", label: "Telugu" },
-  { id: "kn", label: "Kannada" },
-  { id: "ml", label: "Malayalam" },
-  { id: "es", label: "Spanish" },
-  { id: "fr", label: "French" },
-];
 
 const APP_THEMES = [
   { id: "light", label: "Light", colors: ["#ffffff", "#f5f5f5", "#81b64c"] },
@@ -40,6 +33,25 @@ const APP_FONTS = [
   { id: "system", label: "System", sample: "Native device font" },
   { id: "mono", label: "JetBrains Mono", sample: "Clock 10:00 + 3" },
   { id: "serif", label: "Serif", sample: "Classic chess notes" },
+];
+
+
+const ACCENT_COLORS = [
+  { id: "", label: "Theme default", color: "#81b64c" },
+  { id: "#81b64c", label: "Chess green", color: "#81b64c" },
+  { id: "#38bdf8", label: "Sky blue", color: "#38bdf8" },
+  { id: "#a78bfa", label: "Royal purple", color: "#a78bfa" },
+  { id: "#f59e0b", label: "Gold", color: "#f59e0b" },
+  { id: "#ef4444", label: "Blitz red", color: "#ef4444" },
+];
+
+const TEXT_COLORS = [
+  { id: "", label: "Theme default", color: "var(--color-text-primary)" },
+  { id: "#111827", label: "Ink black", color: "#111827" },
+  { id: "#f8fafc", label: "Snow white", color: "#f8fafc" },
+  { id: "#fde68a", label: "Warm gold", color: "#fde68a" },
+  { id: "#bfdbfe", label: "Soft blue", color: "#bfdbfe" },
+  { id: "#dcfce7", label: "Soft green", color: "#dcfce7" },
 ];
 
 const PIECE_SETS = [
@@ -179,6 +191,7 @@ function Segmented({ value, options, onChange, theme }) {
 
 export default function Settings({ user, onBack }) {
   const { theme, isDark } = useTheme();
+  const { t } = useI18n();
   const settingsApi = useSettings();
   const current = settingsApi.settings;
   const [activeSection, setActiveSection] = useState("account");
@@ -237,7 +250,7 @@ export default function Settings({ user, onBack }) {
             >
               Back to dashboard
             </button>
-            <h1 className="text-3xl font-black font-['Montserrat']">Settings</h1>
+            <h1 className="text-3xl font-black font-['Montserrat']">{t("settings")}</h1>
             <p className="text-sm mt-1" style={{ color: theme.text.secondary }}>
               Control your account, board, play preferences, alerts, and privacy.
             </p>
@@ -255,7 +268,7 @@ export default function Settings({ user, onBack }) {
               className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50"
               style={{ borderColor: theme.border.secondary }}
             >
-              Reset
+              {t("reset")}
             </button>
             <button
               type="button"
@@ -264,7 +277,7 @@ export default function Settings({ user, onBack }) {
               className="rounded-lg px-4 py-2 font-bold disabled:opacity-50"
               style={{ backgroundColor: theme.primary, color: isDark ? "#111" : "#fff" }}
             >
-              {saving ? "Saving..." : "Save"}
+              {saving ? "Saving..." : t("save")}
             </button>
           </div>
         </header>
@@ -390,18 +403,13 @@ function AccountSection({ user, settings, updateAccount, updateAppearance, theme
     <>
       <Card title="Profile" description="These details appear on your ChessPlay profile." theme={theme}>
         <div className="grid grid-cols-1 md:grid-cols-[120px_1fr] gap-5">
-          <div className="space-y-3">
-            <div
-              className="h-28 w-28 rounded-xl overflow-hidden flex items-center justify-center text-4xl font-black"
-              style={{ backgroundColor: theme.bg.tertiary }}
-            >
-              {settings.account.avatar ? (
-                <img src={settings.account.avatar} alt="Avatar" className="h-full w-full object-cover" />
-              ) : (
-                <span>{(settings.account.username || user?.username || "U").charAt(0).toUpperCase()}</span>
-              )}
-            </div>
-          </div>
+          <AvatarUploader
+            currentAvatar={settings.account.avatar}
+            username={settings.account.username || user?.username}
+            theme={theme}
+            setStatus={setStatus}
+            onUploaded={(avatar) => updateAccount("avatar", avatar || "")}
+          />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <TextField
               label="Username"
@@ -416,12 +424,9 @@ function AccountSection({ user, settings, updateAccount, updateAppearance, theme
               onChange={(value) => updateAccount("email", value)}
               theme={theme}
             />
-            <TextField
-              label="Avatar URL"
-              value={settings.account.avatar || ""}
-              onChange={(value) => updateAccount("avatar", value)}
-              theme={theme}
-            />
+            <div className="rounded-lg p-3 text-sm" style={{ backgroundColor: theme.bg.tertiary, color: theme.text.secondary }}>
+              Avatar is now uploaded with crop support. Cloudinary/S3 is used when configured; otherwise a safe local fallback keeps development working.
+            </div>
             <TextField
               label="Country code"
               value={settings.account.country || "US"}
@@ -452,7 +457,10 @@ function AccountSection({ user, settings, updateAccount, updateAppearance, theme
         <SelectRow
           label="Display language"
           value={settings.appearance.language || "en"}
-          options={LANGUAGES}
+          options={LANGUAGES.map((language) => ({
+            id: language.id,
+            label: `${language.label} · ${language.nativeName}`,
+          }))}
           onChange={(value) => updateAppearance("language", value)}
           theme={theme}
         />
@@ -645,6 +653,23 @@ function BoardSection({ settings, updateAppearance, theme }) {
             ))}
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <ColorChoice
+              label="Accent color"
+              value={settings.appearance.accentColor || ""}
+              options={ACCENT_COLORS}
+              onChange={(value) => updateAppearance("accentColor", value)}
+              theme={theme}
+            />
+            <ColorChoice
+              label="Text color"
+              value={settings.appearance.textColor || ""}
+              options={TEXT_COLORS}
+              onChange={(value) => updateAppearance("textColor", value)}
+              theme={theme}
+            />
+          </div>
+
           <div>
             <div className="flex justify-between text-sm mb-2">
               <span className="font-semibold">Font size</span>
@@ -782,6 +807,43 @@ function PrivacySection({ settings, updatePrivacy, theme }) {
         ))}
       </div>
     </Card>
+  );
+}
+
+function ColorChoice({ label, value, options, onChange, theme }) {
+  return (
+    <div className="rounded-lg p-3" style={{ backgroundColor: theme.bg.tertiary }}>
+      <div className="mb-3 text-sm font-black">{label}</div>
+      <div className="grid grid-cols-2 gap-2">
+        {options.map((option) => (
+          <button
+            key={option.label}
+            type="button"
+            onClick={() => onChange(option.id)}
+            className="flex items-center gap-2 rounded-lg border px-2 py-2 text-left text-xs font-bold"
+            style={{
+              borderColor: value === option.id ? theme.primary : theme.border.secondary,
+              color: theme.text.primary,
+            }}
+          >
+            <span
+              className="h-5 w-5 rounded-full border"
+              style={{ backgroundColor: option.color, borderColor: theme.border.secondary }}
+            />
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <label className="mt-3 block text-xs font-semibold">
+        Custom hex
+        <input
+          type="color"
+          value={value || "#81b64c"}
+          onChange={(event) => onChange(event.target.value)}
+          className="mt-2 h-10 w-full rounded-lg"
+        />
+      </label>
+    </div>
   );
 }
 

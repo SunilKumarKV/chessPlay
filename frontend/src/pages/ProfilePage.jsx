@@ -14,6 +14,7 @@ import {
 import { apiClient } from "../services/apiClient";
 import { useTheme } from "../hooks/useTheme";
 import { notifyUserChanged } from "../hooks/useCurrentUser";
+import AvatarUploader from "../components/profile/AvatarUploader";
 
 const LOCAL_FRIENDS_KEY = "chessplay.topbar.localFriends";
 const TABS = ["overview", "games", "stats", "friends"];
@@ -411,15 +412,15 @@ export default function Profile({ user, onBack, profileUserId = null }) {
               style={{ backgroundColor: theme.bg.tertiary, border: `1px solid ${theme.border.secondary}` }}
             />
           </label>
-          <label className="space-y-2 text-sm font-semibold">
-            <span>Avatar URL</span>
-            <input
-              value={form.avatar}
-              onChange={(e) => setForm((current) => ({ ...current, avatar: e.target.value }))}
-              className="w-full rounded-lg px-3 py-2 outline-none"
-              style={{ backgroundColor: theme.bg.tertiary, border: `1px solid ${theme.border.secondary}` }}
+          <div className="md:row-span-2">
+            <AvatarUploader
+              currentAvatar={form.avatar}
+              username={form.username}
+              theme={theme}
+              setStatus={setStatus}
+              onUploaded={(avatar) => setForm((current) => ({ ...current, avatar: avatar || "" }))}
             />
-          </label>
+          </div>
           <label className="space-y-2 text-sm font-semibold">
             <span>Country</span>
             <input

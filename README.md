@@ -1,18 +1,171 @@
 # ChessPlay
 
-ChessPlay is a full-stack chess app with a React/Vite frontend and an Express + Socket.IO backend. It supports authenticated play against Stockfish, live multiplayer rooms, quick matchmaking, spectators, chat, game history, leaderboards, profile privacy, and board/settings customization.
+**ChessPlay** is a production-focused SaaS chess platform built with React, Vite, Node.js, Express, Socket.IO, MongoDB, and Stockfish.
 
-The app is intentionally split into a static frontend and a separate API/socket server. The frontend talks to the backend with an HttpOnly auth cookie, and the Stockfish worker is served from `frontend/public`.
+Current release: **v1.3.0-beta**
 
-## Stack
+ChessPlay supports AI chess, real-time multiplayer, online matchmaking, same-WiFi style room play, game review, analysis, premium plans, supporter payments, ads logic, referrals, tournaments, community features, private/public messaging, profile customization, multilingual UI, and direct backend Telegram/email alerts.
 
-- Frontend: React 19, Vite, Redux Toolkit, Tailwind CSS, Framer Motion, Recharts.
-- Chess: `chess.js` for the solo board, custom server-side move validation for multiplayer.
-- Engine: Stockfish running in a web worker.
-- Backend: Node.js, Express, Socket.IO, MongoDB, Mongoose.
-- Auth: JWT stored in an HttpOnly cookie, bcrypt password hashing, optional Google Sign-In.
+---
 
-## Repository Layout
+## Live Product Goals
+
+ChessPlay is designed as more than a demo project. The goal is to become a real web chess platform with:
+
+- Stable authenticated gameplay.
+- Play vs AI with multiple engine levels.
+- Real-time multiplayer rooms.
+- Online matchmaking.
+- Premium supporter plans.
+- No-ads premium mode.
+- Community and social engagement.
+- Admin-friendly monetization workflows.
+- Production-ready deployment on Vercel + Render/Railway/Fly.
+
+---
+
+## Tech Stack
+
+### Frontend
+
+- React
+- Vite
+- Redux Toolkit
+- Tailwind CSS
+- Framer Motion
+- Recharts
+- Socket.IO Client
+- Stockfish worker integration
+
+### Backend
+
+- Node.js
+- Express
+- Socket.IO
+- MongoDB
+- Mongoose
+- JWT authentication
+- bcrypt password hashing
+- Google OAuth verification foundation
+- Direct Telegram/email alert integrations
+
+### Chess / Engine
+
+- `chess.js`
+- Stockfish web worker
+- Server-side multiplayer validation
+- Analysis/review board foundation
+
+---
+
+## v1.3.0-beta Highlights
+
+### Authentication
+
+- Email/password login.
+- Google login production setup.
+- Frontend `VITE_GOOGLE_CLIENT_ID` support.
+- Backend Google token verification support.
+- Domain whitelist support for localhost, Vercel, and custom domain.
+- Safer production auth cookie guidance.
+
+### Multiplayer
+
+- Socket.IO auth improvements.
+- Invalid-token retry messaging.
+- WebSocket/polling fallback guidance.
+- Multiplayer reconnect UX.
+- Same-WiFi/room-code play foundation.
+
+### Play vs AI
+
+AI modes:
+
+| Mode | Depth | Skill |
+|---|---:|---:|
+| Easy | 4 | 5 |
+| Medium | 8 | 10 |
+| Hard | 14 | 18 |
+| Pro | 20 | 20 |
+
+Also includes:
+
+- Engine depth indicator.
+- Eval label.
+- Move quality labels.
+- Premium engine-depth foundation.
+
+### Product Features
+
+- Premium login/signup UI.
+- Dashboard upgrade popup.
+- Pricing/support flow.
+- Online matchmaking UI.
+- Win/checkmate/draw result popup.
+- Help center: “How ChessPlay Works”.
+
+### Monetization
+
+- UPI supporter/payment flow.
+- Bank transfer foundation.
+- QR scan payment option.
+- PayPal/Stripe foundation.
+- Manual payment approval fallback.
+- Admin approval logs.
+- Ads enabled for free users.
+- Ads disabled for premium users.
+- Premium unlock logic.
+- Referral coins.
+- Tournament entry-fee foundation.
+
+### Social
+
+- Community page.
+- Posts.
+- Chess puzzles.
+- Discussions.
+- Achievements.
+- Tournaments.
+- Private friend chat foundation.
+- Public community rooms.
+- Block/report/mute.
+- Typing indicator.
+- Online status.
+
+### Settings/Profile
+
+- Profile photo upload foundation.
+- Crop image support.
+- Avatar fallback.
+- Cloudinary-ready config.
+- i18n language support.
+- Dark/light mode.
+- Board themes.
+- Font family.
+- Font size.
+- Accent color.
+- Text color.
+- Professional SaaS settings layout.
+
+### Automation / Alerts
+
+n8n was removed from the required path.
+
+Direct backend supports:
+
+- Telegram admin alerts.
+- Email alerts.
+- Payment submitted alerts.
+- Payment approved/rejected alerts.
+- Support ticket alerts.
+- Refund request alerts.
+- FAQ/question alerts.
+
+WhatsApp can be added later using Twilio or Meta WhatsApp Cloud API.
+
+---
+
+## Project Structure
 
 ```text
 chessPlay/
@@ -28,19 +181,25 @@ chessPlay/
 │   └── src/
 │       ├── app/
 │       ├── components/
-│       ├── features/chess/
+│       ├── features/
 │       ├── hooks/
 │       ├── pages/
 │       ├── services/
 │       └── store/
+├── automation/
+│   └── direct-node/
+├── PRODUCTION_TEST_REPORT.md
+├── UPGRADE_REPORT_v1.3.0-beta.md
 ├── TEST_PRODUCTION_SMOKE.js
 ├── TEST_STOCKFISH.js
 └── package.json
 ```
 
-## Setup
+---
 
-Use Node 20 or newer. MongoDB can be local or hosted.
+## Local Setup
+
+Use Node.js 20 or newer.
 
 ```bash
 npm run install:all
@@ -52,31 +211,49 @@ Create `backend/.env`:
 NODE_ENV=development
 PORT=3001
 MONGODB_URI=mongodb://127.0.0.1:27017/chessplay
-JWT_SECRET=replace-with-a-random-32-plus-character-secret
+JWT_SECRET=replace-with-a-real-32-plus-character-secret
 FRONTEND_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
-HEALTH_SECRET=
-BLOCKED_WORDS=
 GOOGLE_CLIENT_ID=
+COOKIE_DOMAIN=
+
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_ADMIN_CHAT_ID=
+SMTP_HOST=
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=
+SMTP_PASS=
+SUPPORT_EMAIL_TO=
+
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+
+STRIPE_SECRET_KEY=
+PAYPAL_CLIENT_ID=
+PAYPAL_CLIENT_SECRET=
 ```
 
-Create `frontend/.env` only when the defaults are not enough:
+Create `frontend/.env`:
 
 ```bash
 VITE_BACKEND_URL=http://localhost:3001
+VITE_SOCKET_URL=http://localhost:3001
 VITE_GOOGLE_CLIENT_ID=
-VITE_GOOGLE_AUTH_URL=
-VITE_FACEBOOK_AUTH_URL=
+VITE_APP_VERSION=1.3.0-beta
 ```
 
-## Development
+---
 
-Run the frontend:
+## Development Commands
+
+Run frontend:
 
 ```bash
 npm run dev
 ```
 
-Run the backend:
+Run backend:
 
 ```bash
 npm run server
@@ -88,86 +265,118 @@ Run both:
 npm run dev:multi
 ```
 
-Default local URLs:
-
-- Frontend: `http://localhost:5173`
-- Backend: `http://localhost:3001`
-- Health check: `http://localhost:3001/health`
-- Public host health check: `http://localhost:3001/healthz`
+---
 
 ## Quality Checks
+
+Before pushing/deploying:
 
 ```bash
 npm run lint
 npm run build
 npm run test:production
+npm --workspace backend test
 ```
 
-`npm run test:production` runs the two repository smoke tests:
-
-- `TEST_PRODUCTION_SMOKE.js`
-- `TEST_STOCKFISH.js`
-
-Those tests cover the privacy-sensitive API paths, auth cookie wiring, promotion behavior, Stockfish worker files, and backend chess status checks.
-
-For a quick backend syntax pass:
+Backend syntax check:
 
 ```bash
 find backend -path backend/node_modules -prune -o -name '*.js' -exec node -c {} \;
 ```
 
-## Deployment Notes
+---
 
-- Deploy `frontend/dist` to a static host such as Vercel or Netlify.
-- Deploy `backend` to a Node host such as Render, Railway, or Fly.io.
-- Set `VITE_BACKEND_URL` in the frontend environment to the deployed backend URL.
-- Set `VITE_SOCKET_URL` in the frontend environment to the deployed backend URL.
-- Set `FRONTEND_ORIGINS` on the backend to the deployed frontend origin.
-- Current production values: Vercel should use `VITE_BACKEND_URL=https://yourrenderlink.onrender.com` and `VITE_SOCKET_URL=https://yourrenderlink.onrender.com`; Render should use `FRONTEND_ORIGINS=https://yourdomain.com`.
-- Use MongoDB Atlas or another production MongoDB instance.
-- Use a real `JWT_SECRET` with at least 32 characters. The server refuses known placeholder secrets.
-- Leave `COOKIE_DOMAIN` empty for Render + Vercel unless both services are behind a shared custom parent domain.
-- In production, auth cookies are Secure and SameSite=None, so frontend-to-backend calls must use HTTPS.
-- If Google Sign-In is enabled, configure the same client ID as `VITE_GOOGLE_CLIENT_ID` on the frontend and `GOOGLE_CLIENT_ID` on the backend.
+## Production Deployment
 
-## API Snapshot
+### Frontend — Vercel
 
-Auth:
+Set:
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `GET /api/auth/session`
-- `GET /api/auth/profile`
-- `GET /api/auth/profile/:userId`
-- `PUT /api/auth/profile`
-- `PUT /api/auth/password`
-- `GET /api/auth/users/search?q=...`
-- `GET /api/auth/friends`
-- `POST /api/auth/friends/request`
-- `POST /api/auth/friends/respond`
+```bash
+VITE_BACKEND_URL=https://your-backend.onrender.com
+VITE_SOCKET_URL=https://your-backend.onrender.com
+VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+VITE_APP_VERSION=1.3.0-beta
+```
 
-Games:
+### Backend — Render/Railway/Fly
 
-- `GET /api/games/history`
-- `GET /api/games/history?userId=<id>`
-- `POST /api/games/record`
-- `GET /api/games/leaderboard`
-- `GET /api/games/:gameId`
+Set:
 
-Socket events:
+```bash
+NODE_ENV=production
+PORT=3001
+MONGODB_URI=your-mongodb-atlas-uri
+JWT_SECRET=your-real-32-plus-character-secret
+FRONTEND_ORIGINS=https://getchessplay.com,https://www.getchessplay.com,https://your-vercel-domain.vercel.app
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+COOKIE_DOMAIN=
+```
 
-- Client emits: `createRoom`, `joinRoom`, `rejoinRoom`, `joinQueue`, `leaveQueue`, `makeMove`, `drawOffer`, `drawAccepted`, `drawDeclined`, `resign`, `sendMessage`, `spectateRoom`, `getRooms`.
-- Server emits: `roomCreated`, `joinedRoom`, `rejoinedRoom`, `matchFound`, `moveMade`, `playerResigned`, `playerDisconnected`, `playerAbandoned`, `drawOffer`, `drawAccepted`, `drawDeclined`, `chatMessage`, `roomsList`, `serverError`.
+Optional alert/payment/profile services:
 
-## Production Safeguards
+```bash
+TELEGRAM_BOT_TOKEN=your-token
+TELEGRAM_ADMIN_CHAT_ID=your-chat-id
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+SUPPORT_EMAIL_TO=support@getchessplay.com
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+STRIPE_SECRET_KEY=your-stripe-key
+PAYPAL_CLIENT_ID=your-paypal-client-id
+PAYPAL_CLIENT_SECRET=your-paypal-client-secret
+```
 
-- Public user lookups do not expose email addresses.
-- Profile visibility, game history visibility, and friend request privacy are enforced on the backend.
-- Browser API calls use credentials and do not rely on localStorage bearer tokens.
-- Chat messages are length-limited, lightly sanitized, optionally censored via `BLOCKED_WORDS`, and rate-limited per socket.
-- Multiplayer rooms keep a short reconnection grace period before awarding abandonment wins.
+Deployment order:
+
+1. Deploy backend first.
+2. Verify `/health` and `/healthz`.
+3. Deploy frontend.
+4. Test login, Google login, multiplayer, AI, payment proof, and alerts.
+5. Create GitHub release tag `v1.3.0-beta`.
+
+---
+
+## Important Security Rules
+
+- Do not commit `.env` files.
+- Use HTTPS in production.
+- Use strong JWT secrets.
+- Restrict `FRONTEND_ORIGINS` to trusted domains only.
+- Validate real payment webhooks before auto-activating premium plans.
+- Keep manual admin payment approval until payment providers are fully tested.
+- Rotate leaked secrets immediately.
+
+---
+
+## Git Release
+
+Recommended commit message:
+
+```bash
+git add .
+git commit -m "release: upgrade ChessPlay to v1.3.0-beta production SaaS build"
+git tag -a v1.3.0-beta -m "ChessPlay v1.3.0-beta"
+git push origin main
+git push origin v1.3.0-beta
+```
+
+---
+
+## Release Reports
+
+Read these before deployment:
+
+- `PRODUCTION_TEST_REPORT.md`
+- `UPGRADE_REPORT_v1.3.0-beta.md`
+
+---
 
 ## License
 
-MIT
+Private/portfolio production project unless you choose to open-source it.

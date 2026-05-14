@@ -26,6 +26,8 @@ const DEFAULT_SETTINGS = {
     fontFamily: "inter",
     fontSize: 16,
     language: "en",
+    accentColor: "",
+    textColor: "",
     moveNotation: "san",
     boardCoordinates: true,
     boardAnimation: "normal",
@@ -217,7 +219,7 @@ export function useSettings() {
       appearance: { ...prev.appearance, [key]: value },
     }));
 
-    if (["theme", "fontFamily", "fontSize", "language"].includes(key)) {
+    if (["theme", "fontFamily", "fontSize", "language", "accentColor", "textColor"].includes(key)) {
       window.dispatchEvent(
         new CustomEvent("appearanceSettingsChanged", {
           detail: { [key]: value },
@@ -287,6 +289,7 @@ export function useSettings() {
             id: userResponse.user._id || storedUser.id,
             username: userResponse.user.username,
             email: userResponse.user.email,
+            avatar: userResponse.user.avatar,
           }),
         );
       }

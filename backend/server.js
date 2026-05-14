@@ -58,6 +58,7 @@ const authRoutes = require("./routes/auth");
 const gameRoutes = require("./routes/games");
 const billingRoutes = require("./routes/billing");
 const socialRoutes = require("./routes/social");
+const automationRoutes = require("./routes/automation");
 const User = require("./models/User");
 const Game = require("./models/Game");
 const { updatePlayerStats } = require("./utils/elo");
@@ -317,6 +318,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/games", gameRoutes);
 app.use("/api/billing", billingRoutes);
 app.use("/api/social", socialRoutes);
+app.use("/api/automation", automationRoutes);
 
 // Basic health check
 app.get("/health", (req, res) => {

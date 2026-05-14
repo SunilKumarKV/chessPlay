@@ -9,6 +9,7 @@ const AdminAuditLog = require("../models/AdminAuditLog");
 const Referral = require("../models/Referral");
 const Tournament = require("../models/Tournament");
 const { sanitizeText } = require("../utils/security");
+const { sendAutomationNotification } = require("../utils/automationBot");
 
 const router = express.Router();
 
@@ -292,6 +293,22 @@ router.post("/upi-request", auth, async (req, res) => {
     });
 
     await User.findByIdAndUpdate(req.user.userId, { planStatus: "pending" });
+    const user = await User.findById(req.user.userId).select("username email");
+    await sendAutomationNotification({
+      type: "payment_submitted",
+      user: req.user.userId,
+      title: "New payment proof submitted",
+      message: `${user?.username || "User"} submitted ${paymentMethod.toUpperCase()} proof for ${config.label}.`,
+      payload: {
+        requestId: String(request._id),
+        userEmail: user?.email,
+        plan,
+        method: paymentMethod,
+        reference: utr,
+        amount,
+        currency: request.currency,
+      },
+    });
     res.status(201).json({ message: "Payment proof submitted. Admin approval is required before premium access is enabled.", request });
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ message: "This reference number was already submitted" });
@@ -324,6 +341,13 @@ router.patch("/admin/requests/:id/approve", auth, requireAdmin, async (req, res)
     request.expiresAt = expiresAt;
     await request.save();
     await writeAudit(req, "supporter.approved", "SupporterRequest", request._id, { plan: request.plan, amount: request.amount, method: request.paymentMethod });
+    await sendAutomationNotification({
+      type: "payment_approved",
+      user: user._id,
+      title: "Premium plan approved",
+      message: `${user.username || user.email} is now premium until ${expiresAt.toDateString()}.`,
+      payload: { requestId: String(request._id), userEmail: user.email, plan: request.plan, reference: request.utr, amount: request.amount, currency: request.currency, expiresAt },
+    });
     res.json({ message: "Supporter approved", request, billing: publicBillingUser(user) });
   } catch (error) {
     console.error("Approve supporter error:", error);
@@ -344,6 +368,14 @@ router.patch("/admin/requests/:id/reject", auth, requireAdmin, async (req, res) 
     const hasPending = await SupporterRequest.exists({ user: request.user, status: "pending" });
     if (!hasPending) await User.findByIdAndUpdate(request.user, { planStatus: "active" });
     await writeAudit(req, "supporter.rejected", "SupporterRequest", request._id, { reason: request.rejectionReason });
+    const user = await User.findById(request.user).select("username email");
+    await sendAutomationNotification({
+      type: "payment_rejected",
+      user: request.user,
+      title: "Payment proof rejected",
+      message: `${user?.username || "User"}'s payment proof was rejected: ${request.rejectionReason}`,
+      payload: { requestId: String(request._id), userEmail: user?.email, plan: request.plan, reference: request.utr, reason: request.rejectionReason },
+    });
     res.json({ message: "Supporter request rejected", request });
   } catch (error) {
     console.error("Reject supporter error:", error);

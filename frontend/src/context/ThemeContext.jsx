@@ -218,13 +218,32 @@ function getInitialLanguage() {
   return getStoredAppearance().language || "en";
 }
 
+function getInitialAccentColor() {
+  return getStoredAppearance().accentColor || "";
+}
+
+function getInitialTextColor() {
+  return getStoredAppearance().textColor || "";
+}
+
 export function ThemeProvider({ children }) {
   const [themeMode, setThemeMode] = useState(getInitialThemeMode);
   const [appFont, setAppFont] = useState(getInitialFont);
   const [fontSize, setFontSize] = useState(getInitialFontSize);
   const [language, setLanguage] = useState(getInitialLanguage);
+  const [accentColor, setAccentColor] = useState(getInitialAccentColor);
+  const [textColor, setTextColor] = useState(getInitialTextColor);
 
-  const theme = THEMES[themeMode] || THEMES.dark;
+  const baseTheme = THEMES[themeMode] || THEMES.dark;
+  const theme = {
+    ...baseTheme,
+    primary: accentColor || baseTheme.primary,
+    primaryDark: accentColor || baseTheme.primaryDark,
+    text: {
+      ...baseTheme.text,
+      primary: textColor || baseTheme.text.primary,
+    },
+  };
   const isDark = DARK_MODES.has(themeMode);
 
   // Save theme preference to localStorage
@@ -251,6 +270,8 @@ export function ThemeProvider({ children }) {
     appFont,
     fontSize,
     language,
+    accentColor,
+    textColor,
     theme.bg.primary,
     theme.bg.secondary,
     theme.bg.tertiary,
@@ -276,6 +297,8 @@ export function ThemeProvider({ children }) {
       if (next.fontFamily) setAppFont(next.fontFamily);
       if (next.fontSize) setFontSize(Number(next.fontSize));
       if (next.language) setLanguage(next.language);
+      if (next.accentColor !== undefined) setAccentColor(next.accentColor);
+      if (next.textColor !== undefined) setTextColor(next.textColor);
     };
 
     window.addEventListener("appearanceSettingsChanged", handleAppearanceChange);
@@ -314,6 +337,11 @@ export function ThemeProvider({ children }) {
     setThemeMode,
     setAppFont,
     setFontSize,
+    setLanguage,
+    setAccentColor,
+    setTextColor,
+    accentColor,
+    textColor,
     // Helper functions for conditional styling
     bg: theme.bg,
     text: theme.text,
