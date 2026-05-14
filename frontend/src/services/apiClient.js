@@ -4,24 +4,16 @@ async function readJson(response) {
   return response.json().catch(() => ({}));
 }
 
-function getSessionAccessToken() {
-  return sessionStorage.getItem("chessplay_access_token") ||
-    sessionStorage.getItem("chessplay_socket_token") ||
-    "";
-}
-
 function clearSessionTokens() {
   sessionStorage.removeItem("chessplay_access_token");
   sessionStorage.removeItem("chessplay_socket_token");
 }
 
 async function request(endpoint, options = {}) {
-  const token = getSessionAccessToken();
   const hasBody = Boolean(options.body);
   const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const headers = {
     ...(hasBody && !isFormData ? { "Content-Type": "application/json" } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
 
