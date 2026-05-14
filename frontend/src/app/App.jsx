@@ -33,6 +33,7 @@ import MessagesPage from "../pages/MessagesPage";
 import AutomationPage from "../pages/AutomationPage";
 
 function pageFromPathname(pathname) {
+  if (pathname === "/forgot-password") return "forgot-password";
   if (pathname === "/reset-password") return "reset-password";
   if (pathname === "/verify-email") return "verify-email";
   return "dashboard";
@@ -59,6 +60,8 @@ export default function App() {
   );
 
   useEffect(() => {
+    const syncPageFromUrl = () => setCurrentPage(pageFromPathname(window.location.pathname));
+    window.addEventListener("popstate", syncPageFromUrl);
     let cancelled = false;
 
     const fallbackTimer = window.setTimeout(() => {
@@ -99,12 +102,14 @@ export default function App() {
     restoreSession();
     return () => {
       cancelled = true;
+      window.removeEventListener("popstate", syncPageFromUrl);
       window.clearTimeout(fallbackTimer);
     };
   }, []);
 
   const handleLogin = (userData) => {
     localStorage.removeItem("guestMode");
+    window.history.replaceState({}, "", "/");
     setUser(userData);
     notifyUserChanged();
   };
@@ -132,6 +137,8 @@ export default function App() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("guestMode");
+    sessionStorage.removeItem("chessplay_access_token");
+    sessionStorage.removeItem("chessplay_socket_token");
     setUser(null);
     setCurrentPage("dashboard");
     notifyUserChanged();
@@ -139,6 +146,14 @@ export default function App() {
 
   if (!authChecked) {
     return <AppSplash />;
+  }
+
+  if (currentPage === "forgot-password") {
+    return (
+      <ErrorBoundary>
+        <ForgotPasswordPage onBack={() => { window.history.pushState({}, "", "/"); setCurrentPage("dashboard"); }} />
+      </ErrorBoundary>
+    );
   }
 
   if (currentPage === "reset-password") {

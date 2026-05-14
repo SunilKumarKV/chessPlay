@@ -87,7 +87,10 @@ export default function Auth({
 
       localStorage.removeItem("token");
       localStorage.setItem("user", JSON.stringify(data.user));
-      if (data.socketToken) sessionStorage.setItem("chessplay_socket_token", data.socketToken);
+      if (data.socketToken) {
+        sessionStorage.setItem("chessplay_access_token", data.socketToken);
+        sessionStorage.setItem("chessplay_socket_token", data.socketToken);
+      }
 
       onLogin(data.user);
     } catch (error) {
@@ -140,7 +143,10 @@ export default function Auth({
 
         localStorage.removeItem("token");
         localStorage.setItem("user", JSON.stringify(data.user));
-      if (data.socketToken) sessionStorage.setItem("chessplay_socket_token", data.socketToken);
+        if (data.socketToken) {
+          sessionStorage.setItem("chessplay_access_token", data.socketToken);
+          sessionStorage.setItem("chessplay_socket_token", data.socketToken);
+        }
         onLogin(data.user);
       } catch (error) {
         setError(error.message);
@@ -324,6 +330,19 @@ export default function Auth({
           >
             {loading ? "Please wait..." : isLogin ? "Sign In" : "Sign Up"}
           </PrimaryBtn>
+
+          {isLogin && (
+            <button
+              type="button"
+              onClick={() => {
+                window.history.pushState({}, "", "/forgot-password");
+                window.dispatchEvent(new PopStateEvent("popstate"));
+              }}
+              className="w-full text-center text-sm font-bold text-[#a8e36f] hover:text-[#c5f29c]"
+            >
+              Forgot password?
+            </button>
+          )}
         </form>
       )}
 

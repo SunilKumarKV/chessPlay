@@ -4,9 +4,17 @@ async function readJson(response) {
   return response.json().catch(() => ({}));
 }
 
+function getSessionAccessToken() {
+  return sessionStorage.getItem("chessplay_access_token") ||
+    sessionStorage.getItem("chessplay_socket_token") ||
+    "";
+}
+
 async function request(endpoint, options = {}) {
+  const token = getSessionAccessToken();
   const headers = {
     "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
 
@@ -28,6 +36,11 @@ export const apiClient = async (endpoint, options = {}) => {
   if (response.status === 401 && endpoint !== "/api/auth/refresh") {
     const refreshResponse = await request("/api/auth/refresh", { method: "POST" });
     if (refreshResponse.ok) {
+      const refreshData = await readJson(refreshResponse);
+      if (refreshData.socketToken) {
+        sessionStorage.setItem("chessplay_access_token", refreshData.socketToken);
+        sessionStorage.setItem("chessplay_socket_token", refreshData.socketToken);
+      }
       response = await request(endpoint, options);
     }
   }

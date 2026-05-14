@@ -89,7 +89,12 @@ function clearCookieOptions() {
   return cookieOptions();
 }
 
+function isConfiguredAdminEmail(email) {
+  return parseCsvEnv(process.env.ADMIN_EMAILS).includes(normalizeEmail(email));
+}
+
 function authUserPayload(user) {
+  const isAdmin = Boolean(user.isAdmin) || isConfiguredAdminEmail(user.email);
   return {
     id: user._id,
     username: user.username,
@@ -107,7 +112,7 @@ function authUserPayload(user) {
     supporterPlan: user.supporterPlan || "none",
     supporterExpiresAt: user.supporterExpiresAt || null,
     adsDisabled: Boolean(user.adsDisabled),
-    isAdmin: Boolean(user.isAdmin),
+    isAdmin,
     isGuest: false,
   };
 }
@@ -136,6 +141,16 @@ function getCookie(req, name) {
     ?.slice(name.length + 1);
 }
 
+function getBearerToken(req) {
+  const header = String(req.headers.authorization || '');
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : '';
+}
+
+function getRequestAccessToken(req) {
+  return getCookie(req, 'accessToken') || getCookie(req, 'authToken') || getBearerToken(req);
+}
+
 function sanitizeText(value, maxLength = 500) {
   return validator.escape(String(value || '').trim().slice(0, maxLength));
 }
@@ -143,11 +158,14 @@ function sanitizeText(value, maxLength = 500) {
 module.exports = {
   authUserPayload,
   clearSessionCookies,
+  getBearerToken,
   getCookie,
   getJwtSecret,
   hashToken,
   issueSession,
   normalizeEmail,
+  getRequestAccessToken,
+  isConfiguredAdminEmail,
   randomToken,
   sanitizeText,
   signAccessToken,
