@@ -35,6 +35,11 @@ import AutomationPage from "../pages/AutomationPage";
 
 function pageFromPathname(pathname) {
   if (pathname === "/admin" || pathname === "/admin/" || pathname === "/admin/dashboard") return "admin";
+  if (pathname === "/play") return "ai";
+  if (pathname === "/dashboard") return "dashboard";
+  if (pathname === "/leaderboard") return "leaderboard";
+  if (pathname === "/help") return "help";
+  if (pathname === "/pricing") return "pricing";
   if (pathname === "/forgot-password") return "forgot-password";
   if (pathname === "/reset-password") return "reset-password";
   if (pathname === "/verify-email") return "verify-email";
@@ -42,12 +47,20 @@ function pageFromPathname(pathname) {
 }
 
 function navigateToAppPage(page, setCurrentPage) {
-  if (["forgot-password", "reset-password", "verify-email"].includes(page)) {
-    window.history.pushState({}, "", `/${page}`);
-  } else if (page === "admin") {
-    window.history.pushState({}, "", "/admin");
-  } else if (window.location.pathname !== "/") {
-    window.history.pushState({}, "", "/");
+  const routeMap = {
+    admin: "/admin",
+    ai: "/play",
+    dashboard: "/dashboard",
+    leaderboard: "/leaderboard",
+    help: "/help",
+    pricing: "/pricing",
+    "forgot-password": "/forgot-password",
+    "reset-password": "/reset-password",
+    "verify-email": "/verify-email",
+  };
+  const nextPath = routeMap[page] || "/dashboard";
+  if (window.location.pathname !== nextPath) {
+    window.history.pushState({}, "", nextPath);
   }
   setCurrentPage(page);
 }
@@ -122,8 +135,9 @@ export default function App() {
 
   const handleLogin = (userData) => {
     localStorage.removeItem("guestMode");
-    window.history.replaceState({}, "", "/");
+    window.history.replaceState({}, "", "/dashboard");
     setUser(userData);
+    setCurrentPage("dashboard");
     notifyUserChanged();
   };
 
@@ -137,6 +151,9 @@ export default function App() {
     localStorage.setItem("guestMode", "true");
     localStorage.setItem("selectedTimeControl", "3+0");
     setUser(guestUser);
+    if (window.location.pathname !== "/play") {
+      window.history.pushState({}, "", "/play");
+    }
     setCurrentPage("ai");
     notifyUserChanged();
   };
