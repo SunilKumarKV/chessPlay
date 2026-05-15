@@ -96,7 +96,7 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
   const navItems = [
     { href: "#features", label: "Features" },
     { href: "/puzzles", label: "Puzzles", route: true },
-    { href: "#how-it-works", label: "How it works" },
+    { href: "/how-it-works", label: "How it works", route: true },
     { href: "#security", label: "Security" },
     { href: "#start", label: "Start" },
   ];
@@ -323,6 +323,7 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
             <button type="button" onClick={openLogin} className="hover:text-white">Login</button>
             <button type="button" onClick={openSignup} className="hover:text-white">Register</button>
             <a href="#features" className="hover:text-white">Features</a>
+            <a href="/how-it-works" className="hover:text-white">How it works</a>
           </div>
         </div>
       </footer>

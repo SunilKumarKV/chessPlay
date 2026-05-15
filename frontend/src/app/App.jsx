@@ -28,6 +28,7 @@ import BillingPage from "../pages/billing/BillingPage";
 import AdminSupportersPage from "../pages/billing/AdminSupportersPage";
 import AdminPanelPage from "../pages/admin/AdminPanelPage";
 import HelpCenterPage from "../pages/HelpCenterPage";
+import HowItWorksPage from "../pages/HowItWorksPage";
 import MonetizationPage from "../pages/billing/MonetizationPage";
 import ReferralPage from "../pages/billing/ReferralPage";
 import TournamentsPage from "../pages/billing/TournamentsPage";
@@ -58,6 +59,7 @@ const routeMap = {
   messages: "/messages",
   automation: "/admin/automation",
   help: "/help",
+  "how-it-works": "/how-it-works",
   puzzles: "/puzzles",
   privacy: "/privacy",
   terms: "/terms",
@@ -278,6 +280,18 @@ export default function App() {
     );
   }
 
+  if (!user && currentPage === "how-it-works") {
+    return (
+      <ErrorBoundary>
+        <HowItWorksPage
+          user={null}
+          onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+          onOpenAuth={() => navigateToAppPage("dashboard", setCurrentPage)}
+        />
+      </ErrorBoundary>
+    );
+  }
+
   if (!user) {
     return (
       <ErrorBoundary>
@@ -399,6 +413,8 @@ export default function App() {
           );
         }
         return <AutomationPage onBack={goDashboard} />;
+      case "how-it-works":
+        return <HowItWorksPage user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "help":
         return <HelpCenterPage onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "monetization":
