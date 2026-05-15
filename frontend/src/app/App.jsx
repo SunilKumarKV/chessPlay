@@ -71,11 +71,18 @@ function pageFromPathname(pathname) {
   const normalized = pathname.replace(/\/$/, "") || "/";
   if (normalized === "/") return "dashboard";
   if (normalized === "/admin" || normalized === "/admin/dashboard") return "admin";
+  if (normalized.startsWith("/profile/") && normalized.split("/")[2]) return "profile-public";
   if (["/admin/payments", "/admin/supporters"].includes(normalized)) return "admin-supporters";
   if (["/play-player", "/play/local"].includes(normalized)) return "local";
   if (["/lan", "/wifi", "/play-wifi"].includes(normalized)) return "lan";
   const entry = Object.entries(routeMap).find(([, path]) => path === normalized);
   return entry ? entry[0] : "dashboard";
+}
+
+function profileUsernameFromPathname(pathname) {
+  const parts = pathname.replace(/\/$/, "").split("/");
+  if (parts[1] === "profile" && parts[2]) return decodeURIComponent(parts[2]);
+  return null;
 }
 
 function navigateToAppPage(page, setCurrentPage, replace = false) {
@@ -290,6 +297,19 @@ export default function App() {
     );
   }
 
+  if (!user && currentPage === "profile-public") {
+    return (
+      <ErrorBoundary>
+        <Profile
+          user={null}
+          username={profileUsernameFromPathname(window.location.pathname)}
+          onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
+          onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+        />
+      </ErrorBoundary>
+    );
+  }
+
   if (!user) {
     return (
       <ErrorBoundary>
@@ -356,7 +376,16 @@ export default function App() {
         return <Leaderboard user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "profile":
         return (
-          <Profile user={user} onBack={goDashboard} />
+          <Profile user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />
+        );
+      case "profile-public":
+        return (
+          <Profile
+            user={user}
+            username={profileUsernameFromPathname(window.location.pathname)}
+            onBack={goDashboard}
+            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+          />
         );
       case "settings":
         return (

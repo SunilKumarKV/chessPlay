@@ -66,6 +66,7 @@ const referralRoutes = require("./routes/referrals");
 const tournamentRoutes = require("./routes/tournaments");
 const messageRoutes = require("./routes/messages");
 const settingsRoutes = require("./routes/settings");
+const profileRoutes = require("./routes/profile");
 const User = require("./models/User");
 const Game = require("./models/Game");
 const { updatePlayerStats } = require("./utils/elo");
@@ -337,6 +338,7 @@ app.use("/api/referrals", referralRoutes);
 app.use("/api/tournaments", tournamentRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/profile", profileRoutes);
 
 // Basic health check
 app.get("/health", (req, res) => {
