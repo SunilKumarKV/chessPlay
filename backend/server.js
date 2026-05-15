@@ -64,6 +64,7 @@ const puzzleRoutes = require("./routes/puzzles");
 const analysisRoutes = require("./routes/analysis");
 const referralRoutes = require("./routes/referrals");
 const tournamentRoutes = require("./routes/tournaments");
+const messageRoutes = require("./routes/messages");
 const User = require("./models/User");
 const Game = require("./models/Game");
 const { updatePlayerStats } = require("./utils/elo");
@@ -333,6 +334,7 @@ app.use("/api/puzzles", puzzleRoutes);
 app.use("/api/analysis", analysisRoutes);
 app.use("/api/referrals", referralRoutes);
 app.use("/api/tournaments", tournamentRoutes);
+app.use("/api/messages", messageRoutes);
 
 // Basic health check
 app.get("/health", (req, res) => {
@@ -1380,11 +1382,19 @@ const PORT = process.env.PORT || 3001;
 
 // Global Express error handler
 app.use((err, req, res, next) => {
-  console.error("Unhandled express error:", err);
+  const status = Number(err.status || err.statusCode || 500);
+  const safeStatus = status >= 400 && status < 600 ? status : 500;
+  if (safeStatus >= 500) {
+    console.error("Unhandled express error:", err);
+  } else {
+    console.warn("Handled express error:", err.message);
+  }
   if (res.headersSent) {
     return next(err);
   }
-  return res.status(500).json({ message: "Internal server error" });
+  return res.status(safeStatus).json({
+    message: safeStatus >= 500 ? "Internal server error" : (err.message || "Request failed"),
+  });
 });
 
 server.on("error", (error) => {
