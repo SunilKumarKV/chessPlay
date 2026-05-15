@@ -28,7 +28,6 @@ import BillingPage from "../pages/billing/BillingPage";
 import AdminSupportersPage from "../pages/billing/AdminSupportersPage";
 import AdminPanelPage from "../pages/admin/AdminPanelPage";
 import HelpCenterPage from "../pages/HelpCenterPage";
-import HowItWorksPage from "../pages/HowItWorksPage";
 import MonetizationPage from "../pages/billing/MonetizationPage";
 import ReferralPage from "../pages/billing/ReferralPage";
 import TournamentsPage from "../pages/billing/TournamentsPage";
@@ -59,7 +58,6 @@ const routeMap = {
   messages: "/messages",
   automation: "/admin/automation",
   help: "/help",
-  "how-it-works": "/how-it-works",
   puzzles: "/puzzles",
   privacy: "/privacy",
   terms: "/terms",
@@ -268,10 +266,10 @@ export default function App() {
     );
   }
 
-  if (!user && currentPage === "puzzles") {
+  if (!user && currentPage === "leaderboard") {
     return (
       <ErrorBoundary>
-        <PuzzlesPage
+        <Leaderboard
           user={null}
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
           onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
@@ -280,13 +278,13 @@ export default function App() {
     );
   }
 
-  if (!user && currentPage === "how-it-works") {
+  if (!user && currentPage === "puzzles") {
     return (
       <ErrorBoundary>
-        <HowItWorksPage
+        <PuzzlesPage
           user={null}
+          onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
           onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
-          onOpenAuth={() => navigateToAppPage("dashboard", setCurrentPage)}
         />
       </ErrorBoundary>
     );
@@ -355,7 +353,7 @@ export default function App() {
       case "history":
         return <GameHistory onBack={goDashboard} />;
       case "leaderboard":
-        return <Leaderboard onBack={goDashboard} />;
+        return <Leaderboard user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "profile":
         return (
           <Profile user={user} onBack={goDashboard} />
@@ -413,8 +411,6 @@ export default function App() {
           );
         }
         return <AutomationPage onBack={goDashboard} />;
-      case "how-it-works":
-        return <HowItWorksPage user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "help":
         return <HelpCenterPage onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "monetization":

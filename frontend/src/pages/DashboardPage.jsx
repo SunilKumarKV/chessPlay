@@ -372,12 +372,11 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
                 <p className="mt-1 text-sm text-slate-400">Every visible action is connected to a real route.</p>
               </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {[
                 { title: "Play vs AI", meta: "Practice instantly", action: () => startGame("ai"), accent: "#81b64c" },
                 { title: "Play Online", meta: isGuest ? "Login required" : "Live rooms", action: () => (isGuest ? onNavigate?.("settings") : startGame("multi")), accent: "#38bdf8" },
                 { title: "Puzzles", meta: "Train tactics", action: () => onNavigate?.("puzzles"), accent: "#a78bfa" },
-                { title: "How it works", meta: "Learn the app", action: () => onNavigate?.("how-it-works"), accent: "#22c55e" },
                 { title: "Game History", meta: "Recent results", action: () => onNavigate?.("history"), accent: "#f59e0b" },
               ].map((item) => (
                 <button key={item.title} type="button" onClick={item.action} className="group rounded-xl border border-white/10 bg-black/20 p-4 text-left transition-all hover:-translate-y-1 hover:bg-white/10">

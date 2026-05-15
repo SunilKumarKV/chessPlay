@@ -33,7 +33,7 @@ export default function Sidebar({
         { id: "community", label: "Community", icon: "☷" },
         { id: "messages", label: "Messages", icon: "✉" },
         ...(user?.isAdmin ? [{ id: "admin", label: "Admin Panel", icon: "🛡" }, { id: "automation", label: "Admin Automation", icon: "🤖" }] : []),
-        { id: "how-it-works", label: "How it works", icon: "?" },
+        { id: "help", label: "How it works", icon: "?" },
         { id: "leaderboard", label: "Leaderboard", icon: "★" },
         { id: "settings", label: "Settings", icon: "⚙" },
       ],
