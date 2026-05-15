@@ -37,7 +37,7 @@ import AutomationPage from "../pages/AutomationPage";
 
 const routeMap = {
   admin: "/admin",
-  "admin-supporters": "/admin/supporters",
+  "admin-supporters": "/admin/payments",
   ai: "/play",
   multi: "/play/online",
   local: "/play/local",
@@ -71,6 +71,7 @@ function pageFromPathname(pathname) {
   const normalized = pathname.replace(/\/$/, "") || "/";
   if (normalized === "/") return "dashboard";
   if (normalized === "/admin" || normalized === "/admin/dashboard") return "admin";
+  if (["/admin/payments", "/admin/supporters"].includes(normalized)) return "admin-supporters";
   if (["/play-player", "/play/local"].includes(normalized)) return "local";
   if (["/lan", "/wifi", "/play-wifi"].includes(normalized)) return "lan";
   const entry = Object.entries(routeMap).find(([, path]) => path === normalized);

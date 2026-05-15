@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const validator = require("validator");
@@ -68,6 +69,21 @@ async function requireAdmin(req, res, next) {
   } catch {
     res.status(500).json({ message: "Admin check failed" });
   }
+}
+
+function isValidObjectId(id) {
+  return mongoose.Types.ObjectId.isValid(String(id || ""));
+}
+
+function billingMessageFor(status) {
+  if (status === 401) return "Session expired. Please sign in again.";
+  if (status === 403) return "You do not have permission to perform this action.";
+  if (status === 404) return "Payment request not found.";
+  return "Unable to update billing information. Please try again.";
+}
+
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function validateUpiId(value) {
@@ -255,8 +271,8 @@ router.get("/me", auth, async (req, res) => {
   if (!user) return res.status(404).json({ message: "User not found" });
   const requests = await SupporterRequest.find({ user: user._id })
     .sort({ createdAt: -1 })
-    .limit(5)
-    .select("plan amount currency paymentMethod upiId utr bankReference payerEmail paymentProofUrl status rejectionReason expiresAt createdAt updatedAt");
+    .limit(25)
+    .select("plan amount currency paymentMethod upiId utr bankReference payerEmail providerReference paymentProofUrl status rejectionReason reviewedAt expiresAt paymentDate note createdAt updatedAt");
   const intents = await PaymentIntent.find({ user: user._id }).sort({ createdAt: -1 }).limit(5).select("plan provider amount currency status reference providerCheckoutUrl createdAt expiresAt");
   res.json({ billing: publicBillingUser(user), requests, intents, referralCode: user.referralCode || null });
 });
@@ -312,7 +328,7 @@ router.post("/upi-request", auth, supporterRequestLimiter, async (req, res) => {
     });
 
     await User.findByIdAndUpdate(req.user.userId, { planStatus: "pending" });
-    await writeAudit(req, "supporter.request.submitted", "SupporterRequest", request._id, { plan, amount, method: paymentMethod });
+    await writeAudit(req, "payment_request_created", "SupporterRequest", request._id, { plan, amount, method: paymentMethod });
     const user = await User.findById(req.user.userId).select("username email");
     await sendAutomationNotification({
       type: "payment_submitted",
@@ -338,18 +354,42 @@ router.post("/upi-request", auth, supporterRequestLimiter, async (req, res) => {
 });
 
 router.get("/admin/requests", auth, requireAdmin, async (req, res) => {
-  const status = ["pending", "approved", "rejected"].includes(req.query.status) ? req.query.status : undefined;
-  const filter = status ? { status } : {};
-  const requests = await SupporterRequest.find(filter)
-    .sort({ createdAt: -1 })
-    .limit(100)
-    .populate("user", "username email rating plan planStatus isSupporter isPremium supporterExpiresAt coins")
-    .populate("reviewedBy", "username email");
-  res.json({ requests });
+  try {
+    const status = ["pending", "approved", "rejected"].includes(req.query.status) ? req.query.status : undefined;
+    const search = sanitizeText(req.query.search || "", 80);
+    const filter = status ? { status } : {};
+    if (search) {
+      filter.$or = [
+        { utr: new RegExp(escapeRegExp(search), "i") },
+        { bankReference: new RegExp(escapeRegExp(search), "i") },
+        { providerReference: new RegExp(escapeRegExp(search), "i") },
+        { payerEmail: new RegExp(escapeRegExp(search), "i") },
+      ];
+    }
+
+    const requests = await SupporterRequest.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .populate("user", "username email rating plan planStatus isSupporter isPremium supporterExpiresAt adsDisabled coins")
+      .populate("reviewedBy", "username email");
+
+    const filtered = search
+      ? requests.filter((request) => {
+          const value = `${request.user?.username || ""} ${request.user?.email || ""} ${request.utr || ""} ${request.bankReference || ""} ${request.providerReference || ""} ${request.payerEmail || ""}`.toLowerCase();
+          return value.includes(search.toLowerCase());
+        })
+      : requests;
+
+    res.json({ requests: filtered });
+  } catch (error) {
+    console.error("Admin billing request list error:", error.message);
+    res.status(500).json({ message: "Unable to load payment requests." });
+  }
 });
 
 router.patch("/admin/requests/:id/approve", auth, requireAdmin, async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid payment request ID" });
     const request = await SupporterRequest.findById(req.params.id).populate("user");
     if (!request) return res.status(404).json({ message: "Supporter request not found" });
     if (request.status !== "pending") return res.status(409).json({ message: "Request is already reviewed" });
@@ -360,7 +400,8 @@ router.patch("/admin/requests/:id/approve", auth, requireAdmin, async (req, res)
     request.reviewedAt = new Date();
     request.expiresAt = expiresAt;
     await request.save();
-    await writeAudit(req, "supporter.approved", "SupporterRequest", request._id, { plan: request.plan, amount: request.amount, method: request.paymentMethod });
+    await writeAudit(req, "payment_request_approved", "SupporterRequest", request._id, { plan: request.plan, amount: request.amount, method: request.paymentMethod });
+    await writeAudit(req, "supporter_enabled", "User", user._id, { plan: request.plan, requestId: String(request._id), adsDisabled: true });
     await sendAutomationNotification({
       type: "payment_approved",
       user: user._id,
@@ -368,26 +409,29 @@ router.patch("/admin/requests/:id/approve", auth, requireAdmin, async (req, res)
       message: `${user.username || user.email} is now premium until ${expiresAt.toDateString()}.`,
       payload: { requestId: String(request._id), userEmail: user.email, plan: request.plan, reference: request.utr, amount: request.amount, currency: request.currency, expiresAt },
     });
-    res.json({ message: "Supporter approved", request, billing: publicBillingUser(user) });
+    res.json({ message: "Payment request approved successfully.", request, billing: publicBillingUser(user) });
   } catch (error) {
-    console.error("Approve supporter error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Approve supporter error:", error.message);
+    res.status(500).json({ message: billingMessageFor(500) });
   }
 });
 
 router.patch("/admin/requests/:id/reject", auth, requireAdmin, async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid payment request ID" });
+    const reason = sanitizeText(req.body.reason || "", 300);
+    if (!reason || reason.length < 6) return res.status(400).json({ message: "Rejection reason is required." });
     const request = await SupporterRequest.findById(req.params.id);
     if (!request) return res.status(404).json({ message: "Supporter request not found" });
     if (request.status !== "pending") return res.status(409).json({ message: "Request is already reviewed" });
     request.status = "rejected";
     request.reviewedBy = req.adminUser._id;
     request.reviewedAt = new Date();
-    request.rejectionReason = sanitizeText(req.body.reason || "Payment could not be verified", 300);
+    request.rejectionReason = reason;
     await request.save();
     const hasPending = await SupporterRequest.exists({ user: request.user, status: "pending" });
     if (!hasPending) await User.findByIdAndUpdate(request.user, { planStatus: "active" });
-    await writeAudit(req, "supporter.rejected", "SupporterRequest", request._id, { reason: request.rejectionReason });
+    await writeAudit(req, "payment_request_rejected", "SupporterRequest", request._id, { reason: request.rejectionReason });
     const user = await User.findById(request.user).select("username email");
     await sendAutomationNotification({
       type: "payment_rejected",
@@ -396,10 +440,10 @@ router.patch("/admin/requests/:id/reject", auth, requireAdmin, async (req, res) 
       message: `${user?.username || "User"}'s payment proof was rejected: ${request.rejectionReason}`,
       payload: { requestId: String(request._id), userEmail: user?.email, plan: request.plan, reference: request.utr, reason: request.rejectionReason },
     });
-    res.json({ message: "Supporter request rejected", request });
+    res.json({ message: "Payment request rejected successfully.", request });
   } catch (error) {
-    console.error("Reject supporter error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Reject supporter error:", error.message);
+    res.status(500).json({ message: billingMessageFor(500) });
   }
 });
 
