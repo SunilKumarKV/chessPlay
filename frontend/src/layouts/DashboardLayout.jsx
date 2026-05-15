@@ -14,8 +14,8 @@ export default function DashboardLayout({
     try {
       const storedUser = localStorage.getItem("user");
       return storedUser ? JSON.parse(storedUser) : null;
-    } catch (e) {
-      console.error("Could not parse user", e);
+    } catch {
+      localStorage.removeItem("user");
       return null;
     }
   })();
