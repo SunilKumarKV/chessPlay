@@ -1,15 +1,6 @@
 import type { PremiumPlan } from "../../generated/prisma/client";
-
-type BillingPlan = {
-  label: string;
-  amount: number;
-  usdAmount: number;
-  days: number;
-  benefits: string[];
-  entitlements: Record<string, boolean>;
-};
-
-type BillingPlanConfig = Record<string, BillingPlan>;
+import type { BillingPlan, BillingPlanConfig } from "../types/billing.js";
+import { logger } from "../utils/logger.js";
 
 const PUBLIC_PLAN_CODES = new Set(["supporter_monthly", "supporter_yearly", "pro"]);
 
@@ -67,7 +58,9 @@ export async function getPremiumPlanConfig(fallbackPlans: BillingPlanConfig) {
   try {
     return (await loadPrismaPlans(fallbackPlans)) ?? fallbackPlans;
   } catch (error) {
-    console.warn("[Prisma] Premium plans unavailable; using in-memory billing plans.", error instanceof Error ? error.message : error);
+    logger.warn("[Prisma] Premium plans unavailable; using in-memory billing plans.", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return fallbackPlans;
   }
 }
