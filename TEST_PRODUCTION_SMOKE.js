@@ -6,6 +6,12 @@ function read(path) {
   return fs.readFileSync(path, "utf8");
 }
 
+function readExisting(paths) {
+  const target = paths.find((path) => fs.existsSync(path));
+  assert(target, `Missing expected source file: ${paths.join(" or ")}`);
+  return read(target);
+}
+
 function initialGameState() {
   const gameState = {
     board: [
@@ -72,7 +78,7 @@ function assertSourceChecks() {
   assert(/FRONTEND_ORIGINS/.test(server), "CORS must use configured frontend origins");
   assert(/enforceProductionOrigin/.test(server), "Production origin enforcement is missing");
 
-  const games = read("backend/routes/games.js");
+  const games = readExisting(["backend/routes/games.ts", "backend/routes/games.js"]);
   assert(/const targetUserId = req\.query\.userId/.test(games), "Game history cannot target viewed profile");
   assert(/privacy\?\.gameHistory === false/.test(games), "Game history privacy is not enforced");
 
