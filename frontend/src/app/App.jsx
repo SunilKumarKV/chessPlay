@@ -246,14 +246,22 @@ export default function App() {
     );
   }
 
-  if (!user && (currentPage === "pricing" || currentPage === "support")) {
+  if (!user && (currentPage === "pricing" || currentPage === "support" || currentPage === "monetization")) {
     return (
       <ErrorBoundary>
+        {currentPage === "monetization" ? (
+          <MonetizationPage
+            user={null}
+            onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
+            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+          />
+        ) : (
         <PricingPage
           user={null}
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
           onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
         />
+        )}
       </ErrorBoundary>
     );
   }
