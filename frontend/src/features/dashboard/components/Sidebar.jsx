@@ -1,236 +1,301 @@
-import React from "react";
-import SidebarItem from "./SidebarItem";
+import React, { useEffect } from "react";
 import { useTheme } from "../../../hooks/useTheme";
 import PlanBadge from "../../../components/billing/PlanBadge";
+
+const ROUTE_GROUPS = [
+  {
+    title: "Play",
+    items: [
+      { id: "dashboard", label: "Dashboard", icon: "▦", auth: true },
+      { id: "ai", label: "Play vs AI", icon: "♞" },
+      { id: "multi", label: "Play Online", icon: "♟", auth: true },
+      { id: "local", label: "Play vs Player", icon: "♙" },
+      { id: "lan", label: "Same WiFi", icon: "⇄" },
+    ],
+  },
+  {
+    title: "Improve",
+    items: [
+      { id: "puzzles", label: "Puzzles", icon: "◇" },
+      { id: "analysis", label: "Analysis", icon: "∑" },
+      { id: "leaderboard", label: "Leaderboard", icon: "★" },
+      { id: "help", label: "How It Works", icon: "?" },
+    ],
+  },
+  {
+    title: "Community",
+    items: [
+      { id: "community", label: "Community", icon: "☷" },
+      { id: "messages", label: "Messages", icon: "✉", auth: true },
+      { id: "referral", label: "Referral", icon: "↗", auth: true },
+      { id: "tournaments", label: "Tournaments", icon: "🏆" },
+    ],
+  },
+  {
+    title: "Account",
+    items: [
+      { id: "profile", label: "Profile", icon: "◉", auth: true },
+      { id: "settings", label: "Settings", icon: "⚙", auth: true },
+      { id: "billing", label: "Billing", icon: "◈", auth: true },
+    ],
+  },
+  {
+    title: "Support",
+    items: [
+      { id: "monetization", label: "Premium", icon: "♛" },
+      { id: "support", label: "Support", icon: "♡" },
+      { id: "pricing", label: "Pricing", icon: "₹" },
+    ],
+  },
+];
+
+function getSupporterState(user) {
+  if (!user) return "guest";
+  if (user.isSupporter || user.adsDisabled || user.plan === "supporter") return "supporter";
+  if (user.supporterStatus === "pending" || user.billingStatus === "pending") return "pending";
+  if (user.supporterStatus === "rejected" || user.billingStatus === "rejected") return "rejected";
+  return "free";
+}
+
+function isVisible(item, user) {
+  if (item.auth && !user) return false;
+  return true;
+}
+
+function NavButton({ item, activePage, isCollapsed, onNavigate }) {
+  const { theme } = useTheme();
+  const active = activePage === item.id;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onNavigate(item.id)}
+      aria-current={active ? "page" : undefined}
+      aria-label={item.label}
+      title={isCollapsed ? item.label : undefined}
+      className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+        isCollapsed ? "justify-center" : "justify-start"
+      }`}
+      style={{
+        backgroundColor: active ? `${theme.primary}22` : "transparent",
+        color: active ? theme.primary : theme.text.secondary,
+        border: `1px solid ${active ? `${theme.primary}66` : "transparent"}`,
+        boxShadow: active ? `0 8px 24px ${theme.primary}18` : "none",
+      }}
+      onMouseEnter={(event) => {
+        if (!active) {
+          event.currentTarget.style.backgroundColor = theme.hover;
+          event.currentTarget.style.color = theme.text.primary;
+        }
+      }}
+      onMouseLeave={(event) => {
+        if (!active) {
+          event.currentTarget.style.backgroundColor = "transparent";
+          event.currentTarget.style.color = theme.text.secondary;
+        }
+      }}
+    >
+      <span className="grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg text-base" style={{ backgroundColor: active ? `${theme.primary}18` : "rgba(255,255,255,0.04)" }}>
+        {item.icon}
+      </span>
+      {!isCollapsed && <span className="truncate">{item.label}</span>}
+    </button>
+  );
+}
 
 export default function Sidebar({
   isOpen,
   onClose,
-  activePage = "play",
+  activePage = "dashboard",
   onNavigate,
   user,
   isCollapsed,
   onToggleCollapse,
 }) {
   const { theme, isDark } = useTheme();
+  const supporterState = getSupporterState(user);
+  const initial = user?.username ? user.username.charAt(0).toUpperCase() : "C";
 
-  const navigationStructure = [
-    {
-      category: "ChessPlay",
-      items: [
-        { id: "dashboard", label: "Dashboard", icon: "♜" },
-        { id: "ai", label: "Play AI", icon: "♞" },
-        { id: "multi", label: "Play Online", icon: "♟" },
-        { id: "local", label: "Play vs Player", icon: "♙" },
-        { id: "lan", label: "Same WiFi", icon: "⇄" },
-        { id: "puzzles", label: "Puzzles", icon: "◇" },
-        { id: "analysis", label: "Analysis", icon: "∑" },
-        { id: "support", label: "Support / Pricing", icon: "₹" },
-        { id: "billing", label: "Billing", icon: "◈" },
-        { id: "monetization", label: "Premium", icon: "$" },
-        { id: "referral", label: "Referral", icon: "↗" },
-        { id: "tournaments", label: "Tournaments", icon: "🏆" },
-        { id: "community", label: "Community", icon: "☷" },
-        { id: "messages", label: "Messages", icon: "✉" },
-        ...(user?.isAdmin ? [{ id: "admin", label: "Admin Panel", icon: "🛡" }, { id: "automation", label: "Admin Automation", icon: "🤖" }] : []),
-        { id: "help", label: "How it works", icon: "?" },
-        { id: "leaderboard", label: "Leaderboard", icon: "★" },
-        { id: "settings", label: "Settings", icon: "⚙" },
-      ],
-    },
-  ];
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") onClose?.();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
 
-  const handleNav = (id) => {
-    if (onNavigate) onNavigate(id);
-    onClose(); // Close mobile menu if open
+  const handleNavigate = (id) => {
+    onNavigate?.(id);
+    onClose?.();
   };
 
-  const initial = user?.username ? user.username.charAt(0).toUpperCase() : "U";
+  const groups = [
+    ...ROUTE_GROUPS,
+    ...(user?.isAdmin
+      ? [
+          {
+            title: "Admin",
+            items: [
+              { id: "admin", label: "Admin Panel", icon: "🛡" },
+              { id: "admin-supporters", label: "Payments", icon: "◈" },
+              { id: "automation", label: "Automation", icon: "⚡" },
+            ],
+          },
+        ]
+      : []),
+  ];
 
   return (
     <>
-      {/* Mobile Overlay Background */}
       {isOpen && (
-        <div
-          className="fixed inset-0 backdrop-blur-sm z-40 lg:hidden transition-opacity"
+        <button
+          type="button"
+          aria-label="Close navigation overlay"
+          className="fixed inset-0 z-40 cursor-default bg-black/60 backdrop-blur-sm lg:hidden"
           onClick={onClose}
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
         />
       )}
 
-      {/* Sidebar Container */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 flex-shrink-0 z-50 shadow-2xl transition-all duration-300 ease-in-out transform ${
-          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        } ${isCollapsed ? "w-20" : "w-72 max-w-[86vw]"} flex flex-col backdrop-blur-2xl`}
+        aria-label="ChessPlay sidebar navigation"
+        className={`fixed left-0 top-0 z-50 flex h-[100dvh] flex-col border-r shadow-2xl transition-all duration-300 lg:static lg:translate-x-0 ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        } ${isCollapsed ? "lg:w-20" : "w-80 lg:w-72"}`}
         style={{
-          background: `linear-gradient(180deg, ${theme.bg.secondary}, ${theme.bg.primary})`,
-          borderRightColor: theme.border.secondary,
-          borderRight: `1px solid ${theme.border.secondary}`,
+          backgroundColor: theme.bg.secondary,
+          borderColor: theme.border.secondary,
           color: theme.text.primary,
         }}
       >
-        {/* Brand Header */}
-        <div
-          className={`p-5 flex items-center ${isCollapsed ? "justify-center" : "justify-between"} flex-shrink-0 h-20 transition-colors duration-300`}
-          style={{
-            borderBottomColor: theme.border.secondary,
-            borderBottom: `1px solid ${theme.border.secondary}`,
-          }}
-        >
-          <div
-            className="text-3xl font-black flex items-center gap-3 drop-shadow-md font-['Montserrat'] overflow-hidden"
-            style={{ color: theme.text.primary }}
+        <div className="flex h-20 items-center justify-between gap-3 border-b px-4" style={{ borderColor: theme.border.secondary }}>
+          <button
+            type="button"
+            onClick={() => handleNavigate("dashboard")}
+            aria-label="Go to ChessPlay home"
+            className={`flex min-w-0 items-center gap-3 rounded-xl p-1 text-left focus:outline-none focus-visible:ring-2 ${isCollapsed ? "justify-center" : ""}`}
           >
-            <span style={{ color: theme.primary }} className="flex-shrink-0">
+            <span
+              className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-2xl text-2xl font-black shadow-lg"
+              style={{ backgroundColor: `${theme.primary}22`, color: theme.primary }}
+              aria-hidden="true"
+            >
               ♟
             </span>
-            {!isCollapsed && <span>ChessPlay</span>}
-          </div>
-          {!isCollapsed && (
-            <button
-              className="lg:hidden p-2 transition-colors"
-              style={{
-                color: theme.text.secondary,
-                backgroundColor: "transparent",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = theme.text.primary;
-                e.currentTarget.style.backgroundColor = theme.hover;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = theme.text.secondary;
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-              onClick={onClose}
-            >
-              ✕
-            </button>
-          )}
-        </div>
-
-        {/* Main Navigation Links */}
-        <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto custom-scrollbar">
-          {navigationStructure.map((section, index) => (
-            <div key={index}>
-              {section.category && !isCollapsed && (
-                <h3
-                  className="px-4 pt-2 pb-2 text-xs font-bold uppercase tracking-[0.22em]"
-                  style={{ color: theme.text.tertiary }}
-                >
-                  {section.category}
-                </h3>
-              )}
-              {section.category && isCollapsed && index > 0 && (
-                <div
-                  className="w-full h-px my-2"
-                  style={{ backgroundColor: theme.border.secondary }}
-                />
-              )}
-              <div className="space-y-1">
-                {section.items.map((item) => (
-                  <SidebarItem
-                    key={item.id}
-                    icon={item.icon}
-                    label={item.label}
-                    isActive={activePage === item.id}
-                    isCollapsed={isCollapsed}
-                    onClick={() => handleNav(item.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </nav>
-
-        {/* Bottom User/Settings Area */}
-        <div
-          className="p-3 space-y-2 flex-shrink-0 transition-colors duration-300"
-          style={{
-            borderTopColor: theme.border.secondary,
-            borderTop: `1px solid ${theme.border.secondary}`,
-            background: isDark
-              ? "linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02))"
-              : "linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,.02))",
-          }}
-        >
-          <button
-            onClick={onToggleCollapse}
-            className={`w-full hidden lg:flex items-center gap-4 px-4 py-3 rounded-lg font-bold transition-colors text-left ${
-              isCollapsed ? "justify-center !px-0" : ""
-            }`}
-            style={{
-              color: theme.text.secondary,
-              backgroundColor: "transparent",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = theme.text.primary;
-              e.currentTarget.style.backgroundColor = theme.hover;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = theme.text.secondary;
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
-          >
-            <span className="text-2xl drop-shadow-sm flex-shrink-0">
-              {isCollapsed ? "→" : "←"}
-            </span>
             {!isCollapsed && (
-              <span className="text-lg font-['Montserrat'] truncate">
-                Collapse
+              <span className="min-w-0">
+                <span className="block truncate text-xl font-black tracking-tight">ChessPlay</span>
+                <span className="block truncate text-xs font-semibold" style={{ color: theme.text.tertiary }}>
+                  Play. Improve. Compete.
+                </span>
               </span>
             )}
           </button>
 
-          <div
-            onClick={() => handleNav("profile")}
-            className={`mt-1 flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-all shadow-inner ${
-              isCollapsed ? "justify-center" : ""
-            }`}
-            style={{
-              backgroundColor: isDark
-                ? "rgba(255, 255, 255, 0.05)"
-                : "rgba(0, 0, 0, 0.03)",
-              borderColor: theme.border.secondary,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = isDark
-                ? "rgba(255, 255, 255, 0.08)"
-                : "rgba(0, 0, 0, 0.06)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = isDark
-                ? "rgba(255, 255, 255, 0.05)"
-                : "rgba(0, 0, 0, 0.03)";
-            }}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close navigation"
+            className="rounded-xl px-3 py-2 text-lg font-bold transition lg:hidden"
+            style={{ color: theme.text.secondary }}
           >
-            <div
-              className="w-10 h-10 rounded-md flex items-center justify-center font-bold shadow-sm text-lg flex-shrink-0"
+            ×
+          </button>
+        </div>
+
+        <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4 custom-scrollbar">
+          {groups.map((group) => {
+            const visibleItems = group.items.filter((item) => isVisible(item, user));
+            if (visibleItems.length === 0) return null;
+
+            return (
+              <section key={group.title} aria-labelledby={`sidebar-${group.title}`}>
+                {!isCollapsed ? (
+                  <h2
+                    id={`sidebar-${group.title}`}
+                    className="px-3 pb-2 text-[11px] font-black uppercase tracking-[0.22em]"
+                    style={{ color: theme.text.tertiary }}
+                  >
+                    {group.title}
+                  </h2>
+                ) : (
+                  <div className="mx-auto mb-2 h-px w-10" style={{ backgroundColor: theme.border.secondary }} />
+                )}
+                <div className="space-y-1.5">
+                  {visibleItems.map((item) => (
+                    <NavButton
+                      key={item.id}
+                      item={item}
+                      activePage={activePage}
+                      isCollapsed={isCollapsed}
+                      onNavigate={handleNavigate}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </nav>
+
+        <div className="border-t p-3" style={{ borderColor: theme.border.secondary }}>
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className={`mb-3 hidden w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold transition lg:flex ${isCollapsed ? "justify-center" : ""}`}
+            style={{ color: theme.text.secondary, backgroundColor: "transparent" }}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <span>{isCollapsed ? "→" : "←"}</span>
+            {!isCollapsed && <span>Collapse</span>}
+          </button>
+
+          {user ? (
+            <button
+              type="button"
+              onClick={() => handleNavigate("profile")}
+              className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${isCollapsed ? "justify-center" : ""}`}
               style={{
-                backgroundColor: theme.primary,
-                color: isDark ? "#000" : "#fff",
+                backgroundColor: isDark ? "rgba(255,255,255,0.045)" : "rgba(0,0,0,0.035)",
+                borderColor: theme.border.secondary,
               }}
             >
-              {initial}
-            </div>
-            {!isCollapsed && (
-              <div className="flex flex-col overflow-hidden">
-                <span
-                  className="font-bold truncate text-sm"
-                  style={{ color: theme.text.primary }}
-                >
-                  {user?.username || "Guest Player"}
+              <span
+                className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl text-sm font-black"
+                style={{ backgroundColor: theme.primary, color: isDark ? "#07120a" : "#ffffff" }}
+              >
+                {initial}
+              </span>
+              {!isCollapsed && (
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-black">{user.username || "Player"}</span>
+                  <span className="block truncate text-xs" style={{ color: theme.text.tertiary }}>
+                    {user.rating || 1200} rating
+                  </span>
+                  <PlanBadge user={user} compact />
                 </span>
-                <span
-                  className="font-bold text-xs truncate"
-                  style={{ color: theme.primary }}
-                >
-                  {user?.rating || 1200} ELO
-                </span>
-                <PlanBadge user={user} compact />
-              </div>
-            )}
-          </div>
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleNavigate("dashboard")}
+              className="w-full rounded-2xl border p-3 text-left text-sm font-bold"
+              style={{ borderColor: theme.border.secondary, color: theme.text.secondary }}
+            >
+              Sign in to unlock your dashboard.
+            </button>
+          )}
+
+          {!isCollapsed && supporterState !== "supporter" && (
+            <button
+              type="button"
+              onClick={() => handleNavigate(supporterState === "rejected" ? "billing" : "monetization")}
+              className="mt-3 w-full rounded-2xl px-4 py-3 text-sm font-black transition"
+              style={{ backgroundColor: `${theme.primary}22`, color: theme.primary, border: `1px solid ${theme.primary}55` }}
+            >
+              {supporterState === "pending" ? "Pending verification" : supporterState === "rejected" ? "View billing status" : "Support ChessPlay"}
+            </button>
+          )}
         </div>
       </aside>
     </>
