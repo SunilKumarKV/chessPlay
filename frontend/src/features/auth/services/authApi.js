@@ -22,12 +22,12 @@ export async function loginWithEmail({ email, password }) {
   }
 }
 
-export async function registerWithEmail({ username, email, password }) {
+export async function registerWithEmail({ username, email, password, referralCode }) {
   try {
     return await apiClient("/api/auth/register", {
       method: "POST",
       skipAuthRefresh: true,
-      body: JSON.stringify({ username, email, password }),
+      body: JSON.stringify({ username, email, password, referralCode }),
     });
   } catch (error) {
     throw new Error(normalizeAuthError(error, "Unable to create account. Please try again."));

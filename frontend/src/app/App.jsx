@@ -404,7 +404,7 @@ export default function App() {
       case "monetization":
         return <MonetizationPage user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "referral":
-        return <ReferralPage onBack={goDashboard} />;
+        return <ReferralPage onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "tournaments":
         return <TournamentsPage onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "puzzles":

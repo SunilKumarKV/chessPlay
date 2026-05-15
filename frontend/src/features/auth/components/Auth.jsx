@@ -75,14 +75,22 @@ export default function Auth({
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
+  const [referralCode, setReferralCode] = useState("");
   const googleButtonRef = useRef(null);
 
   useEffect(() => {
-    setIsLogin(initialIsLogin);
+    const params = new URLSearchParams(window.location.search);
+    const ref = String(params.get("ref") || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 24);
+    setReferralCode(ref);
+    if (ref) setIsLogin(false);
+  }, []);
+
+  useEffect(() => {
+    setIsLogin(referralCode ? false : initialIsLogin);
     setError("");
     setSuccess("");
     setFormData({ username: "", email: "", password: "", confirmPassword: "" });
-  }, [initialIsLogin]);
+  }, [initialIsLogin, referralCode]);
 
   const heading = isLogin ? "Sign in to ChessPlay" : "Create your ChessPlay account";
   const helperText = isLogin
@@ -149,9 +157,9 @@ export default function Auth({
 
       const data = isLogin
         ? await loginWithEmail(payload)
-        : await registerWithEmail({ ...payload, username: formData.username.trim() });
+        : await registerWithEmail({ ...payload, username: formData.username.trim(), referralCode });
 
-      completeLogin(data, isLogin ? "Welcome back." : "Account created successfully.");
+      completeLogin(data, isLogin ? "Welcome back." : data?.referralConnected ? "Account created successfully. Referral connected." : "Account created successfully.");
     } catch (authError) {
       setError(authError.message || "Authentication failed. Please try again.");
     } finally {
@@ -255,6 +263,12 @@ export default function Auth({
     <div className="relative mx-auto w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl shadow-black/20 backdrop-blur-2xl sm:p-6">
       <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[#81b64c]/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-20 -left-16 h-44 w-44 rounded-full bg-amber-300/10 blur-3xl" />
+
+      {referralCode && !isLogin && (
+        <div className="relative mb-4 rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-3 text-sm font-semibold text-emerald-100">
+          You were invited to ChessPlay. Referral code <span className="font-mono text-emerald-200">{referralCode}</span> will be connected after registration if it is valid.
+        </div>
+      )}
 
       <div className="relative text-center">
         <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-[#81b64c] text-3xl text-[#07100a] shadow-lg shadow-[#81b64c]/20">

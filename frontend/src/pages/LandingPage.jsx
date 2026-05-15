@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal } from "../components/ui";
 import Auth from "../features/auth/components/Auth";
 
@@ -50,6 +50,17 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const floatingPieces = useMemo(() => ["♔", "♕", "♘", "♜", "♟", "♗"], []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (window.location.pathname === "/register" || params.get("ref")) {
+      setIsLogin(false);
+      setShowAuth(true);
+    } else if (window.location.pathname === "/login") {
+      setIsLogin(true);
+      setShowAuth(true);
+    }
+  }, []);
 
   const openSignup = () => {
     setMobileMenuOpen(false);

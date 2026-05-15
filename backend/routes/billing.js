@@ -494,31 +494,113 @@ router.get("/monetization", auth, async (req, res) => {
   });
 });
 
-router.get("/referral/me", auth, async (req, res) => {
-  const user = await User.findById(req.user.userId).select("referralCode coins");
-  if (!user) return res.status(404).json({ message: "User not found" });
-  if (!user.referralCode) {
-    user.referralCode = `CP${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
-    await user.save();
+
+function normalizeReferralCode(code) {
+  return sanitizeText(code || "", 24).toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+async function ensureReferralCode(user) {
+  if (user.referralCode && /^[A-Z0-9]{6,16}$/.test(user.referralCode)) return user.referralCode;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const code = `CP${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+    // eslint-disable-next-line no-await-in-loop
+    const exists = await User.exists({ referralCode: code });
+    if (!exists) {
+      user.referralCode = code;
+      await user.save();
+      return code;
+    }
   }
-  await Referral.updateOne({ referrer: user._id, code: user.referralCode }, { $setOnInsert: { referrer: user._id, code: user.referralCode, status: "created" } }, { upsert: true });
-  const referrals = await Referral.find({ referrer: user._id }).sort({ createdAt: -1 }).limit(50).populate("referred", "username email plan");
-  res.json({ code: user.referralCode, coins: user.coins || 0, referrals, redeemOptions: ["premium month", "analysis credits", "board themes"] });
+  throw new Error("Could not create a unique referral code");
+}
+
+function publicReferral(referral) {
+  const referred = referral.referred || null;
+  return {
+    id: referral._id,
+    username: referred?.username || "ChessPlay player",
+    joinedAt: referral.createdAt,
+    status: referral.status === "created" ? "pending" : referral.status,
+    rewardStatus: referral.status === "rewarded" ? "rewarded" : referral.status === "rejected" ? "rejected" : "manual_review",
+    rewardNote: referral.rewardNote || "Rewards are reviewed manually.",
+  };
+}
+
+async function referralDashboardForUser(userId) {
+  const user = await User.findById(userId).select("username email referralCode referredBy isSupporter isPremium adsDisabled");
+  if (!user) return null;
+  const code = await ensureReferralCode(user);
+  await Referral.updateOne(
+    { referrer: user._id, referred: null, code },
+    { $setOnInsert: { referrer: user._id, referred: null, code, status: "created", rewardNote: "Invite link created." } },
+    { upsert: true },
+  );
+  const referralRows = await Referral.find({ referrer: user._id, referred: { $ne: null } })
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .populate("referred", "username createdAt")
+    .lean();
+  const joined = referralRows.filter((item) => ["joined", "verified", "reward_eligible", "rewarded"].includes(item.status)).length;
+  const verified = referralRows.filter((item) => ["verified", "reward_eligible", "rewarded"].includes(item.status)).length;
+  const rewarded = referralRows.filter((item) => item.status === "rewarded").length;
+  const rewardEligible = referralRows.filter((item) => item.status === "reward_eligible").length;
+  return {
+    code,
+    linkPath: `/register?ref=${code}`,
+    stats: {
+      invitesSent: referralRows.length,
+      joinedUsers: joined,
+      verifiedReferrals: verified,
+      rewardStatus: rewarded > 0 ? "rewarded" : rewardEligible > 0 ? "eligible for manual review" : "manual review",
+    },
+    rewards: [
+      { threshold: 3, label: "Supporter badge trial", status: joined >= 3 ? "manual review" : "coming soon" },
+      { threshold: 5, label: "Early themes access", status: joined >= 5 ? "manual review" : "coming soon" },
+      { threshold: 10, label: "Founder supporter badge", status: joined >= 10 ? "manual review" : "coming soon" },
+    ],
+    referrals: referralRows.map(publicReferral),
+    user: {
+      username: user.username,
+      isSupporter: Boolean(user.isSupporter || user.isPremium),
+      adsDisabled: Boolean(user.adsDisabled),
+    },
+  };
+}
+
+router.get("/referral/me", auth, async (req, res) => {
+  const dashboard = await referralDashboardForUser(req.user.userId);
+  if (!dashboard) return res.status(404).json({ message: "User not found" });
+  res.json(dashboard);
 });
 
-router.post("/referral/apply", auth, async (req, res) => {
-  const code = String(req.body.code || "").trim().toUpperCase();
-  if (!/^[A-Z0-9]{4,20}$/.test(code)) return res.status(400).json({ message: "Invalid referral code" });
-  const ref = await Referral.findOne({ code }).populate("referrer");
-  if (!ref || String(ref.referrer._id) === String(req.user.userId)) return res.status(400).json({ message: "Referral code cannot be used" });
-  const user = await User.findById(req.user.userId);
-  if (!user || user.referredBy) return res.status(409).json({ message: "Referral already applied" });
-  user.referredBy = ref.referrer._id;
-  await user.save();
-  await Referral.create({ referrer: ref.referrer._id, referred: user._id, code, status: "joined", coinsEarned: 25, rewardReason: "friend joined" });
-  await User.findByIdAndUpdate(ref.referrer._id, { $inc: { coins: 25 } });
-  res.json({ message: "Referral applied. Referrer earned 25 coins." });
+router.get("/referrals/me", auth, async (req, res) => {
+  const dashboard = await referralDashboardForUser(req.user.userId);
+  if (!dashboard) return res.status(404).json({ message: "User not found" });
+  res.json(dashboard);
 });
+
+async function applyReferralForUser(req, res, rawCode) {
+  const code = normalizeReferralCode(rawCode);
+  if (!/^[A-Z0-9]{6,16}$/.test(code)) return res.status(400).json({ message: "Invalid referral code." });
+  const referrer = await User.findOne({ referralCode: code }).select("_id username referralCode");
+  if (!referrer || String(referrer._id) === String(req.user.userId)) return res.status(400).json({ message: "Referral code cannot be used." });
+  const user = await User.findById(req.user.userId).select("referredBy referralCode");
+  if (!user) return res.status(404).json({ message: "User not found" });
+  if (user.referredBy) return res.status(409).json({ message: "Referral already connected to this account." });
+  user.referredBy = referrer._id;
+  await user.save();
+  await Referral.updateOne(
+    { referrer: referrer._id, referred: user._id },
+    { $setOnInsert: { referrer: referrer._id, referred: user._id, code, status: "joined", rewardNote: "Joined through referral. Reward is manually reviewed." } },
+    { upsert: true },
+  );
+  await writeAudit(req, "referral_created", "Referral", user._id, { referrer: String(referrer._id) });
+  return res.json({ message: "Referral connected successfully. Rewards are reviewed manually." });
+}
+
+router.post("/referral/apply", auth, async (req, res) => applyReferralForUser(req, res, req.body.code));
+
+router.post("/referrals/claim", auth, async (req, res) => applyReferralForUser(req, res, req.body.code || req.body.referralCode));
 
 router.get("/tournaments", auth, async (_req, res) => {
   const tournaments = await Tournament.find({ status: { $in: ["open", "running"] } }).sort({ startsAt: 1 }).limit(50).select("title description mode entryFee currency startsAt maxPlayers status participants");

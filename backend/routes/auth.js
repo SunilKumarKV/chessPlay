@@ -2,6 +2,7 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/User");
+const Referral = require("../models/Referral");
 const SecurityEvent = require("../models/SecurityEvent");
 const { storeAvatar, safeExternalImageUrl } = require("../utils/avatarStorage");
 const {
@@ -144,6 +145,26 @@ async function verifyGoogleCredential(credential) {
 }
 
 
+function normalizeReferralCode(code) {
+  return String(code || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 24);
+}
+
+async function connectReferralForNewUser(user, referralCode) {
+  const code = normalizeReferralCode(referralCode);
+  if (!code || !/^[A-Z0-9]{6,16}$/.test(code)) return false;
+  const referrer = await User.findOne({ referralCode: code }).select("_id referralCode");
+  if (!referrer || String(referrer._id) === String(user._id)) return false;
+  if (user.referredBy) return false;
+  user.referredBy = referrer._id;
+  await user.save();
+  await Referral.updateOne(
+    { referrer: referrer._id, referred: user._id },
+    { $setOnInsert: { referrer: referrer._id, referred: user._id, code, status: "joined", rewardNote: "Joined through referral. Reward is manually reviewed." } },
+    { upsert: true },
+  );
+  return true;
+}
+
 async function recordSecurityEvent(req, payload) {
   try {
     await SecurityEvent.create({
@@ -240,6 +261,7 @@ const authLimiter = createRateLimiter({
 router.post("/register", authLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
+    const referralCode = req.body.referralCode || req.body.ref || "";
     const emailValidation = validateProductionEmail(req.body.email);
     if (!emailValidation.ok) {
       return res.status(400).json({ message: emailValidation.message });
@@ -273,11 +295,12 @@ router.post("/register", authLimiter, async (req, res) => {
     // Create new user
     const user = new User({ username, email, password });
     await user.save();
+    const referralConnected = await connectReferralForNewUser(user, referralCode);
 
     await issueSession(res, user);
     await recordSecurityEvent(req, { type: "register_success", email: user.email, user: user._id });
 
-    res.status(201).json(buildAuthResponse("Account created successfully", user));
+    res.status(201).json({ ...buildAuthResponse("Account created successfully", user), referralConnected });
   } catch (error) {
     console.error("Registration error:", error);
     res.status(500).json({ message: "Server error" });
@@ -312,6 +335,7 @@ router.post("/login", authLimiter, async (req, res) => {
     // Update last login
     user.lastLogin = new Date();
     await user.save();
+    const referralConnected = await connectReferralForNewUser(user, referralCode);
 
     await issueSession(res, user);
     await recordSecurityEvent(req, { type: user.isAdmin ? "admin_login" : "login_success", email: user.email, user: user._id });
