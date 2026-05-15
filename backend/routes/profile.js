@@ -6,8 +6,8 @@ const auth = require("../middleware/auth");
 
 const router = express.Router();
 
-const USER_SELECT = "username email avatar bio country title rating gamesPlayed gamesWon gamesLost gamesDrawn createdAt isSupporter isPremium isAdmin adsDisabled plan planStatus supporterPlan supporterSince settings privacy friends";
-const PUBLIC_SELECT = "username avatar bio country title rating gamesPlayed gamesWon gamesLost gamesDrawn createdAt isSupporter isPremium isAdmin adsDisabled plan planStatus supporterPlan supporterSince settings privacy";
+const USER_SELECT = "username email avatar bio country title rating gamesPlayed gamesWon gamesLost gamesDrawn createdAt isSupporter isPremium isAdmin adsDisabled plan planStatus supporterPlan supporterSince settings privacy friends badges";
+const PUBLIC_SELECT = "username avatar bio country title rating gamesPlayed gamesWon gamesLost gamesDrawn createdAt isSupporter isPremium isAdmin adsDisabled plan planStatus supporterPlan supporterSince settings privacy badges";
 
 function cleanText(value, maxLength = 160) {
   return String(value || "")
@@ -59,6 +59,8 @@ function relationshipSafeUser(user, ownProfile = false) {
     planStatus: user.planStatus || "active",
     supporterPlan: user.supporterPlan || "none",
     supporterSince: user.supporterSince || null,
+    selectedBadge: settings.appearance?.selectedBadge || user.badges?.selected || (user.isSupporter || user.isPremium ? "supporter" : "new-player"),
+    earnedBadges: ownProfile ? (user.badges?.earned || ["new-player", "active-player", "community-member"]) : undefined,
     settings: ownProfile ? settings : undefined,
     privacy: {
       profileVisibility: privacy.profileVisibility || (user.privacy?.profileVisibility === false ? "private" : "public"),

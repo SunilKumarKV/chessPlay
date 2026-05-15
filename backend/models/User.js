@@ -202,8 +202,15 @@ const userSchema = new mongoose.Schema({
       supporter: { type: Boolean, default: true },
     },
     appearance: {
-      theme: { type: String, enum: ["system", "light", "dark"], default: "system" },
-      boardTheme: { type: String, enum: ["classic", "neon", "wood", "tournament"], default: "classic" },
+      theme: { type: String, enum: ["system", "light", "dark", "newspaper", "midnight", "tournament", "royal", "forest", "neon"], default: "system" },
+      accentColor: { type: String, enum: ["default", "blue", "purple", "emerald", "amber", "rose", "cyan"], default: "default" },
+      textColor: { type: String, enum: ["default", "softWhite", "warm", "cool", "highContrast"], default: "default" },
+      boardTheme: { type: String, enum: ["classic", "tournamentGreen", "neonDark", "wooden", "marble", "neonCyberpunk", "glassBoard", "darkPro", "minimalLight"], default: "classic" },
+      selectedBadge: { type: String, default: "new-player", trim: true, maxlength: 64 },
+    },
+    badges: {
+      earned: [{ type: String, trim: true, maxlength: 64 }],
+      selected: { type: String, default: "new-player", trim: true, maxlength: 64 },
     },
     gameplay: {
       defaultMode: { type: String, enum: ["ai", "online", "player"], default: "ai" },

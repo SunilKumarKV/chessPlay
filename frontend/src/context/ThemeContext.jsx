@@ -145,6 +145,31 @@ const THEMES = {
     active: "rgba(214, 169, 74, 0.18)",
     disabled: "#554d43",
   },
+
+  royal: {
+    primary: "#a78bfa", primaryDark: "#7c3aed", primaryLight: "#c4b5fd",
+    bg: { primary: "#140f24", secondary: "#1f1735", tertiary: "#2b2147", quaternary: "#372a5b", overlay: "#1a1230" },
+    text: { primary: "#f4f0ff", secondary: "#c9bff0", tertiary: "#9b8bc8", muted: "#6b5b94" },
+    border: { primary: "#30234f", secondary: "#44316f", light: "#594091" },
+    success: "#22c55e", warning: "#f59e0b", error: "#fb7185", info: "#60a5fa",
+    hover: "rgba(167, 139, 250, 0.1)", active: "rgba(167, 139, 250, 0.18)", disabled: "#493b69",
+  },
+  forest: {
+    primary: "#34d399", primaryDark: "#059669", primaryLight: "#86efac",
+    bg: { primary: "#071a13", secondary: "#0d261b", tertiary: "#143524", quaternary: "#1d4630", overlay: "#0a2117" },
+    text: { primary: "#ecfdf5", secondary: "#b6d7c6", tertiary: "#7faa97", muted: "#527361" },
+    border: { primary: "#1c3e2c", secondary: "#28563d", light: "#34704f" },
+    success: "#22c55e", warning: "#f59e0b", error: "#f87171", info: "#38bdf8",
+    hover: "rgba(52, 211, 153, 0.1)", active: "rgba(52, 211, 153, 0.18)", disabled: "#375340",
+  },
+  neon: {
+    primary: "#22d3ee", primaryDark: "#0891b2", primaryLight: "#f0abfc",
+    bg: { primary: "#080817", secondary: "#11102a", tertiary: "#1a1840", quaternary: "#24205a", overlay: "#0b0b20" },
+    text: { primary: "#f8fafc", secondary: "#bde7f0", tertiary: "#8cc8d8", muted: "#5b7c8a" },
+    border: { primary: "#27326b", secondary: "#37418a", light: "#4f46e5" },
+    success: "#22c55e", warning: "#f59e0b", error: "#fb7185", info: "#22d3ee",
+    hover: "rgba(34, 211, 238, 0.1)", active: "rgba(217, 70, 239, 0.16)", disabled: "#30345f",
+  },
   newspaper: {
     primary: "#3f6f45",
     primaryDark: "#2f5634",
@@ -177,13 +202,31 @@ const THEMES = {
   },
 };
 
-const DARK_MODES = new Set(["dark", "midnight", "tournament"]);
+const DARK_MODES = new Set(["dark", "midnight", "tournament", "royal", "forest", "neon"]);
 const FONT_STACKS = {
   inter: "'Inter', system-ui, sans-serif",
   montserrat: "'Montserrat', system-ui, sans-serif",
   mono: "'JetBrains Mono', ui-monospace, monospace",
   system: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   serif: "Georgia, 'Times New Roman', serif",
+};
+
+const ACCENT_COLOR_VALUES = {
+  default: "",
+  blue: "#3b82f6",
+  purple: "#8b5cf6",
+  emerald: "#10b981",
+  amber: "#f59e0b",
+  rose: "#f43f5e",
+  cyan: "#06b6d4",
+};
+
+const TEXT_COLOR_VALUES = {
+  default: "",
+  softWhite: "#f8fafc",
+  warm: "#fff7ed",
+  cool: "#e0f2fe",
+  highContrast: "#ffffff",
 };
 
 function getStoredAppearance() {
@@ -235,13 +278,15 @@ export function ThemeProvider({ children }) {
   const [textColor, setTextColor] = useState(getInitialTextColor);
 
   const baseTheme = THEMES[themeMode] || THEMES.dark;
+  const resolvedAccentColor = ACCENT_COLOR_VALUES[accentColor] ?? accentColor;
+  const resolvedTextColor = TEXT_COLOR_VALUES[textColor] ?? textColor;
   const theme = {
     ...baseTheme,
-    primary: accentColor || baseTheme.primary,
-    primaryDark: accentColor || baseTheme.primaryDark,
+    primary: resolvedAccentColor || baseTheme.primary,
+    primaryDark: resolvedAccentColor || baseTheme.primaryDark,
     text: {
       ...baseTheme.text,
-      primary: textColor || baseTheme.text.primary,
+      primary: resolvedTextColor || baseTheme.text.primary,
     },
   };
   const isDark = DARK_MODES.has(themeMode);

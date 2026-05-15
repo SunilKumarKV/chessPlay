@@ -3,6 +3,8 @@ import { useSettings } from "../hooks/useSettings";
 import { useTheme } from "../hooks/useTheme";
 import { notifyUserChanged } from "../hooks/useCurrentUser";
 import { apiClient } from "../services/apiClient";
+import { APP_THEME_OPTIONS, ACCENT_COLOR_OPTIONS, TEXT_COLOR_OPTIONS, BADGE_OPTIONS, FREE_BOARD_THEMES, SUPPORTER_BOARD_THEMES, isSupporterOnlyTheme, isSupporterOnlyBoard, isSupporterOnlyBadge } from "../config/customization";
+import { BOARD_THEMES } from "../features/chess/constants/boardThemes";
 
 const SECTIONS = [
   { id: "account", label: "Account", helper: "Username and profile basics" },
@@ -30,17 +32,10 @@ const SELECTS = {
     { value: "friendsOfFriends", label: "Friends of friends" },
     { value: "none", label: "No one" },
   ],
-  theme: [
-    { value: "system", label: "System" },
-    { value: "light", label: "Light" },
-    { value: "dark", label: "Dark" },
-  ],
-  boardTheme: [
-    { value: "classic", label: "Classic" },
-    { value: "neon", label: "Neon · Supporter preview", disabled: true },
-    { value: "wood", label: "Wood · Supporter preview", disabled: true },
-    { value: "tournament", label: "Tournament · Supporter preview", disabled: true },
-  ],
+  theme: APP_THEME_OPTIONS.map((option) => ({ value: option.id, label: option.supporter ? `${option.label} · Supporter` : option.label })),
+  accentColor: ACCENT_COLOR_OPTIONS.map((option) => ({ value: option.id, label: option.label })),
+  textColor: TEXT_COLOR_OPTIONS.map((option) => ({ value: option.id, label: option.label })),
+  boardTheme: [...FREE_BOARD_THEMES, ...SUPPORTER_BOARD_THEMES].map((id) => ({ value: id, label: `${BOARD_THEMES[id]?.label || id}${SUPPORTER_BOARD_THEMES.includes(id) ? " · Supporter" : ""}` })),
   defaultMode: [
     { value: "ai", label: "Play vs AI" },
     { value: "online", label: "Play Online" },
@@ -337,13 +332,64 @@ export default function Settings({ user, onBack, onNavigate }) {
             ) : null}
 
             {activeSection === "appearance" ? (
-              <Card title="Appearance Settings" description="Choose a stable app theme and board theme. Supporter previews are not enabled until they are fully implemented." theme={theme}>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <SelectField label="App theme" value={settings.appearance.theme} options={SELECTS.theme} onChange={(value) => settingsApi.updateAppearance("theme", value)} theme={theme} />
-                  <SelectField label="Board theme" value={settings.appearance.boardTheme} options={SELECTS.boardTheme} onChange={(value) => settingsApi.updateAppearance("boardTheme", value)} theme={theme} />
+              <Card title="Themes & Badges" description="Personalize ChessPlay with app themes, contrast-safe colors, board styles, and profile badges. These are cosmetic only and never affect gameplay." theme={theme}>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <ThemeGrid
+                    title="App themes"
+                    items={APP_THEME_OPTIONS}
+                    selected={settings.appearance.theme}
+                    isLocked={(item) => isSupporterOnlyTheme(item.id) && !settings.premium.isSupporter}
+                    onSelect={(item) => settingsApi.updateAppearance("theme", item.id)}
+                    theme={theme}
+                    lockedCopy="Support ChessPlay to unlock this premium app theme."
+                  />
+                  <ThemeGrid
+                    title="Accent colors"
+                    items={ACCENT_COLOR_OPTIONS}
+                    selected={settings.appearance.accentColor || "default"}
+                    isLocked={(item) => !item.free && !settings.premium.isSupporter}
+                    onSelect={(item) => settingsApi.updateAppearance("accentColor", item.id)}
+                    theme={theme}
+                    swatchKey="value"
+                    lockedCopy="Premium accent colors are supporter cosmetics."
+                  />
+                  <ThemeGrid
+                    title="Text colors"
+                    items={TEXT_COLOR_OPTIONS}
+                    selected={settings.appearance.textColor || "default"}
+                    isLocked={(item) => !item.free && !settings.premium.isSupporter}
+                    onSelect={(item) => settingsApi.updateAppearance("textColor", item.id)}
+                    theme={theme}
+                    swatchKey="value"
+                    lockedCopy="Text presets are contrast-safe supporter cosmetics."
+                  />
+                  <BoardThemeGrid
+                    selected={settings.appearance.boardTheme}
+                    isSupporter={settings.premium.isSupporter}
+                    onSelect={(id) => settingsApi.updateAppearance("boardTheme", id)}
+                    theme={theme}
+                  />
+                </div>
+                <BadgeGrid
+                  selected={settings.appearance.selectedBadge || settings.badges?.selected || "new-player"}
+                  earned={settings.badges?.earned || []}
+                  isSupporter={settings.premium.isSupporter}
+                  onSelect={(id) => settingsApi.updateAppearance("selectedBadge", id)}
+                  theme={theme}
+                />
+                <div className="rounded-2xl p-4" style={{ backgroundColor: theme.bg.tertiary }}>
+                  <p className="font-black">Live preview</p>
+                  <div className="mt-3 rounded-2xl border p-4" style={{ borderColor: theme.border.secondary, backgroundColor: theme.bg.secondary }}>
+                    <p className="text-xl font-black" style={{ color: theme.primary }}>ChessPlay Premium Cosmetics</p>
+                    <p className="mt-2 text-sm" style={{ color: theme.text.secondary }}>Themes, text colors, board styles, and badges are cosmetic. Free gameplay remains fully available.</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span className="rounded-full border px-3 py-1 text-xs font-black" style={{ borderColor: theme.primary, color: theme.primary }}>{settings.appearance.selectedBadge || "new-player"}</span>
+                      {settings.premium.isSupporter ? <span className="rounded-full bg-amber-400/15 px-3 py-1 text-xs font-black text-amber-300">Supporter unlocked</span> : <button type="button" onClick={() => go("premium")} className="rounded-full bg-[#81b64c] px-3 py-1 text-xs font-black text-[#101510]">Support ChessPlay to unlock cosmetics</button>}
+                    </div>
+                  </div>
                 </div>
                 <p className="rounded-xl p-3 text-sm" style={{ backgroundColor: theme.bg.tertiary, color: theme.text.secondary }}>
-                  Premium settings never affect gameplay fairness. Future supporter themes are cosmetic only.
+                  Premium settings never affect rating, move validation, leaderboard fairness, or chess gameplay. PayPal/UPI/Bank supporter verification stays in Premium/Billing.
                 </p>
               </Card>
             ) : null}
@@ -402,6 +448,118 @@ export default function Settings({ user, onBack, onNavigate }) {
         </div>
       </div>
     </div>
+  );
+}
+
+
+function ThemeGrid({ title, items, selected, isLocked, onSelect, theme, swatchKey, lockedCopy }) {
+  return (
+    <section className="rounded-2xl border p-4" style={{ borderColor: theme.border.secondary, backgroundColor: theme.bg.tertiary }}>
+      <h3 className="font-black">{title}</h3>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {items.map((item) => {
+          const locked = isLocked(item);
+          const active = selected === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => !locked && onSelect(item)}
+              disabled={locked}
+              className="rounded-2xl border p-3 text-left transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70"
+              style={{ borderColor: active ? theme.primary : theme.border.secondary, backgroundColor: active ? theme.active : theme.bg.secondary }}
+              aria-label={`${item.label}${locked ? " locked" : ""}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-black">{item.label}</p>
+                  <p className="mt-1 text-xs" style={{ color: theme.text.secondary }}>{locked ? lockedCopy : item.description || "Ready to use."}</p>
+                </div>
+                {swatchKey ? <span className="h-6 w-6 rounded-full border" style={{ backgroundColor: item[swatchKey] || theme.primary, borderColor: theme.border.secondary }} /> : null}
+              </div>
+              <div className="mt-3 flex gap-2">
+                {active ? <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[11px] font-black text-emerald-300">Active</span> : null}
+                {locked ? <span className="rounded-full bg-amber-500/15 px-2 py-1 text-[11px] font-black text-amber-300">Locked</span> : null}
+                {item.supporter ? <span className="rounded-full bg-purple-500/15 px-2 py-1 text-[11px] font-black text-purple-300">Supporter</span> : null}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function BoardThemeGrid({ selected, isSupporter, onSelect, theme }) {
+  const ids = [...FREE_BOARD_THEMES, ...SUPPORTER_BOARD_THEMES];
+  return (
+    <section className="rounded-2xl border p-4" style={{ borderColor: theme.border.secondary, backgroundColor: theme.bg.tertiary }}>
+      <h3 className="font-black">Board themes</h3>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {ids.map((id) => {
+          const board = BOARD_THEMES[id];
+          const locked = isSupporterOnlyBoard(id) && !isSupporter;
+          const active = selected === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => !locked && onSelect(id)}
+              disabled={locked}
+              className="rounded-2xl border p-3 text-left disabled:cursor-not-allowed disabled:opacity-70"
+              style={{ borderColor: active ? theme.primary : theme.border.secondary, backgroundColor: theme.bg.secondary }}
+            >
+              <div className="grid grid-cols-4 overflow-hidden rounded-xl border" style={{ borderColor: board.border }}>
+                {Array.from({ length: 8 }).map((_, index) => (
+                  <span key={index} className="h-7" style={{ background: index % 2 ? board.dark : board.light }} />
+                ))}
+              </div>
+              <p className="mt-3 font-black">{board.label}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {active ? <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[11px] font-black text-emerald-300">Active</span> : null}
+                {locked ? <span className="rounded-full bg-amber-500/15 px-2 py-1 text-[11px] font-black text-amber-300">Locked</span> : null}
+                {isSupporterOnlyBoard(id) ? <span className="rounded-full bg-purple-500/15 px-2 py-1 text-[11px] font-black text-purple-300">Supporter</span> : null}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function BadgeGrid({ selected, earned, isSupporter, onSelect, theme }) {
+  const earnedSet = new Set(earned || []);
+  return (
+    <section className="rounded-2xl border p-4" style={{ borderColor: theme.border.secondary, backgroundColor: theme.bg.tertiary }}>
+      <h3 className="font-black">Impressive profile badges</h3>
+      <p className="mt-1 text-sm" style={{ color: theme.text.secondary }}>Select only earned badges. Locked badges are previews, never fake rewards.</p>
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        {BADGE_OPTIONS.map((badge) => {
+          const supporterLocked = isSupporterOnlyBadge(badge.id) && !isSupporter;
+          const earnedBadge = earnedSet.has(badge.id) || badge.free || (badge.supporter && isSupporter);
+          const locked = supporterLocked || !earnedBadge;
+          const active = selected === badge.id;
+          return (
+            <button
+              key={badge.id}
+              type="button"
+              disabled={locked}
+              onClick={() => !locked && onSelect(badge.id)}
+              className="rounded-2xl border p-4 text-left disabled:cursor-not-allowed disabled:opacity-65"
+              style={{ borderColor: active ? theme.primary : theme.border.secondary, backgroundColor: active ? theme.active : theme.bg.secondary }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <span className="rounded-full border px-3 py-1 text-xs font-black" style={{ borderColor: theme.primary, color: theme.primary }}>{badge.label}</span>
+                <span className="text-[10px] font-black uppercase" style={{ color: theme.text.tertiary }}>{badge.rarity}</span>
+              </div>
+              <p className="mt-3 text-xs" style={{ color: theme.text.secondary }}>{locked ? "Locked until earned or supporter verified." : badge.description}</p>
+              {active ? <p className="mt-2 text-xs font-black text-emerald-300">Selected</p> : null}
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

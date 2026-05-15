@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BACKEND_URL } from "../config/runtime";
 import { useTheme } from "../hooks/useTheme";
+import { getBadgeLabel } from "../config/customization";
 
 const FILTERS = [
   { id: "all", label: "All" },
@@ -35,6 +36,7 @@ function SupporterBadge() {
 }
 
 function PlayerStatus({ player }) {
+  if (player.selectedBadge) return <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-amber-200">{getBadgeLabel(player.selectedBadge)}</span>;
   if (player.isSupporter) return <SupporterBadge />;
   if (safeNumber(player.gamesPlayed) === 0) {
     return <span className="rounded-full bg-slate-700/70 px-2 py-0.5 text-[11px] font-bold text-slate-300">New Player</span>;

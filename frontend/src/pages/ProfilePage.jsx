@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiClient } from "../services/apiClient";
 import { useTheme } from "../hooks/useTheme";
 import { notifyUserChanged } from "../hooks/useCurrentUser";
+import { getBadgeLabel } from "../config/customization";
 
 const TABS = ["overview", "games", "badges", "supporter"];
 
@@ -203,6 +204,7 @@ export default function Profile({ user, username = null, onBack, onNavigate }) {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {isSupporter ? <Badge tone="supporter">Supporter</Badge> : <Badge>Free</Badge>}
+                    {profile?.selectedBadge ? <Badge tone={isSupporter ? "supporter" : "info"}>{getBadgeLabel(profile.selectedBadge)}</Badge> : null}
                     {profile?.isAdmin ? <Badge tone="admin">Admin</Badge> : null}
                     {gamesPlayed > 0 ? <Badge tone="good">Active Player</Badge> : <Badge tone="info">New Player</Badge>}
                   </div>
@@ -314,7 +316,7 @@ export default function Profile({ user, username = null, onBack, onNavigate }) {
 
             {activeTab === "badges" && (
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"><Badge tone={isSupporter ? "supporter" : "neutral"}>{isSupporter ? "Supporter" : "Free Player"}</Badge><p className="mt-3 text-sm text-white/60">{isSupporter ? "Thank you for supporting ChessPlay." : "Support ChessPlay to display a supporter badge."}</p></div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"><Badge tone={isSupporter ? "supporter" : "info"}>{getBadgeLabel(profile?.selectedBadge || (isSupporter ? "supporter" : "new-player"))}</Badge><p className="mt-3 text-sm text-white/60">Selected badges are earned or supporter-verified cosmetics only.</p></div>
                 <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"><Badge tone={profile?.isAdmin ? "admin" : "neutral"}>{profile?.isAdmin ? "Admin" : "Player"}</Badge><p className="mt-3 text-sm text-white/60">Admin badges are shown only from verified backend account roles.</p></div>
               </div>
             )}

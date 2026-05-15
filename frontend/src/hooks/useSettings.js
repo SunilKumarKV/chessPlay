@@ -28,7 +28,14 @@ const DEFAULT_SETTINGS = {
   },
   appearance: {
     theme: "system",
+    accentColor: "default",
+    textColor: "default",
     boardTheme: "classic",
+    selectedBadge: "new-player",
+  },
+  badges: {
+    earned: ["new-player", "active-player", "community-member"],
+    selected: "new-player",
   },
   gameplay: {
     defaultMode: "ai",
@@ -57,6 +64,13 @@ function mergeSettings(base = {}) {
   next.appearance.boardTheme = normalizeBoardThemeId(
     next.appearance.boardTheme || localStorage.getItem(BOARD_THEME_STORAGE_KEY) || "classic",
   );
+  next.appearance.accentColor = next.appearance.accentColor || "default";
+  next.appearance.textColor = next.appearance.textColor || "default";
+  next.appearance.selectedBadge = next.appearance.selectedBadge || next.badges?.selected || "new-player";
+  next.badges = {
+    earned: Array.isArray(next.badges?.earned) && next.badges.earned.length ? next.badges.earned : ["new-player", "active-player", "community-member"],
+    selected: next.appearance.selectedBadge,
+  };
   return next;
 }
 
@@ -74,6 +88,7 @@ function mapApiResponse(data, localSettings) {
       avatar: user.avatar || null,
       country: user.country || "US",
     },
+    badges: serverSettings.badges || localSettings.badges,
     premium: {
       supporterStatus: user.supporterStatus || (user.isSupporter ? "supporter" : "free"),
       isSupporter: Boolean(user.isSupporter),
