@@ -25,7 +25,7 @@ export default function Sidebar({
         { id: "lan", label: "Same WiFi", icon: "⇄" },
         { id: "puzzles", label: "Puzzles", icon: "◇" },
         { id: "analysis", label: "Analysis", icon: "∑" },
-        { id: "pricing", label: "Support / Pricing", icon: "₹" },
+        { id: "support", label: "Support / Pricing", icon: "₹" },
         { id: "billing", label: "Billing", icon: "◈" },
         { id: "monetization", label: "Premium", icon: "$" },
         { id: "referral", label: "Referral", icon: "↗" },

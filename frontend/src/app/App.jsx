@@ -49,6 +49,7 @@ const routeMap = {
   settings: "/settings",
   analysis: "/analysis",
   pricing: "/pricing",
+  support: "/support",
   billing: "/billing",
   monetization: "/premium",
   referral: "/referral",
@@ -244,6 +245,18 @@ export default function App() {
     );
   }
 
+  if (!user && (currentPage === "pricing" || currentPage === "support")) {
+    return (
+      <ErrorBoundary>
+        <PricingPage
+          user={null}
+          onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
+          onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+        />
+      </ErrorBoundary>
+    );
+  }
+
   if (!user && currentPage === "puzzles") {
     return (
       <ErrorBoundary>
@@ -331,8 +344,10 @@ export default function App() {
       case "analysis":
         return <AnalysisPage user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "pricing":
+      case "support":
         return (
           <PricingPage
+            user={user}
             onBack={goDashboard}
             onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
           />

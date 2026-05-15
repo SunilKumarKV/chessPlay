@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 const validator = require("validator");
 const auth = require("../middleware/auth");
 const User = require("../models/User");
@@ -12,6 +13,14 @@ const { sanitizeText } = require("../utils/security");
 const { sendAutomationNotification } = require("../utils/automationBot");
 
 const router = express.Router();
+
+const supporterRequestLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many supporter requests. Please try again later." },
+});
 
 const PLAN_CONFIG = {
   supporter_monthly: {
@@ -102,7 +111,6 @@ function paymentMethodsFor(plan) {
     ],
     global: [
       { id: "paypal", label: "PayPal", checkoutUrl: process.env.PAYPAL_CHECKOUT_URL || "", paypalEmail: process.env.PAYPAL_EMAIL || "", amount: selected.usdAmount, currency: "USD", configured: Boolean(process.env.PAYPAL_CHECKOUT_URL || process.env.PAYPAL_EMAIL) },
-      { id: "stripe", label: "Stripe", checkoutUrl: process.env.STRIPE_PAYMENT_LINK || "", amount: selected.usdAmount, currency: "USD", configured: Boolean(process.env.STRIPE_PAYMENT_LINK) },
     ],
     manualFallback: { enabled: true, label: "Manual approval fallback" },
   };
@@ -184,6 +192,11 @@ router.get("/plans", (_req, res) => {
     merchantName: process.env.UPI_MERCHANT_NAME || "ChessPlay",
     plans: PLAN_CONFIG,
     paymentMethods: paymentMethodsFor("supporter_monthly"),
+    support: {
+      contactEmail: process.env.SUPPORT_EMAIL_TO || process.env.ADMIN_EMAIL || "",
+      manualVerification: true,
+      message: "Payments are manually verified by admin before supporter benefits are enabled.",
+    },
     adNetworks: {
       web: ["Google AdSense", "Media.net"],
       mobileLater: ["AdMob", "Unity Ads"],
@@ -191,7 +204,7 @@ router.get("/plans", (_req, res) => {
   });
 });
 
-router.get("/payment-methods", auth, (req, res) => {
+router.get("/payment-methods", (req, res) => {
   const plan = String(req.query.plan || "supporter_monthly");
   res.json({ plan, methods: paymentMethodsFor(plan) });
 });
@@ -202,14 +215,14 @@ router.post("/payment-intents", auth, async (req, res) => {
     const provider = String(req.body.provider || "manual").toLowerCase();
     const config = PLAN_CONFIG[plan];
     if (!config) return res.status(400).json({ message: "Invalid plan" });
-    if (!["upi", "bank", "qr", "paypal", "stripe", "manual"].includes(provider)) return res.status(400).json({ message: "Invalid payment provider" });
+    if (!["upi", "bank", "paypal", "manual"].includes(provider)) return res.status(400).json({ message: "Invalid payment provider" });
     const configuredMethod = [...paymentMethodsFor(plan).india, ...paymentMethodsFor(plan).global].find((method) => method.id === provider);
     if (configuredMethod && configuredMethod.configured === false) return res.status(503).json({ message: "This payment method is not active yet. Please choose an active method or contact support." });
 
-    const amount = ["paypal", "stripe"].includes(provider) ? config.usdAmount : config.amount;
-    const currency = ["paypal", "stripe"].includes(provider) ? "USD" : "INR";
+    const amount = provider === "paypal" ? config.usdAmount : config.amount;
+    const currency = provider === "paypal" ? "USD" : "INR";
     const reference = createReference(provider);
-    const providerCheckoutUrl = provider === "paypal" ? (process.env.PAYPAL_CHECKOUT_URL || "") : provider === "stripe" ? (process.env.STRIPE_PAYMENT_LINK || "") : "";
+    const providerCheckoutUrl = provider === "paypal" ? (process.env.PAYPAL_CHECKOUT_URL || "") : "";
     const payload = { userId: req.user.userId, plan, provider, amount, currency, reference };
     const signature = signPayload(payload);
 
@@ -248,26 +261,26 @@ router.get("/me", auth, async (req, res) => {
   res.json({ billing: publicBillingUser(user), requests, intents, referralCode: user.referralCode || null });
 });
 
-router.post("/upi-request", auth, async (req, res) => {
+router.post("/upi-request", auth, supporterRequestLimiter, async (req, res) => {
   try {
     const plan = String(req.body.plan || "").trim();
     const config = PLAN_CONFIG[plan];
     if (!config) return res.status(400).json({ message: "Invalid supporter plan" });
 
     const paymentMethod = String(req.body.paymentMethod || "upi").toLowerCase();
-    if (!["upi", "bank", "qr", "paypal", "stripe", "manual"].includes(paymentMethod)) return res.status(400).json({ message: "Invalid payment method" });
+    if (!["upi", "bank", "paypal"].includes(paymentMethod)) return res.status(400).json({ message: "Invalid payment method" });
     const configuredMethod = [...paymentMethodsFor(plan).india, ...paymentMethodsFor(plan).global].find((method) => method.id === paymentMethod);
     if (configuredMethod && configuredMethod.configured === false) return res.status(503).json({ message: "This payment method is not active yet. Please choose an active method or contact support." });
 
     const amount = Number(req.body.amount);
-    const minAmount = ["paypal", "stripe"].includes(paymentMethod) ? config.usdAmount : config.amount;
-    if (!Number.isFinite(amount) || amount < minAmount) return res.status(400).json({ message: `Minimum amount for this plan is ${paymentMethod === "paypal" || paymentMethod === "stripe" ? "$" : "₹"}${minAmount}` });
+    const minAmount = paymentMethod === "paypal" ? config.usdAmount : config.amount;
+    if (!Number.isFinite(amount) || amount < minAmount) return res.status(400).json({ message: `Minimum amount for this plan is ${paymentMethod === "paypal" ? "$" : "₹"}${minAmount}` });
 
     const utr = validateUtr(req.body.utr || req.body.bankReference || req.body.providerReference);
     if (!utr) return res.status(400).json({ message: "Enter a valid UTR / bank / provider reference number" });
 
-    const upiId = paymentMethod === "upi" || paymentMethod === "qr" ? validateUpiId(req.body.upiId) : "manual@payment";
-    if ((paymentMethod === "upi" || paymentMethod === "qr") && !upiId) return res.status(400).json({ message: "Enter a valid UPI ID, for example name@bank" });
+    const upiId = paymentMethod === "upi" ? validateUpiId(req.body.upiId) : "manual@payment";
+    if (paymentMethod === "upi" && !upiId) return res.status(400).json({ message: "Enter a valid UPI ID, for example name@bank" });
 
     const paymentProofUrl = String(req.body.paymentProofUrl || "").trim();
     if (paymentProofUrl && !validator.isURL(paymentProofUrl, { require_protocol: true, protocols: ["https"] })) return res.status(400).json({ message: "Payment proof must be a valid https URL" });
@@ -284,7 +297,7 @@ router.post("/upi-request", auth, async (req, res) => {
       user: req.user.userId,
       plan,
       amount,
-      currency: ["paypal", "stripe"].includes(paymentMethod) ? "USD" : "INR",
+      currency: paymentMethod === "paypal" ? "USD" : "INR",
       paymentMethod,
       upiId,
       utr,
@@ -294,10 +307,12 @@ router.post("/upi-request", auth, async (req, res) => {
       paymentIntentReference: sanitizeText(req.body.paymentIntentReference || "", 120),
       paymentProofUrl,
       proofSignature,
+      paymentDate: req.body.paymentDate ? new Date(req.body.paymentDate) : null,
       note: sanitizeText(req.body.note, 500),
     });
 
     await User.findByIdAndUpdate(req.user.userId, { planStatus: "pending" });
+    await writeAudit(req, "supporter.request.submitted", "SupporterRequest", request._id, { plan, amount, method: paymentMethod });
     const user = await User.findById(req.user.userId).select("username email");
     await sendAutomationNotification({
       type: "payment_submitted",

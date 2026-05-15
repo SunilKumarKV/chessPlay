@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const allowedPlans = ["supporter_monthly", "supporter_yearly", "pro"];
-const allowedMethods = ["upi", "bank", "qr", "paypal", "stripe", "manual"];
+const allowedMethods = ["upi", "bank", "paypal"];
 
 const supporterRequestSchema = new mongoose.Schema(
   {
@@ -43,6 +43,7 @@ const supporterRequestSchema = new mongoose.Schema(
     providerReference: { type: String, trim: true, maxlength: 120, default: "" },
     paymentIntentReference: { type: String, trim: true, maxlength: 120, default: "" },
     proofSignature: { type: String, trim: true, maxlength: 128, default: "" },
+    paymentDate: { type: Date, default: null },
     paymentProofUrl: {
       type: String,
       trim: true,
