@@ -63,6 +63,7 @@ const adminRoutes = require("./routes/admin");
 const puzzleRoutes = require("./routes/puzzles");
 const analysisRoutes = require("./routes/analysis");
 const referralRoutes = require("./routes/referrals");
+const tournamentRoutes = require("./routes/tournaments");
 const User = require("./models/User");
 const Game = require("./models/Game");
 const { updatePlayerStats } = require("./utils/elo");
@@ -331,6 +332,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/puzzles", puzzleRoutes);
 app.use("/api/analysis", analysisRoutes);
 app.use("/api/referrals", referralRoutes);
+app.use("/api/tournaments", tournamentRoutes);
 
 // Basic health check
 app.get("/health", (req, res) => {
