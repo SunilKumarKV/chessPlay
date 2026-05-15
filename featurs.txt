@@ -1,0 +1,107 @@
+
+## v1.3.0-beta Highlights
+
+### Authentication
+
+- Email/password login.
+- Google login production setup.
+- Frontend `VITE_GOOGLE_CLIENT_ID` support.
+- Backend Google token verification support.
+- Domain whitelist support for localhost, Vercel, and custom domain.
+- Safer production auth cookie guidance.
+
+### Multiplayer
+
+- Socket.IO auth improvements.
+- Invalid-token retry messaging.
+- WebSocket/polling fallback guidance.
+- Multiplayer reconnect UX.
+- Same-WiFi/room-code play foundation.
+
+### Play vs AI
+
+AI modes:
+
+| Mode | Depth | Skill |
+|---|---:|---:|
+| Easy | 4 | 5 |
+| Medium | 8 | 10 |
+| Hard | 14 | 18 |
+| Pro | 20 | 20 |
+
+Also includes:
+
+- Engine depth indicator.
+- Eval label.
+- Move quality labels.
+- Premium engine-depth foundation.
+
+### Product Features
+
+- Premium login/signup UI.
+- Dashboard upgrade popup.
+- Pricing/support flow.
+- Online matchmaking UI.
+- Win/checkmate/draw result popup.
+- Help center: “How ChessPlay Works”.
+
+### Monetization
+
+- UPI supporter/payment flow.
+- Bank transfer foundation.
+- QR scan payment option.
+- PayPal/Stripe foundation.
+- Manual payment approval fallback.
+- Admin approval logs.
+- Ads enabled for free users.
+- Ads disabled for premium users.
+- Premium unlock logic.
+- Referral coins.
+- Tournament entry-fee foundation.
+
+### Social
+
+- Community page.
+- Posts.
+- Chess puzzles.
+- Discussions.
+- Achievements.
+- Tournaments.
+- Private friend chat foundation.
+- Public community rooms.
+- Block/report/mute.
+- Typing indicator.
+- Online status.
+
+### Settings/Profile
+
+- Profile photo upload foundation.
+- Crop image support.
+- Avatar fallback.
+- Cloudinary-ready config.
+- i18n language support.
+- Dark/light mode.
+- Board themes.
+- Font family.
+- Font size.
+- Accent color.
+- Text color.
+- Professional SaaS settings layout.
+
+### Automation / Alerts
+
+n8n was removed from the required path.
+
+Direct backend supports:
+
+- Telegram admin alerts.
+- Email alerts.
+- Payment submitted alerts.
+- Payment approved/rejected alerts.
+- Support ticket alerts.
+- Refund request alerts.
+- FAQ/question alerts.
+
+WhatsApp can be added later using Twilio or Meta WhatsApp Cloud API.
+
+---
