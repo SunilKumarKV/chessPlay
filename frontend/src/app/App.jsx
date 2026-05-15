@@ -232,6 +232,18 @@ export default function App() {
     );
   }
 
+  if (!user && currentPage === "analysis") {
+    return (
+      <ErrorBoundary>
+        <AnalysisPage
+          user={null}
+          onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
+          onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+        />
+      </ErrorBoundary>
+    );
+  }
+
   if (!user && currentPage === "puzzles") {
     return (
       <ErrorBoundary>
@@ -317,7 +329,7 @@ export default function App() {
           <Settings user={user} onBack={goDashboard} />
         );
       case "analysis":
-        return <AnalysisPage onBack={goDashboard} />;
+        return <AnalysisPage user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "pricing":
         return (
           <PricingPage
