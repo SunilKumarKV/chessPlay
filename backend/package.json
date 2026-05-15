@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "tsx src/scripts/seedPremiumPlans.ts",
     "prisma:studio": "prisma studio",
     "test": "find . \\( -path ./node_modules -o -path ./dist \\) -prune -o -name '*.js' -exec node -c {} \\;"
   },
