@@ -32,7 +32,7 @@ export default function MonetizationPage({ user, onBack, onNavigate }) {
     <div className="min-h-full p-4 text-slate-100 sm:p-6 lg:p-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.25em] text-amber-300">Premium features</p>
+          <p className="text-sm font-black uppercase tracking-[0.25em] text-amber-300">Phase 3 monetization</p>
           <h1 className="text-3xl font-black sm:text-4xl">Premium Unlocks & Ads</h1>
           <p className="mt-2 max-w-2xl text-slate-400">Free users see ads. Premium users get no ads, deeper analysis, custom themes and tournament access.</p>
         </div>
@@ -72,7 +72,7 @@ export default function MonetizationPage({ user, onBack, onNavigate }) {
               <li>✅ After match ad card</li>
               <li>✅ Dashboard banner</li>
               <li>✅ Home page promo slot</li>
-              <li>✅ Rewarded ad slot after opt-in activities</li>
+              <li>✅ Rewarded ad placeholder</li>
             </ul>
           </div>
           <AdSlot user={adsEnabled ? {} : { isPremium: true }} label="Dashboard banner ad preview" />

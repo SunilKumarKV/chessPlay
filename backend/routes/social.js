@@ -49,9 +49,9 @@ function safePost(post, userId) {
   };
 }
 
-router.get('/community/posts', auth, async (req, res, next) => {
+router.get('/community/posts', async (req, res, next) => {
   try {
-    const user = await getCurrentUser(req);
+    const viewerId = null;
     const type = POST_TYPES.has(req.query.type) ? req.query.type : null;
     const query = { isHidden: false };
     if (type) query.type = type;
@@ -59,7 +59,7 @@ router.get('/community/posts', auth, async (req, res, next) => {
       .sort({ isPinned: -1, createdAt: -1 })
       .limit(Math.min(Number(req.query.limit) || 30, 50))
       .lean();
-    res.json({ posts: posts.map((post) => safePost(post, user._id)) });
+    res.json({ posts: posts.map((post) => safePost(post, viewerId)) });
   } catch (error) {
     next(error);
   }

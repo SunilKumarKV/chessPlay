@@ -33,19 +33,9 @@ import MessagesPage from "../pages/MessagesPage";
 import AutomationPage from "../pages/AutomationPage";
 
 function pageFromPathname(pathname) {
-  if (pathname === "/forgot-password") return "forgot-password";
   if (pathname === "/reset-password") return "reset-password";
   if (pathname === "/verify-email") return "verify-email";
   return "dashboard";
-}
-
-function navigateToAppPage(page, setCurrentPage) {
-  if (["forgot-password", "reset-password", "verify-email"].includes(page)) {
-    window.history.pushState({}, "", `/${page}`);
-  } else if (window.location.pathname !== "/") {
-    window.history.pushState({}, "", "/");
-  }
-  setCurrentPage(page);
 }
 
 export default function App() {
@@ -69,8 +59,6 @@ export default function App() {
   );
 
   useEffect(() => {
-    const syncPageFromUrl = () => setCurrentPage(pageFromPathname(window.location.pathname));
-    window.addEventListener("popstate", syncPageFromUrl);
     let cancelled = false;
 
     const fallbackTimer = window.setTimeout(() => {
@@ -83,20 +71,23 @@ export default function App() {
     async function restoreSession() {
       try {
         localStorage.removeItem("token");
-        const data = await apiClient("/api/auth/session");
+        const data = await apiClient("/api/auth/session", { skipRefresh: true });
         if (cancelled) return;
         const nextUser = data.user || null;
         if (nextUser) {
           localStorage.setItem("user", JSON.stringify(nextUser));
+          setUser(nextUser);
         } else {
-          localStorage.removeItem("user");
+          // Keep a freshly logged-in local user as a safe fallback when the
+          // browser blocks cross-site cookies between Vercel and Render.
+          const storedUser = localStorage.getItem("user");
+          setUser(storedUser ? JSON.parse(storedUser) : null);
         }
-        setUser(nextUser);
         notifyUserChanged();
       } catch {
         if (!cancelled) {
-          localStorage.removeItem("user");
-          setUser(null);
+          const storedUser = localStorage.getItem("user");
+          setUser(storedUser ? JSON.parse(storedUser) : null);
           notifyUserChanged();
         }
       } finally {
@@ -111,14 +102,12 @@ export default function App() {
     restoreSession();
     return () => {
       cancelled = true;
-      window.removeEventListener("popstate", syncPageFromUrl);
       window.clearTimeout(fallbackTimer);
     };
   }, []);
 
   const handleLogin = (userData) => {
     localStorage.removeItem("guestMode");
-    window.history.replaceState({}, "", "/");
     setUser(userData);
     notifyUserChanged();
   };
@@ -146,8 +135,6 @@ export default function App() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("guestMode");
-    sessionStorage.removeItem("chessplay_access_token");
-    sessionStorage.removeItem("chessplay_socket_token");
     setUser(null);
     setCurrentPage("dashboard");
     notifyUserChanged();
@@ -157,18 +144,10 @@ export default function App() {
     return <AppSplash />;
   }
 
-  if (currentPage === "forgot-password") {
-    return (
-      <ErrorBoundary>
-        <ForgotPasswordPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-      </ErrorBoundary>
-    );
-  }
-
   if (currentPage === "reset-password") {
     return (
       <ErrorBoundary>
-        <ResetPasswordPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+        <ResetPasswordPage onBack={() => setCurrentPage("dashboard")} />
       </ErrorBoundary>
     );
   }
@@ -176,7 +155,7 @@ export default function App() {
   if (currentPage === "verify-email") {
     return (
       <ErrorBoundary>
-        <VerifyEmailPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+        <VerifyEmailPage onBack={() => setCurrentPage("dashboard")} />
       </ErrorBoundary>
     );
   }
@@ -208,7 +187,7 @@ export default function App() {
           <Dashboard
             user={user}
             onStartGame={handleStartGame}
-            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+            onNavigate={setCurrentPage}
             onAuthError={handleLogout}
           />
         );
@@ -218,7 +197,7 @@ export default function App() {
         return (
           <Chess
             onBack={() => setCurrentPage("dashboard")}
-            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+            onNavigate={setCurrentPage}
             initialAiEnabled
             timeControl={selectedTimeControl}
           />
@@ -232,7 +211,7 @@ export default function App() {
         return (
           <Chess
             onBack={() => setCurrentPage("dashboard")}
-            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+            onNavigate={setCurrentPage}
             initialAiEnabled={false}
             timeControl={selectedTimeControl}
             title="Play vs Player"
@@ -266,7 +245,7 @@ export default function App() {
         return (
           <PricingPage
             onBack={() => setCurrentPage("dashboard")}
-            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+            onNavigate={setCurrentPage}
           />
         );
       case "billing":
@@ -274,7 +253,7 @@ export default function App() {
           <BillingPage
             user={user}
             onBack={() => setCurrentPage("dashboard")}
-            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+            onNavigate={setCurrentPage}
           />
         );
       case "admin-supporters":
@@ -316,10 +295,10 @@ export default function App() {
           <div className="p-8">
             <div className="bg-[#1a1a1a] rounded-lg p-8 border border-[#2a2a2a] text-center">
               <h2 className="text-2xl font-bold text-[#e0e0e0] mb-4 font-['Montserrat']">
-                Feature unavailable
+                Coming Soon
               </h2>
               <p className="text-[#7a7a7a] font-['Inter']">
-                This page is not available for your current account or deployment configuration.
+                This feature is under development.
               </p>
             </div>
           </div>
@@ -331,7 +310,7 @@ export default function App() {
     <ErrorBoundary>
       <DashboardLayout
         activePage={authTimedOut ? "offline" : currentPage}
-        onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+        onNavigate={setCurrentPage}
         onLogout={handleLogout}
       >
         {renderContent()}

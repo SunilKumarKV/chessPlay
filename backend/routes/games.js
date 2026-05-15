@@ -134,42 +134,27 @@ router.post("/record", auth, async (req, res) => {
 });
 
 // Get leaderboard
-router.get("/leaderboard", auth, async (req, res) => {
+router.get("/leaderboard", async (req, res) => {
   try {
     const limit = parsePositiveInt(req.query.limit, 20, MAX_PAGE_SIZE);
-    const leaderboard = await User.find()
+    const leaderboard = await User.find({ deletedAt: null })
       .sort({ gamesWon: -1, rating: -1, gamesPlayed: -1, username: 1 })
       .limit(limit)
-      .select("username gamesPlayed gamesWon rating");
-
-    const currentUser = await User.findById(req.user.userId).select(
-      "username gamesPlayed gamesWon rating",
-    );
-
-    if (!currentUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const rank =
-      (await User.countDocuments({
-        $or: [
-          { gamesWon: { $gt: currentUser.gamesWon } },
-          {
-            gamesWon: currentUser.gamesWon,
-            rating: { $gt: currentUser.rating },
-          },
-        ],
-      })) + 1;
+      .select("username gamesPlayed gamesWon gamesLost gamesDrawn rating isSupporter");
 
     res.json({
-      leaderboard,
-      currentUser: {
-        username: currentUser.username,
-        gamesPlayed: currentUser.gamesPlayed,
-        gamesWon: currentUser.gamesWon,
-        rating: currentUser.rating,
-        rank,
-      },
+      leaderboard: leaderboard.map((item, index) => ({
+        _id: item._id,
+        rank: index + 1,
+        username: item.username,
+        gamesPlayed: item.gamesPlayed || 0,
+        gamesWon: item.gamesWon || 0,
+        gamesLost: item.gamesLost || 0,
+        gamesDrawn: item.gamesDrawn || 0,
+        rating: item.rating || 1200,
+        isSupporter: Boolean(item.isSupporter),
+      })),
+      currentUser: null,
     });
   } catch (error) {
     console.error("Leaderboard error:", error);

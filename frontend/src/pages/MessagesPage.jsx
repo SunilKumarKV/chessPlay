@@ -5,11 +5,24 @@ import { apiClient } from '../services/apiClient';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../hooks/useTheme';
 
+function readSocketFallbackToken() {
+  try {
+    return sessionStorage.getItem('chessplay_socket_token') || '';
+  } catch {
+    return '';
+  }
+}
+
 async function getSocketToken() {
-  const response = await fetch(`${BACKEND_URL}/api/auth/socket-token`, { credentials: 'include' });
+  const fallbackToken = readSocketFallbackToken();
+  if (fallbackToken) return fallbackToken;
+  const response = await fetch(`${BACKEND_URL}/api/auth/socket-token`, {
+    credentials: 'include',
+  });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || 'Socket token unavailable');
-  return data.socketToken;
+  if (data.socketToken) sessionStorage.setItem('chessplay_socket_token', data.socketToken);
+  return data.socketToken || '';
 }
 
 export default function MessagesPage({ onBack, onNavigate }) {
@@ -42,13 +55,21 @@ export default function MessagesPage({ onBack, onNavigate }) {
   }, []);
 
   useEffect(() => {
+    if (!user) {
+      setNotice('Please sign in to view messages.');
+      return undefined;
+    }
     const timer = window.setTimeout(loadBootstrap, 0);
     return () => window.clearTimeout(timer);
-  }, [loadBootstrap]);
+  }, [loadBootstrap, user]);
 
   useEffect(() => {
     let alive = true;
     async function connect() {
+      if (!user) {
+        setConnectionStatus('offline');
+        return;
+      }
       try {
         const token = await getSocketToken();
         if (!alive) return;

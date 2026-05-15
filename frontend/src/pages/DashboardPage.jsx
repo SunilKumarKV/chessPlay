@@ -61,14 +61,8 @@ export default function Dashboard({
   ];
 
   const fetchDashboardData = useCallback(async () => {
-    if (!user || user.isGuest || !user.email) {
-      if (!user) setLoading(false);
-      if (user?.isGuest) {
-        setStats(user);
-        setRecentGames([]);
-        setLeaderboard([]);
-        setLoading(false);
-      }
+    if (!user) {
+      setLoading(false);
       return;
     }
 
@@ -89,13 +83,18 @@ export default function Dashboard({
       );
       setRecentGames(gamesData.games || []);
 
-      const leaderboardData = await apiClient("/api/games/leaderboard?limit=5");
+      const leaderboardData = await apiClient(
+        "/api/games/leaderboard?limit=5",
+        { publicRequest: true, skipRefresh: true },
+      );
       const leaderboardItems = Array.isArray(leaderboardData)
         ? leaderboardData
         : leaderboardData.leaderboard || [];
       setLeaderboard(leaderboardItems);
     } catch (error) {
-      console.error("Error fetching dashboard data:", error);
+      if (error.status === 401) {
+        setStats(user);
+      }
       setRecentGames([]);
       setLeaderboard([]);
     } finally {

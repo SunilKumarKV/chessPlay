@@ -59,6 +59,7 @@ const gameRoutes = require("./routes/games");
 const billingRoutes = require("./routes/billing");
 const socialRoutes = require("./routes/social");
 const automationRoutes = require("./routes/automation");
+const settingsRoutes = require("./routes/settings");
 const User = require("./models/User");
 const Game = require("./models/Game");
 const { updatePlayerStats } = require("./utils/elo");
@@ -144,7 +145,7 @@ function createCorsOptions(req) {
     origin(origin, callback) {
       corsOriginForRequest(req, origin, callback);
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
   };
 }
@@ -172,7 +173,7 @@ const socketCorsOptions = {
     }
     return callback(null, isAllowedOrigin(origin));
   },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true,
 };
 
@@ -282,11 +283,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        connectSrc: [...cspConnectSources, "https://accounts.google.com", "https://oauth2.googleapis.com"],
-        scriptSrc: ["'self'", "https://accounts.google.com"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com"],
-        imgSrc: ["'self'", "data:", "https:", "blob:"],
-        fontSrc: ["'self'", "data:"],
+        connectSrc: cspConnectSources,
         workerSrc: ["'self'", "blob:"],
       },
     },
@@ -323,6 +320,7 @@ app.use("/api/games", gameRoutes);
 app.use("/api/billing", billingRoutes);
 app.use("/api/social", socialRoutes);
 app.use("/api/automation", automationRoutes);
+app.use("/api/settings", settingsRoutes);
 
 // Basic health check
 app.get("/health", (req, res) => {

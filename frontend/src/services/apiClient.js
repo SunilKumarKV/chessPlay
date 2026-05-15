@@ -4,16 +4,9 @@ async function readJson(response) {
   return response.json().catch(() => ({}));
 }
 
-function clearSessionTokens() {
-  sessionStorage.removeItem("chessplay_access_token");
-  sessionStorage.removeItem("chessplay_socket_token");
-}
-
 async function request(endpoint, options = {}) {
-  const hasBody = Boolean(options.body);
-  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const headers = {
-    ...(hasBody && !isFormData ? { "Content-Type": "application/json" } : {}),
+    "Content-Type": "application/json",
     ...options.headers,
   };
 
@@ -30,19 +23,20 @@ async function request(endpoint, options = {}) {
  * On expired access token, it tries one refresh-token rotation before failing.
  */
 export const apiClient = async (endpoint, options = {}) => {
-  let response = await request(endpoint, options);
+  const { skipRefresh = false, publicRequest = false, ...fetchOptions } = options;
+  let response = await request(endpoint, fetchOptions);
 
-  if (response.status === 401 && endpoint !== "/api/auth/refresh" && !endpoint.includes("/api/games/leaderboard")) {
+  const shouldRefresh =
+    response.status === 401 &&
+    !skipRefresh &&
+    !publicRequest &&
+    endpoint !== "/api/auth/refresh" &&
+    endpoint !== "/api/auth/session";
+
+  if (shouldRefresh) {
     const refreshResponse = await request("/api/auth/refresh", { method: "POST" });
     if (refreshResponse.ok) {
-      const refreshData = await readJson(refreshResponse);
-      if (refreshData.socketToken) {
-        sessionStorage.setItem("chessplay_access_token", refreshData.socketToken);
-        sessionStorage.setItem("chessplay_socket_token", refreshData.socketToken);
-      }
-      response = await request(endpoint, options);
-    } else {
-      clearSessionTokens();
+      response = await request(endpoint, fetchOptions);
     }
   }
 

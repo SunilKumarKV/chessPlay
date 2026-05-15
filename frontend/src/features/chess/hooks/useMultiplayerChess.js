@@ -86,7 +86,7 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true) {
           await fetch(`${BACKEND_URL}/api/auth/refresh`, {
             method: "POST",
             credentials: "include",
-          });
+          }).catch(() => null);
           return await requestSocketToken();
         } catch {
           return "";
