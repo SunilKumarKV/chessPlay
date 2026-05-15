@@ -158,7 +158,7 @@ router.get("/leaderboard", async (req, res) => {
     const users = await User.find(query)
       .sort(sortByMode[mode])
       .limit(limit)
-      .select("username gamesPlayed gamesWon gamesLost gamesDrawn rating isSupporter isPremium adsDisabled")
+      .select("username gamesPlayed gamesWon gamesLost gamesDrawn rating isSupporter isPremium adsDisabled settings badges")
       .lean();
 
     const leaderboard = users.map((player, index) => ({
@@ -171,6 +171,7 @@ router.get("/leaderboard", async (req, res) => {
       gamesPlayed: player.gamesPlayed || 0,
       isSupporter: Boolean(player.isSupporter || player.isPremium),
       adsDisabled: Boolean(player.adsDisabled),
+      selectedBadge: player.settings?.appearance?.selectedBadge || player.badges?.selected || (player.isSupporter || player.isPremium ? "supporter" : "new-player"),
     }));
 
     res.set("Cache-Control", "public, max-age=30");

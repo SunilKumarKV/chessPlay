@@ -20,7 +20,14 @@ const DEFAULT_SETTINGS = {
   },
   appearance: {
     theme: "system",
+    accentColor: "default",
+    textColor: "default",
     boardTheme: "classic",
+    selectedBadge: "new-player",
+  },
+  badges: {
+    earned: ["new-player", "active-player", "community-member"],
+    selected: "new-player",
   },
   gameplay: {
     defaultMode: "ai",
@@ -35,8 +42,11 @@ const enums = {
   profileVisibility: new Set(["public", "private"]),
   gameHistoryVisibility: new Set(["public", "friends", "private"]),
   friendRequests: new Set(["everyone", "friendsOfFriends", "none"]),
-  theme: new Set(["system", "light", "dark"]),
-  boardTheme: new Set(["classic", "neon", "wood", "tournament"]),
+  theme: new Set(["system", "light", "dark", "newspaper", "midnight", "tournament", "royal", "forest", "neon"]),
+  accentColor: new Set(["default", "blue", "purple", "emerald", "amber", "rose", "cyan"]),
+  textColor: new Set(["default", "softWhite", "warm", "cool", "highContrast"]),
+  boardTheme: new Set(["classic", "tournamentGreen", "neonDark", "wooden", "marble", "neonCyberpunk", "glassBoard", "darkPro", "minimalLight"]),
+  selectedBadge: new Set(["new-player", "active-player", "community-member", "supporter", "founder-supporter", "premium-player", "early-access", "puzzle-learner", "tournament-ready", "referral-builder", "analysis-explorer"]),
   defaultMode: new Set(["ai", "online", "player"]),
   boardOrientation: new Set(["white", "black", "auto"]),
   animation: new Set(["normal", "reduced"]),
@@ -50,7 +60,22 @@ function pickEnum(value, allowed, fallback) {
   return typeof value === "string" && allowed.has(value) ? value : fallback;
 }
 
-function normalizeSettings(input = {}) {
+const SUPPORTER_THEMES = new Set(["midnight", "tournament", "royal", "forest", "neon"]);
+const SUPPORTER_BOARD_THEMES = new Set(["wooden", "marble", "neonCyberpunk", "glassBoard", "darkPro", "minimalLight"]);
+const SUPPORTER_BADGES = new Set(["supporter", "founder-supporter", "premium-player", "early-access"]);
+const DEFAULT_BADGES = ["new-player", "active-player", "community-member"];
+
+function earnedBadgesForUser(user) {
+  const earned = new Set([...(Array.isArray(user?.badges?.earned) ? user.badges.earned : []), ...DEFAULT_BADGES]);
+  if (user?.isSupporter || user?.isPremium) {
+    ["supporter", "founder-supporter", "premium-player", "early-access"].forEach((badge) => earned.add(badge));
+  }
+  if ((user?.puzzlesSolved || 0) > 0) earned.add("puzzle-learner");
+  if ((user?.gamesPlayed || 0) > 0) earned.add("active-player");
+  return Array.from(earned);
+}
+
+function normalizeSettings(input = {}, user = null) {
   return {
     privacy: {
       profileVisibility: pickEnum(input.privacy?.profileVisibility, enums.profileVisibility, DEFAULT_SETTINGS.privacy.profileVisibility),
@@ -67,7 +92,14 @@ function normalizeSettings(input = {}) {
     },
     appearance: {
       theme: pickEnum(input.appearance?.theme, enums.theme, DEFAULT_SETTINGS.appearance.theme),
+      accentColor: pickEnum(input.appearance?.accentColor, enums.accentColor, DEFAULT_SETTINGS.appearance.accentColor),
+      textColor: pickEnum(input.appearance?.textColor, enums.textColor, DEFAULT_SETTINGS.appearance.textColor),
       boardTheme: pickEnum(input.appearance?.boardTheme, enums.boardTheme, DEFAULT_SETTINGS.appearance.boardTheme),
+      selectedBadge: pickEnum(input.appearance?.selectedBadge || input.badges?.selected, enums.selectedBadge, DEFAULT_SETTINGS.appearance.selectedBadge),
+    },
+    badges: {
+      earned: earnedBadgesForUser(user),
+      selected: pickEnum(input.badges?.selected || input.appearance?.selectedBadge, enums.selectedBadge, DEFAULT_SETTINGS.badges.selected),
     },
     gameplay: {
       defaultMode: pickEnum(input.gameplay?.defaultMode, enums.defaultMode, DEFAULT_SETTINGS.gameplay.defaultMode),
@@ -80,7 +112,7 @@ function normalizeSettings(input = {}) {
 }
 
 function settingsFromUser(user) {
-  const normalized = normalizeSettings(user.settings || {});
+  const normalized = normalizeSettings(user.settings || {}, user);
   // Backward compatibility with the existing boolean privacy fields.
   if (!user.settings?.privacy) {
     normalized.privacy.profileVisibility = user.privacy?.profileVisibility === false ? "private" : "public";
@@ -131,7 +163,12 @@ router.patch("/me", auth, async (req, res) => {
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    const nextSettings = normalizeSettings(req.body?.settings || req.body || {});
+    const nextSettings = normalizeSettings(req.body?.settings || req.body || {}, user);
+    const isSupporter = Boolean(user.isSupporter || user.isPremium);
+    if (!isSupporter && SUPPORTER_THEMES.has(nextSettings.appearance.theme)) nextSettings.appearance.theme = user.settings?.appearance?.theme || DEFAULT_SETTINGS.appearance.theme;
+    if (!isSupporter && SUPPORTER_BOARD_THEMES.has(nextSettings.appearance.boardTheme)) nextSettings.appearance.boardTheme = user.settings?.appearance?.boardTheme || DEFAULT_SETTINGS.appearance.boardTheme;
+    if (!nextSettings.badges.earned.includes(nextSettings.appearance.selectedBadge) || (!isSupporter && SUPPORTER_BADGES.has(nextSettings.appearance.selectedBadge))) nextSettings.appearance.selectedBadge = "new-player";
+    nextSettings.badges.selected = nextSettings.appearance.selectedBadge;
     user.settings = nextSettings;
     user.privacy = {
       ...(user.privacy || {}),
