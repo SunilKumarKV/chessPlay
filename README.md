@@ -2,9 +2,42 @@
 
 **ChessPlay** is a production-focused SaaS chess platform built with React, Vite, Node.js, Express, Socket.IO, MongoDB, and Stockfish.
 
-Current release: **v1.3.0-beta**
+Current release: **v1.4.0-beta.1**
 
 ChessPlay supports AI chess, real-time multiplayer, online matchmaking, same-WiFi style room play, game review, analysis, premium plans, supporter payments, ads logic, referrals, tournaments, community features, private/public messaging, profile customization, multilingual UI, and direct backend Telegram/email alerts.
+
+
+---
+
+## Release v1.4.0-beta.1
+
+This release is a final beta release-preparation update. It is focused on production validation, CI readiness, release documentation, and safe public showcase/docs preparation.
+
+### Final Release Commands
+
+```bash
+pnpm install
+pnpm --filter chessplay-backend exec prisma generate
+pnpm build
+pnpm lint
+pnpm test
+```
+
+### Release Safety
+
+Before making anything public, confirm:
+
+- No `.env` files are committed.
+- Public showcase/docs repos do not include backend source code.
+- Public showcase/docs repos do not include auth, admin, payment, referral, database, or socket internals.
+- GitHub Secrets and hosting dashboard secrets are used for production values.
+- The release tag is created only after local checks, CI, and deployed smoke tests pass.
+
+### Public Repository Strategy
+
+- `chessplay-enterprise`: private full production source code.
+- `chessplay-showcase`: public screenshots, feature summary, tech stack, and live demo link only.
+- `chessplay-docs`: public roadmap, changelog, setup guide, architecture overview, and release notes without exposing internals.
 
 ---
 
@@ -380,3 +413,76 @@ Read these before deployment:
 ## License
 
 Private/portfolio production project unless you choose to open-source it.
+
+
+---
+
+## CI/CD
+
+This project uses GitHub Actions for production-safe validation.
+
+### Workflow
+
+The CI workflow is located at:
+
+```txt
+.github/workflows/ci.yml
+```
+
+It runs on:
+
+- Pull requests
+- Pushes to `main`
+
+CI checks:
+
+- `pnpm install --frozen-lockfile`
+- Backend Prisma client generation
+- Frontend lint when a lint script exists
+- Backend lint when a lint script exists
+- Backend build
+- Frontend build
+
+### Required GitHub Secrets
+
+Add these in GitHub:
+
+```txt
+Settings → Secrets and variables → Actions → New repository secret
+```
+
+Required secrets:
+
+```txt
+DATABASE_URL
+JWT_ACCESS_SECRET
+JWT_REFRESH_SECRET
+MONGO_URI
+REDIS_URL
+VITE_API_URL
+VITE_SOCKET_URL
+```
+
+Do not hardcode secrets in source code. Keep real production values only in GitHub Secrets and hosting provider environment settings.
+
+### Local CI Test Commands
+
+Run these before opening or merging a pull request:
+
+```bash
+pnpm install
+pnpm --filter chessplay-backend exec prisma generate
+pnpm -C backend build
+pnpm -C frontend build
+```
+
+Optional when lint scripts exist:
+
+```bash
+pnpm -C frontend lint
+pnpm -C backend lint
+```
+
+### Deployment
+
+Automatic deployment is not enabled in Phase 9. Deploy from your hosting providers only after CI passes and the release checklist is complete.

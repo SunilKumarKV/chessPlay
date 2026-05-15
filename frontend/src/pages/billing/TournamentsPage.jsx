@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiClient } from "../../services/apiClient";
 
 const FILTERS = ["all", "open", "upcoming", "active", "completed"];
@@ -107,7 +107,7 @@ export default function TournamentsPage({ user, onBack, onNavigate }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setError("");
     setLoading(true);
     try {
@@ -119,11 +119,11 @@ export default function TournamentsPage({ user, onBack, onNavigate }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, user]);
 
   useEffect(() => {
     load();
-  }, [filter]);
+  }, [load]);
 
   const filteredTournaments = useMemo(() => tournaments, [tournaments]);
 
