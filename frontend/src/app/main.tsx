@@ -7,7 +7,13 @@ import App from "./App";
 import { ThemeProvider } from "../context/ThemeContext";
 import { I18nProvider } from "../i18n/I18nContext";
 
-ReactDOM.createRoot(document.getElementById("root")).render(
+const root = document.getElementById("root");
+
+if (!root) {
+  throw new Error("Root element not found.");
+}
+
+ReactDOM.createRoot(root).render(
   <React.StrictMode>
     <Provider store={store}>
       <ThemeProvider>

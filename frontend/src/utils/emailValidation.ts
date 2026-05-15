@@ -10,7 +10,7 @@ const PLACEHOLDER_DOMAINS = new Set([
   "guerrillamail.com",
 ]);
 
-export function validateProductionEmail(email) {
+export function validateProductionEmail(email: unknown) {
   const normalized = String(email || "").trim().toLowerCase();
   const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!basicEmailRegex.test(normalized)) {
@@ -18,7 +18,7 @@ export function validateProductionEmail(email) {
   }
 
   const domain = normalized.split("@").pop();
-  if (PLACEHOLDER_DOMAINS.has(domain)) {
+  if (!domain || PLACEHOLDER_DOMAINS.has(domain)) {
     return "Temporary, demo, or placeholder emails are not allowed.";
   }
 
