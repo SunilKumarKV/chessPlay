@@ -139,7 +139,7 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout }) {
     } catch (error) {
       if (error.status === 404) {
         setFriendsData({ friends: localFriends, requests: [] });
-        setFriendStatus("Friends are temporarily available from this browser only.");
+        setFriendStatus("Using local friends until the latest backend is deployed.");
         return;
       }
       setFriendStatus(error.message);
@@ -164,7 +164,7 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout }) {
             const users = await fallbackUserSearch(friendQuery.trim());
             setFriendResults(users);
             setFriendStatus(
-              "Search is using available public player data. Friend requests may be limited temporarily.",
+              "Search is using leaderboard fallback. Deploy the latest backend to enable friend requests.",
             );
           } catch (fallbackError) {
             setFriendStatus(fallbackError.message);

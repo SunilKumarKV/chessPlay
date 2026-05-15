@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { useCurrentUser } from "../hooks/useCurrentUser";
 import Sidebar from "../features/dashboard/components/Sidebar";
 import Topbar from "../features/dashboard/components/Topbar";
 import { useTheme } from "../hooks/useTheme";
@@ -11,14 +10,23 @@ export default function DashboardLayout({
   onNavigate,
   onLogout,
 }) {
+  const initialUser = (() => {
+    try {
+      const storedUser = localStorage.getItem("user");
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (e) {
+      console.error("Could not parse user", e);
+      return null;
+    }
+  })();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { user } = useCurrentUser();
+  const [user] = useState(initialUser);
   const { theme } = useTheme();
 
   return (
     <div
-      className="flex h-[100dvh] min-h-screen font-['Inter'] w-full overflow-hidden transition-colors duration-300"
+      className="flex h-screen font-['Inter'] w-full overflow-hidden transition-colors duration-300"
       style={{
         background: `linear-gradient(135deg, ${theme.bg.primary} 0%, ${theme.bg.secondary} 48%, ${theme.bg.tertiary} 100%)`,
         color: theme.text.primary,
@@ -57,7 +65,7 @@ export default function DashboardLayout({
               background: theme.bg.primary,
             }}
           >
-            <div className="w-full min-h-full max-w-7xl mx-auto">{children}</div>
+            <div className="w-full h-full max-w-7xl mx-auto">{children}</div>
           </main>
 
           {/* Right Panel (Optional Game Info, Chat, Moves) */}

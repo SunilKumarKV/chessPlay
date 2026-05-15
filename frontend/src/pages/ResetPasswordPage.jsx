@@ -58,9 +58,6 @@ export default function ResetPasswordPage({ onBack }) {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           type="password"
-          required
-          minLength={8}
-          autoComplete="new-password"
           className="mb-3 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3"
           placeholder="New password"
         />
@@ -68,9 +65,6 @@ export default function ResetPasswordPage({ onBack }) {
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
           type="password"
-          required
-          minLength={8}
-          autoComplete="new-password"
           className="mb-4 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3"
           placeholder="Confirm password"
         />

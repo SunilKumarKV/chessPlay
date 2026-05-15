@@ -5,7 +5,7 @@ const FEATURE_COPY = {
   puzzles: {
     icon: "◇",
     title: "Chess Puzzles",
-    subtitle: "Tactics trainer is being prepared for public release.",
+    subtitle: "Tactics trainer is coming soon.",
     description:
       "This section will include daily puzzles, puzzle rating, streaks, and themed tactical patterns like forks, pins, skewers, mates, and endgames.",
     checklist: ["Daily challenge", "Puzzle rating", "Streak tracking", "Difficulty levels"],
@@ -13,7 +13,7 @@ const FEATURE_COPY = {
   analysis: {
     icon: "∑",
     title: "Game Analysis",
-    subtitle: "Post-game analysis is being prepared for public release.",
+    subtitle: "Post-game analysis is coming soon.",
     description:
       "This section will help players review mistakes, blunders, best moves, opening accuracy, and engine evaluation after each game.",
     checklist: ["Move accuracy", "Blunder detection", "Engine lines", "PGN review"],
@@ -72,7 +72,7 @@ export default function ComingSoonPage({ feature = "feature", onBack, onPlay }) 
               ))}
             </div>
             <div className="mt-6 flex flex-wrap gap-3">
-              <PrimaryBtn onClick={onPlay}>Practice with AI</PrimaryBtn>
+              <PrimaryBtn onClick={() => alert("Solution: Qe8#")}>Show solution</PrimaryBtn>
               <SecondaryBtn onClick={onBack}>Back to Dashboard</SecondaryBtn>
             </div>
           </div>

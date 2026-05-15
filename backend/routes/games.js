@@ -133,51 +133,47 @@ router.post("/record", auth, async (req, res) => {
   }
 });
 
-// Get public leaderboard
-router.get("/leaderboard", async (req, res) => {
+// Get leaderboard
+router.get("/leaderboard", auth, async (req, res) => {
   try {
-    const limit = parsePositiveInt(req.query.limit, 50, MAX_PAGE_SIZE);
-    const allowedModes = new Set(["all", "rating", "wins", "gamesPlayed"]);
-    const mode = allowedModes.has(String(req.query.mode || "").trim())
-      ? String(req.query.mode).trim()
-      : "all";
-    const search = String(req.query.search || "").trim().slice(0, 40);
+    const limit = parsePositiveInt(req.query.limit, 20, MAX_PAGE_SIZE);
+    const leaderboard = await User.find()
+      .sort({ gamesWon: -1, rating: -1, gamesPlayed: -1, username: 1 })
+      .limit(limit)
+      .select("username gamesPlayed gamesWon rating");
 
-    const query = { deletedAt: null, isBanned: { $ne: true } };
-    if (search) {
-      query.username = { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
+    const currentUser = await User.findById(req.user.userId).select(
+      "username gamesPlayed gamesWon rating",
+    );
+
+    if (!currentUser) {
+      return res.status(404).json({ message: "User not found" });
     }
 
-    const sortByMode = {
-      all: { rating: -1, gamesWon: -1, gamesPlayed: -1, username: 1 },
-      rating: { rating: -1, gamesWon: -1, gamesPlayed: -1, username: 1 },
-      wins: { gamesWon: -1, rating: -1, gamesPlayed: -1, username: 1 },
-      gamesPlayed: { gamesPlayed: -1, rating: -1, gamesWon: -1, username: 1 },
-    };
+    const rank =
+      (await User.countDocuments({
+        $or: [
+          { gamesWon: { $gt: currentUser.gamesWon } },
+          {
+            gamesWon: currentUser.gamesWon,
+            rating: { $gt: currentUser.rating },
+          },
+        ],
+      })) + 1;
 
-    const users = await User.find(query)
-      .sort(sortByMode[mode])
-      .limit(limit)
-      .select("username gamesPlayed gamesWon gamesLost gamesDrawn rating isSupporter isPremium adsDisabled")
-      .lean();
-
-    const leaderboard = users.map((player, index) => ({
-      rank: index + 1,
-      username: player.username,
-      rating: Number.isFinite(player.rating) ? player.rating : null,
-      wins: player.gamesWon || 0,
-      losses: player.gamesLost || 0,
-      draws: player.gamesDrawn || 0,
-      gamesPlayed: player.gamesPlayed || 0,
-      isSupporter: Boolean(player.isSupporter || player.isPremium),
-      adsDisabled: Boolean(player.adsDisabled),
-    }));
-
-    res.set("Cache-Control", "public, max-age=30");
-    res.json({ leaderboard, meta: { limit, mode, search } });
+    res.json({
+      leaderboard,
+      currentUser: {
+        username: currentUser.username,
+        gamesPlayed: currentUser.gamesPlayed,
+        gamesWon: currentUser.gamesWon,
+        rating: currentUser.rating,
+        rank,
+      },
+    });
   } catch (error) {
     console.error("Leaderboard error:", error);
-    res.status(500).json({ message: "Unable to load leaderboard" });
+    res.status(500).json({ message: "Server error" });
   }
 });
 

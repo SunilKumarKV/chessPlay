@@ -2,15 +2,12 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/User");
-const Referral = require("../models/Referral");
-const SecurityEvent = require("../models/SecurityEvent");
 const { storeAvatar, safeExternalImageUrl } = require("../utils/avatarStorage");
 const {
   authUserPayload,
   clearSessionCookies,
   getCookie: getSecureCookie,
   getJwtSecret,
-  getRequestAccessToken,
   hashToken,
   issueSession: issueSecureSession,
   randomToken,
@@ -144,39 +141,6 @@ async function verifyGoogleCredential(credential) {
   return profile;
 }
 
-
-function normalizeReferralCode(code) {
-  return String(code || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 24);
-}
-
-async function connectReferralForNewUser(user, referralCode) {
-  const code = normalizeReferralCode(referralCode);
-  if (!code || !/^[A-Z0-9]{6,16}$/.test(code)) return false;
-  const referrer = await User.findOne({ referralCode: code }).select("_id referralCode");
-  if (!referrer || String(referrer._id) === String(user._id)) return false;
-  if (user.referredBy) return false;
-  user.referredBy = referrer._id;
-  await user.save();
-  await Referral.updateOne(
-    { referrer: referrer._id, referred: user._id },
-    { $setOnInsert: { referrer: referrer._id, referred: user._id, code, status: "joined", rewardNote: "Joined through referral. Reward is manually reviewed." } },
-    { upsert: true },
-  );
-  return true;
-}
-
-async function recordSecurityEvent(req, payload) {
-  try {
-    await SecurityEvent.create({
-      ...payload,
-      ip: req.ip,
-      userAgent: req.headers["user-agent"] || "",
-    });
-  } catch {
-    // Security event logging must never block authentication.
-  }
-}
-
 function isFriend(user, otherUserId) {
   return Boolean(
     user?.friends?.some((friendId) => String(friendId) === String(otherUserId)),
@@ -261,7 +225,6 @@ const authLimiter = createRateLimiter({
 router.post("/register", authLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
-    const referralCode = req.body.referralCode || req.body.ref || "";
     const emailValidation = validateProductionEmail(req.body.email);
     if (!emailValidation.ok) {
       return res.status(400).json({ message: emailValidation.message });
@@ -295,12 +258,10 @@ router.post("/register", authLimiter, async (req, res) => {
     // Create new user
     const user = new User({ username, email, password });
     await user.save();
-    const referralConnected = await connectReferralForNewUser(user, referralCode);
 
     await issueSession(res, user);
-    await recordSecurityEvent(req, { type: "register_success", email: user.email, user: user._id });
 
-    res.status(201).json({ ...buildAuthResponse("Account created successfully", user), referralConnected });
+    res.status(201).json(buildAuthResponse("User created successfully", user));
   } catch (error) {
     console.error("Registration error:", error);
     res.status(500).json({ message: "Server error" });
@@ -316,29 +277,20 @@ router.post("/login", authLimiter, async (req, res) => {
     // Find user
     const user = await User.findOne({ email });
     if (!user) {
-      await recordSecurityEvent(req, { type: "login_failed", email, reason: "user_not_found" });
       return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    if (user.isBanned) {
-      await recordSecurityEvent(req, { type: "login_failed", email, user: user._id, reason: "banned_account" });
-      return res.status(403).json({ message: "This account is temporarily restricted. Contact support if you believe this is a mistake." });
     }
 
     // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      await recordSecurityEvent(req, { type: "login_failed", email, user: user._id, reason: "wrong_password" });
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
     // Update last login
     user.lastLogin = new Date();
     await user.save();
-    const referralConnected = await connectReferralForNewUser(user, referralCode);
 
     await issueSession(res, user);
-    await recordSecurityEvent(req, { type: user.isAdmin ? "admin_login" : "login_success", email: user.email, user: user._id });
 
     res.json(buildAuthResponse("Login successful", user));
   } catch (error) {
@@ -374,15 +326,9 @@ router.post("/google", authLimiter, async (req, res) => {
       user.avatar = profile.picture;
     }
 
-    if (user.isBanned) {
-      await recordSecurityEvent(req, { type: "login_failed", email: user.email, user: user._id, reason: "banned_account_google" });
-      return res.status(403).json({ message: "This account is temporarily restricted. Contact support if you believe this is a mistake." });
-    }
-
     user.lastLogin = new Date();
     await user.save();
     await issueSession(res, user);
-    await recordSecurityEvent(req, { type: user.isAdmin ? "admin_login" : "login_success", email: user.email, user: user._id });
 
     res.json(buildAuthResponse("Google login successful", user));
   } catch (error) {
@@ -400,7 +346,7 @@ router.post("/logout", (req, res) => {
 // Current session without noisy 401s for first page load
 router.get("/session", async (req, res) => {
   try {
-    const token = getRequestAccessToken(req);
+    const token = getCookie(req, "accessToken") || getCookie(req, "authToken");
     if (!token) {
       return res.json({ user: null });
     }
@@ -412,7 +358,7 @@ router.get("/session", async (req, res) => {
       return res.json({ user: null });
     }
 
-    res.json({ user: authUserPayload(user) });
+    res.json({ user });
   } catch {
     clearSessionCookies(res);
     res.json({ user: null });

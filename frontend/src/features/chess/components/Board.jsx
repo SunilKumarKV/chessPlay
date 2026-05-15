@@ -38,7 +38,6 @@ export default function Board(props) {
     onSquareClick: externalOnSquareClick,
     promotion: externalPromotion,
     handlePromotion: externalHandlePromotion,
-    disabled: externalDisabled = false,
   } = props || {};
 
   const dispatch = useAppDispatch();
@@ -92,7 +91,7 @@ export default function Board(props) {
         externalOnSquareClick?.(row, col);
         return;
       }
-      if (externalDisabled || gameState.isGameOver || gameState.aiThinking) return;
+      if (gameState.isGameOver || gameState.aiThinking) return;
 
       const square = coordsToSquare(row, col);
       const piece = board[row][col];
@@ -143,14 +142,13 @@ export default function Board(props) {
       coordsToSquare,
       isExternalBoard,
       externalOnSquareClick,
-      externalDisabled,
     ],
   );
 
   const handleDragStart = useCallback(
     (e, row, col) => {
       if (settings.moveMethod !== "drag") return;
-      if (externalDisabled || isExternalBoard) return;
+      if (isExternalBoard) return;
 
       const piece = board[row][col];
       if (!piece || gameState.game.turn() !== piece.color) return;
@@ -170,7 +168,6 @@ export default function Board(props) {
       dispatch,
       coordsToSquare,
       isExternalBoard,
-      externalDisabled,
     ],
   );
 
@@ -182,7 +179,7 @@ export default function Board(props) {
     (e, row, col) => {
       e.preventDefault();
 
-      if (externalDisabled || !draggedPiece) return;
+      if (!draggedPiece) return;
 
       const from = coordsToSquare(draggedPiece.row, draggedPiece.col);
       const to = coordsToSquare(row, col);
@@ -230,7 +227,6 @@ export default function Board(props) {
       settings.playSounds,
       settings.confirmMove,
       settings.autoQueen,
-      externalDisabled,
     ],
   );
 
@@ -251,8 +247,8 @@ export default function Board(props) {
             soundManager.playPromote();
           }
         }
-      } catch {
-        // Invalid promotion state; keep the board stable and let the user continue.
+      } catch (error) {
+        console.error("Promotion failed:", error);
       }
 
       setPromotionPending(null);
@@ -318,7 +314,7 @@ export default function Board(props) {
   return (
     <div
       ref={boardRef}
-      className={`premium-chess-board relative flex aspect-square w-full select-none overflow-hidden rounded-xl border-[6px] ${externalDisabled ? "pointer-events-none opacity-90" : ""}`}
+      className="premium-chess-board relative flex aspect-square w-full select-none overflow-hidden rounded-xl border-[6px]"
       style={{
         "--board-glow": boardTheme.glow,
         "--board-legal": boardTheme.legal,
@@ -365,7 +361,7 @@ export default function Board(props) {
                   key={`${r}-${c}`}
                   layout={settings.pieceAnimations !== "none"}
                   transition={{ duration: settings.animationDuration / 1000 }}
-                  className={`premium-board-square relative flex items-center justify-center overflow-hidden ${externalDisabled ? "cursor-not-allowed" : "cursor-pointer"}`}
+                  className="premium-board-square relative flex cursor-pointer items-center justify-center overflow-hidden"
                   style={{
                     background: squareColor,
                     backgroundImage: boardTheme.texture,

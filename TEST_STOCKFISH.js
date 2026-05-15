@@ -56,9 +56,9 @@ const checks = [
     pattern: /importScripts\("\/stockfish\/stockfish\.js"\)/,
   },
   {
-    name: "Does not load third-party CDN code",
+    name: "Keeps CDN fallback",
     source: workerCode,
-    pattern: /^(?![\s\S]*cdnjs\.cloudflare\.com\/ajax\/libs\/stockfish\.js\/10\.0\.2\/stockfish\.js)[\s\S]*$/,
+    pattern: /cdnjs\.cloudflare\.com\/ajax\/libs\/stockfish\.js\/10\.0\.2\/stockfish\.js/,
   },
 ];
 

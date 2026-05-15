@@ -61,11 +61,8 @@ function assertSourceChecks() {
   assert(/router\.get\("\/session"/.test(auth), "Session endpoint is missing");
 
   const authMiddleware = read("backend/middleware/auth.js");
-  assert(/getRequestAccessToken\(req\)/.test(authMiddleware), "Auth middleware must use the centralized access-token reader");
-
-  const securityUtils = read("backend/utils/security.js");
-  assert(/getCookie\(req, 'authToken'\)/.test(securityUtils), "Token reader must keep authToken cookie backward compatibility");
-  assert(/getBearerToken\(req\)/.test(securityUtils), "Token reader must support short-lived bearer fallback for browsers blocking cross-site cookies");
+  assert(/getCookie\(req, "authToken"\)/.test(authMiddleware), "Auth middleware must read authToken cookie");
+  assert(!/Authorization|Bearer/.test(authMiddleware), "Auth middleware should not accept browser bearer tokens");
 
   const server = read("backend/server.js");
   assert(/JWT_SECRET must be at least 32 characters/.test(server), "JWT secret length check is missing");
@@ -86,8 +83,7 @@ function assertSourceChecks() {
 
   const apiClient = read("frontend/src/services/apiClient.js");
   assert(/credentials: "include"/.test(apiClient), "API client must send auth cookies");
-  assert(/sessionStorage\.getItem\("chessplay_access_token"\)/.test(apiClient), "API client must support short-lived session token fallback");
-  assert(!/localStorage\.getItem\("token"\)/.test(apiClient), "API client must not use persistent localStorage bearer tokens");
+  assert(!/Authorization|Bearer/.test(apiClient), "API client should not send localStorage bearer tokens");
 
   const authComponent = read("frontend/src/features/auth/components/Auth.jsx");
   assert(/VITE_GOOGLE_CLIENT_ID/.test(authComponent), "Google button must support Google client ID config");

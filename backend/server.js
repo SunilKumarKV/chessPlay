@@ -59,12 +59,7 @@ const gameRoutes = require("./routes/games");
 const billingRoutes = require("./routes/billing");
 const socialRoutes = require("./routes/social");
 const automationRoutes = require("./routes/automation");
-const adminRoutes = require("./routes/admin");
-const puzzleRoutes = require("./routes/puzzles");
-const analysisRoutes = require("./routes/analysis");
-const referralRoutes = require("./routes/referrals");
-const tournamentRoutes = require("./routes/tournaments");
-const messageRoutes = require("./routes/messages");
+const settingsRoutes = require("./routes/settings");
 const User = require("./models/User");
 const Game = require("./models/Game");
 const { updatePlayerStats } = require("./utils/elo");
@@ -150,7 +145,7 @@ function createCorsOptions(req) {
     origin(origin, callback) {
       corsOriginForRequest(req, origin, callback);
     },
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   };
 }
@@ -178,7 +173,7 @@ const socketCorsOptions = {
     }
     return callback(null, isAllowedOrigin(origin));
   },
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true,
 };
 
@@ -288,11 +283,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        connectSrc: [...cspConnectSources, "https://accounts.google.com", "https://oauth2.googleapis.com"],
-        scriptSrc: ["'self'", "https://accounts.google.com"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com"],
-        imgSrc: ["'self'", "data:", "https:", "blob:"],
-        fontSrc: ["'self'", "data:"],
+        connectSrc: cspConnectSources,
         workerSrc: ["'self'", "blob:"],
       },
     },
@@ -329,12 +320,7 @@ app.use("/api/games", gameRoutes);
 app.use("/api/billing", billingRoutes);
 app.use("/api/social", socialRoutes);
 app.use("/api/automation", automationRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/puzzles", puzzleRoutes);
-app.use("/api/analysis", analysisRoutes);
-app.use("/api/referrals", referralRoutes);
-app.use("/api/tournaments", tournamentRoutes);
-app.use("/api/messages", messageRoutes);
+app.use("/api/settings", settingsRoutes);
 
 // Basic health check
 app.get("/health", (req, res) => {
@@ -1382,19 +1368,11 @@ const PORT = process.env.PORT || 3001;
 
 // Global Express error handler
 app.use((err, req, res, next) => {
-  const status = Number(err.status || err.statusCode || 500);
-  const safeStatus = status >= 400 && status < 600 ? status : 500;
-  if (safeStatus >= 500) {
-    console.error("Unhandled express error:", err);
-  } else {
-    console.warn("Handled express error:", err.message);
-  }
+  console.error("Unhandled express error:", err);
   if (res.headersSent) {
     return next(err);
   }
-  return res.status(safeStatus).json({
-    message: safeStatus >= 500 ? "Internal server error" : (err.message || "Request failed"),
-  });
+  return res.status(500).json({ message: "Internal server error" });
 });
 
 server.on("error", (error) => {
