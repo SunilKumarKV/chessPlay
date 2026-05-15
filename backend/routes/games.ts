@@ -1,28 +1,75 @@
-const express = require("express");
-const Game = require("../models/Game");
-const User = require("../models/User");
-const auth = require("../middleware/auth");
+import express, { type Request, type Response } from "express";
+import Game = require("../models/Game");
+import User = require("../models/User");
+import auth = require("../middleware/auth");
+
+type AuthenticatedRequest = Request & {
+  user?: {
+    userId: string;
+    username?: string;
+    type?: string;
+  };
+};
+
+type GameMoveInput = {
+  from?: unknown;
+  to?: unknown;
+  piece?: unknown;
+  promotion?: unknown;
+  timestamp?: unknown;
+};
+
+type RecordGameBody = {
+  moves?: GameMoveInput[];
+  aiOpponent?: unknown;
+  aiDifficulty?: unknown;
+  playerColor?: string;
+  result?: string;
+  winnerColor?: string;
+  duration?: unknown;
+};
+
+type LeaderboardMode = "all" | "rating" | "wins" | "gamesPlayed";
 
 const router = express.Router();
 const VALID_RESULTS = new Set(["white", "black", "draw"]);
 const VALID_COLORS = new Set(["w", "b"]);
 const MAX_PAGE_SIZE = 50;
 
-function parsePositiveInt(value, fallback, max = Number.MAX_SAFE_INTEGER) {
-  const parsed = Number.parseInt(value, 10);
+function parsePositiveInt(value: unknown, fallback: number, max = Number.MAX_SAFE_INTEGER) {
+  const parsed = Number.parseInt(String(value), 10);
   if (!Number.isFinite(parsed) || parsed < 1) return fallback;
   return Math.min(parsed, max);
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function requestUserId(req: AuthenticatedRequest) {
+  return String(req.user?.userId || "");
+}
+
+function normalizeMove(move: GameMoveInput) {
+  return {
+    from: String(move.from || ""),
+    to: String(move.to || ""),
+    piece: String(move.piece || ""),
+    promotion: move.promotion ? String(move.promotion) : undefined,
+    timestamp: move.timestamp ? new Date(String(move.timestamp)) : new Date(),
+  };
+}
+
 // Get user's completed game history
-router.get("/history", auth, async (req, res) => {
+router.get("/history", auth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const page = parsePositiveInt(req.query.page, 1);
     const limit = parsePositiveInt(req.query.limit, 10, MAX_PAGE_SIZE);
     const skip = (page - 1) * limit;
-    const targetUserId = req.query.userId || req.user.userId;
+    const currentUserId = requestUserId(req);
+    const targetUserId = req.query.userId || currentUserId;
 
-    if (String(targetUserId) !== String(req.user.userId)) {
+    if (String(targetUserId) !== String(currentUserId)) {
       const targetUser = await User.findById(targetUserId).select(
         "privacy friends",
       );
@@ -30,7 +77,7 @@ router.get("/history", auth, async (req, res) => {
         return res.status(404).json({ message: "User not found" });
       }
       const isFriend = targetUser.friends.some(
-        (friendId) => String(friendId) === String(req.user.userId),
+        (friendId: unknown) => String(friendId) === String(currentUserId),
       );
       if (targetUser.privacy?.gameHistory === false && !isFriend) {
         return res.status(403).json({ message: "This player's game history is private" });
@@ -68,7 +115,7 @@ router.get("/history", auth, async (req, res) => {
 });
 
 // Record a completed game
-router.post("/record", auth, async (req, res) => {
+router.post("/record", auth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const {
       moves,
@@ -78,7 +125,7 @@ router.post("/record", auth, async (req, res) => {
       result,
       winnerColor,
       duration,
-    } = req.body;
+    } = req.body as RecordGameBody;
 
     if (!Array.isArray(moves)) {
       return res.status(400).json({ message: "Moves are required" });
@@ -86,21 +133,15 @@ router.post("/record", auth, async (req, res) => {
     if (moves.length > 500) {
       return res.status(400).json({ message: "Too many moves" });
     }
-    if (!VALID_RESULTS.has(result)) {
+    if (!VALID_RESULTS.has(String(result))) {
       return res.status(400).json({ message: "Invalid game result" });
     }
     if (!VALID_COLORS.has(playerColor)) {
       return res.status(400).json({ message: "Invalid player color" });
     }
 
-    const gameData = {
-      moves: moves.map((move) => ({
-        from: String(move.from || ""),
-        to: String(move.to || ""),
-        piece: String(move.piece || ""),
-        promotion: move.promotion ? String(move.promotion) : undefined,
-        timestamp: move.timestamp ? new Date(move.timestamp) : new Date(),
-      })),
+    const gameData: Record<string, unknown> = {
+      moves: moves.map(normalizeMove),
       aiOpponent: Boolean(aiOpponent),
       aiDifficulty: Number(aiDifficulty) || 0,
       playerColor,
@@ -110,13 +151,13 @@ router.post("/record", auth, async (req, res) => {
     };
 
     if (playerColor === "w") {
-      gameData.whitePlayer = req.user.userId;
+      gameData.whitePlayer = requestUserId(req);
     } else {
-      gameData.blackPlayer = req.user.userId;
+      gameData.blackPlayer = requestUserId(req);
     }
 
     if (winnerColor === playerColor) {
-      gameData.winner = req.user.userId;
+      gameData.winner = requestUserId(req);
     }
 
     if (result === "draw") {
@@ -134,21 +175,20 @@ router.post("/record", auth, async (req, res) => {
 });
 
 // Get public leaderboard
-router.get("/leaderboard", async (req, res) => {
+router.get("/leaderboard", async (req: Request, res: Response) => {
   try {
     const limit = parsePositiveInt(req.query.limit, 50, MAX_PAGE_SIZE);
-    const allowedModes = new Set(["all", "rating", "wins", "gamesPlayed"]);
-    const mode = allowedModes.has(String(req.query.mode || "").trim())
-      ? String(req.query.mode).trim()
-      : "all";
+    const allowedModes = new Set<LeaderboardMode>(["all", "rating", "wins", "gamesPlayed"]);
+    const requestedMode = String(req.query.mode || "").trim() as LeaderboardMode;
+    const mode = allowedModes.has(requestedMode) ? requestedMode : "all";
     const search = String(req.query.search || "").trim().slice(0, 40);
 
-    const query = { deletedAt: null, isBanned: { $ne: true } };
+    const query: Record<string, unknown> = { deletedAt: null, isBanned: { $ne: true } };
     if (search) {
-      query.username = { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
+      query.username = { $regex: escapeRegExp(search), $options: "i" };
     }
 
-    const sortByMode = {
+    const sortByMode: Record<LeaderboardMode, Record<string, 1 | -1>> = {
       all: { rating: -1, gamesWon: -1, gamesPlayed: -1, username: 1 },
       rating: { rating: -1, gamesWon: -1, gamesPlayed: -1, username: 1 },
       wins: { gamesWon: -1, rating: -1, gamesPlayed: -1, username: 1 },
@@ -161,7 +201,7 @@ router.get("/leaderboard", async (req, res) => {
       .select("username gamesPlayed gamesWon gamesLost gamesDrawn rating isSupporter isPremium adsDisabled settings badges")
       .lean();
 
-    const leaderboard = users.map((player, index) => ({
+    const leaderboard = users.map((player: any, index: number) => ({
       rank: index + 1,
       username: player.username,
       rating: Number.isFinite(player.rating) ? player.rating : null,
@@ -183,7 +223,7 @@ router.get("/leaderboard", async (req, res) => {
 });
 
 // Get specific game details
-router.get("/:gameId", auth, async (req, res) => {
+router.get("/:gameId", auth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const game = await Game.findById(req.params.gameId)
       .populate("whitePlayer", "username")
@@ -196,8 +236,8 @@ router.get("/:gameId", auth, async (req, res) => {
 
     // Check if user is a participant
     if (
-      game.whitePlayer._id.toString() !== req.user.userId &&
-      (!game.blackPlayer || game.blackPlayer._id.toString() !== req.user.userId)
+      game.whitePlayer._id.toString() !== requestUserId(req) &&
+      (!game.blackPlayer || game.blackPlayer._id.toString() !== requestUserId(req))
     ) {
       return res.status(403).json({ message: "Access denied" });
     }
@@ -209,4 +249,4 @@ router.get("/:gameId", auth, async (req, res) => {
   }
 });
 
-module.exports = router;
+export = router;

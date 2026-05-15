@@ -2,25 +2,22 @@
   "name": "chessplay-monorepo",
   "version": "1.3.0-beta",
   "description": "Real-time multiplayer chess game with React frontend and Node.js backend",
+  "packageManager": "pnpm@11.0.3",
   "scripts": {
-    "dev": "cd frontend && npm run dev",
-    "dev:multi": "concurrently \"npm run dev\" \"npm run server\"",
-    "server": "cd backend && npm run dev",
-    "build": "cd frontend && npm run build",
-    "lint": "cd frontend && npm run lint",
-    "test": "npm run test:production && npm --workspace backend test",
+    "dev": "pnpm -C frontend dev",
+    "dev:multi": "concurrently \"pnpm -C frontend dev\" \"pnpm -C backend dev\"",
+    "server": "pnpm -C backend dev",
+    "build": "pnpm -C frontend build",
+    "lint": "pnpm -C frontend lint",
+    "test": "pnpm test:production && pnpm -C backend test",
     "test:production": "node TEST_PRODUCTION_SMOKE.js && node TEST_STOCKFISH.js",
-    "preview": "cd frontend && npm run preview",
-    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
-    "start": "npm run dev:multi"
+    "preview": "pnpm -C frontend preview",
+    "install:all": "pnpm install",
+    "start": "pnpm dev:multi"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
   },
-  "workspaces": [
-    "frontend",
-    "backend"
-  ],
   "dependencies": {
     "helmet": "^8.1.0",
     "morgan": "^1.10.1",

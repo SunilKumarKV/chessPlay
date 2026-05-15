@@ -12,6 +12,7 @@ const Referral = require("../models/Referral");
 const Tournament = require("../models/Tournament");
 const { sanitizeText } = require("../utils/security");
 const { sendAutomationNotification } = require("../utils/automationBot");
+const { getPremiumPlanConfig } = require("../src/services/premiumPlans");
 
 const router = express.Router();
 
@@ -201,12 +202,13 @@ async function applyPlanToUser(user, plan, req) {
   return expiresAt;
 }
 
-router.get("/plans", (_req, res) => {
+router.get("/plans", async (_req, res) => {
+  const plans = await getPremiumPlanConfig(PLAN_CONFIG);
   res.json({
     currency: "INR",
     upiId: process.env.UPI_ID || "",
     merchantName: process.env.UPI_MERCHANT_NAME || "ChessPlay",
-    plans: PLAN_CONFIG,
+    plans,
     paymentMethods: paymentMethodsFor("supporter_monthly"),
     support: {
       contactEmail: process.env.SUPPORT_EMAIL_TO || process.env.ADMIN_EMAIL || "",
