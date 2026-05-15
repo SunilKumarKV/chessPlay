@@ -47,6 +47,7 @@ export default function DashboardLayout({
           user={user}
           onNavigate={onNavigate}
           onLogout={onLogout}
+          activePage={activePage}
         />
 
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
