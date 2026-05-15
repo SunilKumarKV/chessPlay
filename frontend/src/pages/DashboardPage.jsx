@@ -344,6 +344,7 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
             <button type="button" onClick={() => onNavigate?.("history")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Game History</button>
             <button type="button" onClick={copyInvite} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">{inviteCopied ? "Copied" : "Invite"}</button>
             <button type="button" onClick={() => onNavigate?.("leaderboard")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Leaderboard</button>
+            <button type="button" onClick={() => onNavigate?.("puzzles")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Puzzles</button>
             {isAdmin && (
               <button type="button" onClick={() => onNavigate?.("admin")} className="col-span-2 rounded-lg border border-[#81b64c]/40 bg-[#81b64c]/15 px-3 py-3 text-left text-sm font-black text-[#dcf8c6] transition hover:bg-[#81b64c]/20">Open Admin Panel</button>
             )}
@@ -375,7 +376,7 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
               {[
                 { title: "Play vs AI", meta: "Practice instantly", action: () => startGame("ai"), accent: "#81b64c" },
                 { title: "Play Online", meta: isGuest ? "Login required" : "Live rooms", action: () => (isGuest ? onNavigate?.("settings") : startGame("multi")), accent: "#38bdf8" },
-                { title: "View Profile", meta: "Account and rating", action: () => onNavigate?.("profile"), accent: "#a78bfa" },
+                { title: "Puzzles", meta: "Train tactics", action: () => onNavigate?.("puzzles"), accent: "#a78bfa" },
                 { title: "Game History", meta: "Recent results", action: () => onNavigate?.("history"), accent: "#f59e0b" },
               ].map((item) => (
                 <button key={item.title} type="button" onClick={item.action} className="group rounded-xl border border-white/10 bg-black/20 p-4 text-left transition-all hover:-translate-y-1 hover:bg-white/10">

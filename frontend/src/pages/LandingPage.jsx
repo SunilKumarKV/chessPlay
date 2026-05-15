@@ -23,6 +23,7 @@ const FEATURES = [
   { icon: "🌐", title: "Real-time multiplayer", copy: "Create or join live games with friends while the backend protects move validation and room state." },
   { icon: "📜", title: "Game history", copy: "Review saved matches, results, and recent activity after signing in to your ChessPlay account." },
   { icon: "🏆", title: "Leaderboard", copy: "Compare progress with other players through a dedicated leaderboard experience." },
+  { icon: "◇", title: "Chess puzzles", copy: "Practice tactical patterns with starter puzzles and sign in to save progress when live puzzles are enabled." },
   { icon: "👥", title: "Friends and community", copy: "Use profile, friends, messages, and community sections to keep chess social." },
   { icon: "🔐", title: "Secure account", copy: "Cookie-based sessions, protected routes, and production-safe auth screens help protect player access." },
 ];
@@ -40,7 +41,7 @@ const HOW_IT_WORKS = [
   { title: "Review and improve", text: "Use history, leaderboard, and analysis areas to understand your games over time." },
 ];
 
-const PRODUCT_POINTS = ["Play vs AI", "Real-time multiplayer", "Game history", "Leaderboard", "Friends", "Secure account"];
+const PRODUCT_POINTS = ["Play vs AI", "Real-time multiplayer", "Puzzles", "Game history", "Leaderboard", "Secure account"];
 
 export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
   const [showAuth, setShowAuth] = useState(false);
@@ -83,6 +84,7 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
 
   const navItems = [
     { href: "#features", label: "Features" },
+    { href: "/puzzles", label: "Puzzles", route: true },
     { href: "#how-it-works", label: "How it works" },
     { href: "#security", label: "Security" },
     { href: "#start", label: "Start" },

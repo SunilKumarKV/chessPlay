@@ -13,6 +13,7 @@ import Profile from "../pages/ProfilePage";
 import ComingSoonPage from "../pages/ComingSoonPage";
 import AnalysisPage from "../pages/AnalysisPage";
 import LanPlayPage from "../pages/LanPlayPage";
+import PuzzlesPage from "../pages/PuzzlesPage";
 import AppSplash from "../components/AppSplash";
 import DashboardLayout from "../layouts/DashboardLayout";
 import ErrorBoundary from "../components/ErrorBoundary";
@@ -231,6 +232,18 @@ export default function App() {
     );
   }
 
+  if (!user && currentPage === "puzzles") {
+    return (
+      <ErrorBoundary>
+        <PuzzlesPage
+          user={null}
+          onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
+          onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+        />
+      </ErrorBoundary>
+    );
+  }
+
   if (!user) {
     return (
       <ErrorBoundary>
@@ -360,10 +373,10 @@ export default function App() {
         return <TournamentsPage onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "puzzles":
         return (
-          <ComingSoonPage
-            feature={currentPage}
+          <PuzzlesPage
+            user={user}
             onBack={goDashboard}
-            onPlay={() => handleStartGame("ai", "3+0")}
+            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
           />
         );
       case "privacy":
