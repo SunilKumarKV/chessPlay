@@ -385,7 +385,7 @@ export default function App() {
           <AdminSupportersPage onBack={() => navigateToAppPage("billing", setCurrentPage)} />
         );
       case "community":
-        return <CommunityPage onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
+        return <CommunityPage user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "messages":
         return <MessagesPage onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
       case "automation":
