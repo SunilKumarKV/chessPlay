@@ -238,6 +238,14 @@ const chessGameSlice = createSlice({
       state.activeClock = state.game.turn();
     },
 
+    undoLastMove: (state) => {
+      if (state.history.length === 0 || state.isGameOver) return;
+      const nextHistory = state.history.slice(0, -1);
+      rebuildPosition(state, nextHistory);
+      state.gameStarted = nextHistory.length > 0;
+      state.activeClock = state.game.turn();
+    },
+
     resignGame: (state) => {
       if (state.isGameOver) return;
       const humanColor = state.aiColor === "w" ? "b" : "w";
@@ -343,6 +351,7 @@ export const {
   setFlipped,
   setTimeControl,
   undoLastTurn,
+  undoLastMove,
   resignGame,
   updateClock,
   switchClock,

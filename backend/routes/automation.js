@@ -29,7 +29,7 @@ async function requireAdmin(req, res, next) {
   }
 }
 
-router.get("/status", auth, async (_req, res) => {
+router.get("/status", auth, requireAdmin, async (_req, res) => {
   res.json({
     status: getAutomationStatus(),
     config: redactSecrets({

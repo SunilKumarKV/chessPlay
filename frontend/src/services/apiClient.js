@@ -4,9 +4,18 @@ async function readJson(response) {
   return response.json().catch(() => ({}));
 }
 
+function clearSessionTokens() {
+  sessionStorage.removeItem("chessplay_access_token");
+  sessionStorage.removeItem("chessplay_socket_token");
+}
+
 async function request(endpoint, options = {}) {
+  const hasBody = Boolean(options.body);
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+  const fallbackAccessToken = sessionStorage.getItem("chessplay_access_token") || sessionStorage.getItem("chessplay_socket_token");
   const headers = {
-    "Content-Type": "application/json",
+    ...(hasBody && !isFormData ? { "Content-Type": "application/json" } : {}),
+    ...(fallbackAccessToken ? { Authorization: `Bearer ${fallbackAccessToken}` } : {}),
     ...options.headers,
   };
 
@@ -23,20 +32,19 @@ async function request(endpoint, options = {}) {
  * On expired access token, it tries one refresh-token rotation before failing.
  */
 export const apiClient = async (endpoint, options = {}) => {
-  const { skipRefresh = false, publicRequest = false, ...fetchOptions } = options;
-  let response = await request(endpoint, fetchOptions);
+  let response = await request(endpoint, options);
 
-  const shouldRefresh =
-    response.status === 401 &&
-    !skipRefresh &&
-    !publicRequest &&
-    endpoint !== "/api/auth/refresh" &&
-    endpoint !== "/api/auth/session";
-
-  if (shouldRefresh) {
+  if (response.status === 401 && endpoint !== "/api/auth/refresh" && !options.skipAuthRefresh) {
     const refreshResponse = await request("/api/auth/refresh", { method: "POST" });
     if (refreshResponse.ok) {
-      response = await request(endpoint, fetchOptions);
+      const refreshData = await readJson(refreshResponse);
+      if (refreshData.socketToken) {
+        sessionStorage.setItem("chessplay_access_token", refreshData.socketToken);
+        sessionStorage.setItem("chessplay_socket_token", refreshData.socketToken);
+      }
+      response = await request(endpoint, options);
+    } else {
+      clearSessionTokens();
     }
   }
 

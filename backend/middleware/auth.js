@@ -1,9 +1,10 @@
 const jwt = require('jsonwebtoken');
-const { getCookie, getJwtSecret } = require('../utils/security');
+const { getJwtSecret, getRequestAccessToken } = require('../utils/security');
+const User = require('../models/User');
 
-const auth = (req, res, next) => {
+const auth = async (req, res, next) => {
   try {
-    const token = getCookie(req, "accessToken") || getCookie(req, "authToken");
+    const token = getRequestAccessToken(req);
 
     if (!token) {
       return res.status(401).json({ message: 'No token provided' });
@@ -12,6 +13,10 @@ const auth = (req, res, next) => {
     const decoded = jwt.verify(token, getJwtSecret('access'));
     if (decoded.type && decoded.type !== 'access') {
       return res.status(401).json({ message: 'Invalid token type' });
+    }
+    const user = await User.findById(decoded.userId).select('isBanned deletedAt tokenVersion');
+    if (!user || user.deletedAt || user.isBanned) {
+      return res.status(401).json({ message: 'Invalid or restricted session' });
     }
     req.user = decoded;
     next();

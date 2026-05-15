@@ -24,6 +24,10 @@ export default defineConfig([
     },
     rules: {
       "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]" }],
+      // React 19 compiler lint is useful, but this project intentionally loads
+      // remote/local data inside effects. Keep exhaustive-deps on, but avoid
+      // blocking production builds for valid data-fetch effects.
+      "react-hooks/set-state-in-effect": "off",
     },
   },
 ]);

@@ -1,10 +1,11 @@
-// Prefer the self-hosted public asset. Keep the CDN as a fallback only.
+// Self-hosted Stockfish worker. Keep the chess engine local for production safety.
 try {
   importScripts("/stockfish/stockfish.js");
-} catch (localError) {
-  console.warn("[Stockfish] Local engine failed, falling back to CDN.", localError);
-  importScripts("https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js");
+} catch {
+  try {
+    const stockfishUrl = new URL("../stockfish/stockfish.js", self.location.href).toString();
+    importScripts(stockfishUrl);
+  } catch {
+    self.postMessage("error Chess engine failed to load from local assets");
+  }
 }
-
-// The imported Stockfish bundle already initializes the worker message loop.
-// No additional wrapper is required here.

@@ -59,6 +59,13 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  isBanned: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  bannedAt: { type: Date, default: null },
+  bannedReason: { type: String, trim: true, maxlength: 300, default: "" },
 
   // v1.2.1 SaaS / supporter plan fields
   plan: {
@@ -174,22 +181,18 @@ const userSchema = new mongoose.Schema({
       type: Boolean,
       default: true,
     },
-    friendRequestPolicy: {
-      type: String,
-      enum: ["everyone", "friends_of_friends", "none"],
-      default: "everyone",
-    },
-    gameHistoryVisibility: {
-      type: String,
-      enum: ["public", "friends", "private"],
-      default: "public",
-    },
     spectatorMode: {
       type: Boolean,
       default: false,
     },
   },
-  preferences: {
+
+  settings: {
+    privacy: {
+      profileVisibility: { type: String, enum: ["public", "private"], default: "public" },
+      gameHistoryVisibility: { type: String, enum: ["public", "friends", "private"], default: "public" },
+      friendRequests: { type: String, enum: ["everyone", "friendsOfFriends", "none"], default: "everyone" },
+    },
     notifications: {
       gameInvites: { type: Boolean, default: true },
       friendRequests: { type: Boolean, default: true },
@@ -197,40 +200,20 @@ const userSchema = new mongoose.Schema({
       tournaments: { type: Boolean, default: true },
       community: { type: Boolean, default: true },
       supporter: { type: Boolean, default: true },
-      moveNotifications: { type: Boolean, default: true },
-      gameResults: { type: Boolean, default: true },
-      achievementAlerts: { type: Boolean, default: true },
     },
     appearance: {
-      theme: { type: String, default: "dark" },
-      boardTheme: { type: String, default: "classic" },
-      pieceSet: { type: String, default: "classic" },
-      fontFamily: { type: String, default: "inter" },
-      fontSize: { type: Number, default: 16 },
-      language: { type: String, default: "en" },
-      accentColor: { type: String, default: "" },
-      textColor: { type: String, default: "" },
-      moveNotation: { type: String, default: "san" },
-      boardCoordinates: { type: Boolean, default: true },
-      boardAnimation: { type: String, default: "normal" },
+      theme: { type: String, enum: ["system", "light", "dark"], default: "system" },
+      boardTheme: { type: String, enum: ["classic", "neon", "wood", "tournament"], default: "classic" },
     },
     gameplay: {
       defaultMode: { type: String, enum: ["ai", "online", "player"], default: "ai" },
       boardOrientation: { type: String, enum: ["white", "black", "auto"], default: "white" },
       moveConfirmation: { type: Boolean, default: false },
       soundEffects: { type: Boolean, default: true },
-      animation: { type: String, default: "normal" },
-      showLegalMoves: { type: Boolean, default: true },
-      showLastMove: { type: Boolean, default: true },
-      autoPromote: { type: Boolean, default: true },
-      confirmMove: { type: Boolean, default: false },
-      defaultTimeControl: { type: Number, default: 2 },
-      aiDifficulty: { type: Number, default: 3 },
-      premove: { type: Boolean, default: true },
-      autoQueen: { type: Boolean, default: true },
-      alwaysPromoteToQueen: { type: Boolean, default: false },
+      animation: { type: String, enum: ["normal", "reduced"], default: "normal" },
     },
   },
+
   friends: [
     {
       type: mongoose.Schema.Types.ObjectId,

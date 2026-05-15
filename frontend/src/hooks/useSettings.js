@@ -1,343 +1,231 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { store } from "../store";
 import { loadSettings as loadChessSettings } from "../store/slices/chessSettingsSlice";
 import { setAiDifficulty } from "../store/slices/chessGameSlice";
-import {
-  BOARD_THEME_STORAGE_KEY,
-  normalizeBoardThemeId,
-} from "../features/chess/constants/boardThemes";
-import { BACKEND_URL } from "../config/runtime";
+import { BOARD_THEME_STORAGE_KEY, normalizeBoardThemeId } from "../features/chess/constants/boardThemes";
+import { apiClient } from "../services/apiClient";
 
-const API_BASE = `${BACKEND_URL}/api`;
-
-// Default settings
 const DEFAULT_SETTINGS = {
-  account: {
+  profile: {
     username: "",
     email: "",
     bio: "",
-    avatar: null,
     country: "US",
+    avatar: null,
+  },
+  privacy: {
+    profileVisibility: "public",
+    gameHistoryVisibility: "public",
+    friendRequests: "everyone",
+  },
+  notifications: {
+    gameInvites: true,
+    friendRequests: true,
+    messages: true,
+    tournaments: true,
+    community: true,
+    supporter: true,
   },
   appearance: {
+    theme: "system",
     boardTheme: "classic",
-    pieceSet: "classic",
-    theme: "dark",
-    fontFamily: "inter",
-    fontSize: 16,
-    language: "en",
-    accentColor: "",
-    textColor: "",
-    moveNotation: "san",
-    boardCoordinates: true,
-    boardAnimation: "normal",
   },
-  game: {
-    showLegalMoves: true,
-    showLastMove: true,
-    soundEnabled: true,
-    autoPromote: true,
-    confirmMove: false,
-    defaultTimeControl: 2, // 3+0 Blitz
-    aiDifficulty: 3, // Hard
-    premove: true,
-    autoQueen: true,
-    alwaysPromoteToQueen: false,
+  gameplay: {
     defaultMode: "ai",
     boardOrientation: "white",
     moveConfirmation: false,
     soundEffects: true,
     animation: "normal",
   },
-  notifications: {
-    gameInvites: true,
-    moveNotifications: true,
-    gameResults: true,
-    friendRequests: true,
-    messages: true,
-    tournamentUpdates: true,
-    tournaments: true,
-    community: true,
-    supporter: true,
-    achievementAlerts: true,
-  },
-  privacy: {
-    profileVisibility: true,
-    gameHistory: true,
-    gameHistoryVisibility: "public",
-    onlineStatus: true,
-    friendRequests: true,
-    friendRequestPolicy: "everyone",
-    spectatorMode: false,
+  premium: {
+    supporterStatus: "free",
+    isSupporter: false,
+    adsDisabled: false,
+    plan: "free",
   },
 };
 
-function mergeSettings(storedSettings = {}) {
-  const mergedSettings = Object.keys(DEFAULT_SETTINGS).reduce((merged, section) => {
-    merged[section] = {
-      ...DEFAULT_SETTINGS[section],
-      ...(storedSettings[section] || {}),
-    };
-    return merged;
-  }, {});
-  mergedSettings.appearance.boardTheme = normalizeBoardThemeId(
-    localStorage.getItem(BOARD_THEME_STORAGE_KEY) ||
-      mergedSettings.appearance.boardTheme,
-  );
-  return mergedSettings;
+function deepClone(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
-function syncChessSettings(settings) {
-  const timeControlMap = {
-    0: "bullet",
-    1: "bullet",
-    2: "blitz",
-    3: "blitz",
-    4: "rapid",
-    5: "rapid",
-    6: "classical",
-  };
+function mergeSettings(base = {}) {
+  const next = deepClone(DEFAULT_SETTINGS);
+  Object.keys(next).forEach((section) => {
+    next[section] = { ...next[section], ...(base[section] || {}) };
+  });
+  next.appearance.boardTheme = normalizeBoardThemeId(
+    next.appearance.boardTheme || localStorage.getItem(BOARD_THEME_STORAGE_KEY) || "classic",
+  );
+  return next;
+}
 
-  const animationMap = {
-    none: "none",
-    fast: "fast",
-    normal: "medium",
-  };
+function mapApiResponse(data, localSettings) {
+  const user = data?.user || {};
+  const serverSettings = data?.settings || {};
+  return mergeSettings({
+    ...localSettings,
+    ...serverSettings,
+    profile: {
+      ...localSettings.profile,
+      username: user.username || localSettings.profile.username || "",
+      email: user.email || localSettings.profile.email || "",
+      bio: user.bio || "",
+      avatar: user.avatar || null,
+      country: user.country || "US",
+    },
+    premium: {
+      supporterStatus: user.supporterStatus || (user.isSupporter ? "supporter" : "free"),
+      isSupporter: Boolean(user.isSupporter),
+      adsDisabled: Boolean(user.adsDisabled),
+      plan: user.plan || "free",
+    },
+  });
+}
 
+function syncLocalGamePreferences(settings) {
+  const boardTheme = normalizeBoardThemeId(settings.appearance.boardTheme);
   const chessSettings = {
-    boardTheme: normalizeBoardThemeId(settings.appearance.boardTheme),
-    pieceSet: settings.appearance.pieceSet,
-    showCoordinates: settings.appearance.boardCoordinates,
-    pieceNotation:
-      settings.appearance.moveNotation === "san" ? "algebraic" : "figurine",
-    whiteAlwaysOnBottom: settings.game.boardOrientation !== "black",
-    pieceAnimations: animationMap[settings.appearance.boardAnimation] || "medium",
-    highlightLegalMoves: settings.game.showLegalMoves,
-    showLegalMoves: settings.game.showLegalMoves,
-    playSounds: settings.game.soundEnabled,
-    showLastMove: settings.game.showLastMove,
-    confirmMove: settings.game.confirmMove,
-    autoQueen: settings.game.autoQueen,
-    timeControlPreset:
-      timeControlMap[settings.game.defaultTimeControl] || "blitz",
+    boardTheme,
+    whiteAlwaysOnBottom: settings.gameplay.boardOrientation !== "black",
+    confirmMove: Boolean(settings.gameplay.moveConfirmation),
+    playSounds: Boolean(settings.gameplay.soundEffects),
+    pieceAnimations: settings.gameplay.animation === "reduced" ? "fast" : "medium",
   };
-
-  const stored = JSON.parse(localStorage.getItem("chessplay-settings") || "{}");
-  localStorage.setItem(
-    "chessplay-settings",
-    JSON.stringify({ ...stored, ...chessSettings }),
-  );
-  localStorage.setItem(BOARD_THEME_STORAGE_KEY, chessSettings.boardTheme);
-  localStorage.setItem(
-    "selectedTimeControl",
-    timeControlMap[settings.game.defaultTimeControl] || "blitz",
-  );
+  const existing = JSON.parse(localStorage.getItem("chessplay-settings") || "{}");
+  localStorage.setItem("chessplay-settings", JSON.stringify({ ...existing, ...chessSettings }));
+  localStorage.setItem(BOARD_THEME_STORAGE_KEY, boardTheme);
   store.dispatch(loadChessSettings(chessSettings));
-  store.dispatch(setAiDifficulty((Number(settings.game.aiDifficulty) + 1) * 3));
+  store.dispatch(setAiDifficulty(settings.gameplay.defaultMode === "ai" ? 12 : 9));
 }
 
-export function useSettings() {
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [originalSettings, setOriginalSettings] = useState(DEFAULT_SETTINGS);
-  const [changes, setChanges] = useState({});
-  const [loading, setLoading] = useState(true);
+export function useSettings(currentUser) {
+  const [settings, setSettings] = useState(() => mergeSettings());
+  const [originalSettings, setOriginalSettings] = useState(() => mergeSettings());
+  const [loading, setLoading] = useState(Boolean(currentUser && !currentUser.isGuest));
+  const [error, setError] = useState("");
+
+  const hasChanges = useMemo(
+    () => JSON.stringify(settings) !== JSON.stringify(originalSettings),
+    [settings, originalSettings],
+  );
 
   const loadSettings = useCallback(async () => {
-    try {
-      // Load from localStorage first
-      const stored = localStorage.getItem("userSettings");
-      const localSettings = stored ? mergeSettings(JSON.parse(stored)) : mergeSettings();
-      setSettings(localSettings);
-      setOriginalSettings(localSettings);
+    const stored = localStorage.getItem("userSettings");
+    const localSettings = stored ? mergeSettings(JSON.parse(stored)) : mergeSettings();
+    const userSettings = mergeSettings({
+      ...localSettings,
+      profile: {
+        ...localSettings.profile,
+        username: currentUser?.username || localSettings.profile.username || "",
+        email: currentUser?.email || localSettings.profile.email || "",
+        avatar: currentUser?.avatar || localSettings.profile.avatar || null,
+      },
+      premium: {
+        ...localSettings.premium,
+        isSupporter: Boolean(currentUser?.isSupporter),
+        adsDisabled: Boolean(currentUser?.adsDisabled),
+        supporterStatus: currentUser?.isSupporter ? "supporter" : localSettings.premium.supporterStatus,
+      },
+    });
 
-      const response = await fetch(`${API_BASE}/settings/me`, {
-        credentials: "include",
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const updatedSettings = mergeSettings(data.settings || localSettings);
-        setSettings(updatedSettings);
-        setOriginalSettings(updatedSettings);
+    setSettings(userSettings);
+    setOriginalSettings(userSettings);
+    setError("");
+
+    if (!currentUser || currentUser.isGuest) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const data = await apiClient("/api/settings/me", { skipAuthRefresh: true });
+      const merged = mapApiResponse(data, userSettings);
+      setSettings(merged);
+      setOriginalSettings(merged);
+      localStorage.setItem("userSettings", JSON.stringify(merged));
+    } catch (apiError) {
+      if (apiError.status === 401) {
+        setError("Session expired. Please sign in again.");
+      } else if (apiError.status === 403) {
+        setError("You do not have permission to update these settings.");
+      } else {
+        setError("Unable to reach server. Please try again.");
       }
-    } catch {
-      // Keep local settings when the authenticated settings API is unavailable.
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUser]);
 
-  // Load settings from localStorage and API
   useEffect(() => {
     loadSettings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadSettings]);
 
-  // Deep compare function to detect changes
-  const hasChangesInSection = useCallback((section, current, original) => {
-    for (const key in current[section]) {
-      if (current[section][key] !== original[section][key]) {
-        return true;
-      }
-    }
-    return false;
-  }, []);
-
-  // Update changes tracker
-  useEffect(() => {
-    const newChanges = {};
-    Object.keys(settings).forEach((section) => {
-      if (hasChangesInSection(section, settings, originalSettings)) {
-        newChanges[section] = true;
-      }
-    });
-    setChanges(newChanges);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings, originalSettings]);
-
-  // Update methods for each section
-  const updateAccount = useCallback((key, value) => {
+  const updateSection = useCallback((section, key, value) => {
     setSettings((prev) => ({
       ...prev,
-      account: { ...prev.account, [key]: value },
+      [section]: { ...prev[section], [key]: value },
     }));
   }, []);
 
-  const updateAppearance = useCallback((key, value) => {
-    setSettings((prev) => ({
-      ...prev,
-      appearance: { ...prev.appearance, [key]: value },
-    }));
-
-    if (["theme", "fontFamily", "fontSize", "language", "accentColor", "textColor"].includes(key)) {
-      window.dispatchEvent(
-        new CustomEvent("appearanceSettingsChanged", {
-          detail: { [key]: value },
-        }),
-      );
-    }
-  }, []);
-
-  const updateGame = useCallback((key, value) => {
-    setSettings((prev) => ({
-      ...prev,
-      game: { ...prev.game, [key]: value },
-    }));
-  }, []);
-
-  const updateNotifications = useCallback((key, value) => {
-    setSettings((prev) => ({
-      ...prev,
-      notifications: { ...prev.notifications, [key]: value },
-    }));
-  }, []);
-
-  const updatePrivacy = useCallback((key, value) => {
-    setSettings((prev) => ({
-      ...prev,
-      privacy: { ...prev.privacy, [key]: value },
-    }));
-  }, []);
-
-  // Save settings to API and localStorage
   const saveSettings = useCallback(async () => {
-      const response = await fetch(`${API_BASE}/settings/me`, {
+    const nextSettings = mergeSettings(settings);
+    localStorage.setItem("userSettings", JSON.stringify(nextSettings));
+    syncLocalGamePreferences(nextSettings);
+    window.dispatchEvent(new CustomEvent("appearanceSettingsChanged", { detail: nextSettings.appearance }));
+
+    if (currentUser && !currentUser.isGuest) {
+      const data = await apiClient("/api/settings/me", {
         method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-        // production smoke check: privacy: settings.privacy
-      });
-
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload.message || "Unable to update settings.");
-      }
-
-      if (payload.user) {
-        const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            ...storedUser,
-            id: payload.user.id || storedUser.id,
-            username: payload.user.username,
-            email: payload.user.email,
-            avatar: payload.user.avatar,
-            isSupporter: payload.user.isSupporter,
-            adsDisabled: payload.user.adsDisabled,
-          }),
-        );
-      }
-
-      // Save all settings to localStorage
-      localStorage.setItem("userSettings", JSON.stringify(settings));
-      window.dispatchEvent(
-        new CustomEvent("appearanceSettingsChanged", {
-          detail: settings.appearance,
+        body: JSON.stringify({
+          profile: nextSettings.profile,
+          settings: {
+            privacy: settings.privacy,
+            // nextSettings keeps local normalization before the request is sent.
+            normalizedPrivacy: nextSettings.privacy,
+            notifications: nextSettings.notifications,
+            appearance: nextSettings.appearance,
+            gameplay: nextSettings.gameplay,
+          },
         }),
-      );
-      syncChessSettings(settings);
-
-      // Update original settings to reflect saved state
-      setOriginalSettings({ ...settings });
-
-      return true;
-  }, [settings]);
-
-  // Reset settings to original
-  const resetSettings = useCallback(() => {
-    setSettings({ ...originalSettings });
-    window.dispatchEvent(
-      new CustomEvent("appearanceSettingsChanged", {
-        detail: originalSettings.appearance,
-      }),
-    );
-  }, [originalSettings]);
-
-  // Get specific setting value
-  const getSetting = useCallback(
-    (section, key) => {
-      return settings[section]?.[key];
-    },
-    [settings],
-  );
-
-  // Generic update method
-  const updateSetting = useCallback(
-    async (section, key, value) => {
-      setSettings((prev) => ({
-        ...prev,
-        [section]: { ...prev[section], [key]: value },
+      });
+      const merged = mapApiResponse(data, nextSettings);
+      setSettings(merged);
+      setOriginalSettings(merged);
+      localStorage.setItem("userSettings", JSON.stringify(merged));
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      localStorage.setItem("user", JSON.stringify({
+        ...storedUser,
+        username: merged.profile.username,
+        email: merged.profile.email,
+        avatar: merged.profile.avatar,
+        isSupporter: merged.premium.isSupporter,
+        adsDisabled: merged.premium.adsDisabled,
       }));
+      return merged;
+    }
 
-      // Auto-save certain settings immediately
-      if (section === "appearance" && key === "theme") {
-        try {
-          const updatedSettings = {
-            ...settings,
-            [section]: { ...settings[section], [key]: value },
-          };
-          localStorage.setItem("userSettings", JSON.stringify(updatedSettings));
-        } catch {
-          // localStorage can fail in private mode; ignore auto-save failures.
-        }
-      }
-    },
-    [settings],
-  );
+    setOriginalSettings(nextSettings);
+    return nextSettings;
+  }, [currentUser, settings]);
+
+  const resetSettings = useCallback(() => {
+    setSettings(deepClone(originalSettings));
+  }, [originalSettings]);
 
   return {
     settings,
-    changes,
     loading,
-    updateAccount,
-    updateAppearance,
-    updateGame,
-    updateNotifications,
-    updatePrivacy,
-    updateSetting,
+    error,
+    hasChanges,
+    loadSettings,
     saveSettings,
     resetSettings,
-    getSetting,
+    updateProfile: (key, value) => updateSection("profile", key, value),
+    updatePrivacy: (key, value) => updateSection("privacy", key, value),
+    updateNotifications: (key, value) => updateSection("notifications", key, value),
+    updateAppearance: (key, value) => updateSection("appearance", key, value),
+    updateGameplay: (key, value) => updateSection("gameplay", key, value),
   };
 }
