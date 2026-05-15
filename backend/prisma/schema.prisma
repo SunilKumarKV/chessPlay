@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum GameStatus {
+  WAITING
+  ACTIVE
+  COMPLETED
+  ABANDONED
+}
+
+enum GameResult {
+  WHITE_WIN
+  BLACK_WIN
+  DRAW
+  ABANDONED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  MANUAL
+  PAYPAL
+  STRIPE
+  UPI
+  BANK
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum ReferralStatus {
+  PENDING
+  QUALIFIED
+  REWARDED
+  EXPIRED
+}
+
+enum TournamentStatus {
+  DRAFT
+  OPEN
+  ACTIVE
+  COMPLETED
+  CANCELED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  mongoUserId  String?  @unique
+  email        String   @unique
+  username     String   @unique
+  displayName  String?
+  passwordHash String?
+  role         UserRole @default(USER)
+  rating       Int      @default(1200)
+  isPremium    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  gamesAsWhite  Game[]         @relation("WhitePlayer")
+  gamesAsBlack  Game[]         @relation("BlackPlayer")
+  payments      Payment[]
+  subscriptions Subscription[]
+  referralsMade Referral[]     @relation("Referrer")
+  referralsUsed Referral[]     @relation("ReferredUser")
+  tournaments   Tournament[]   @relation("TournamentCreator")
+
+  @@index([email])
+  @@index([username])
+}
+
+model Game {
+  id            String      @id @default(cuid())
+  mongoGameId   String?     @unique
+  whitePlayerId String?
+  blackPlayerId String?
+  whitePlayer   User?       @relation("WhitePlayer", fields: [whitePlayerId], references: [id], onDelete: SetNull)
+  blackPlayer   User?       @relation("BlackPlayer", fields: [blackPlayerId], references: [id], onDelete: SetNull)
+  status        GameStatus  @default(WAITING)
+  result        GameResult?
+  pgn           String?
+  fen           String?
+  moves         Json?
+  timeControl   String?
+  startedAt     DateTime?
+  endedAt       DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([whitePlayerId])
+  @@index([blackPlayerId])
+  @@index([status])
+}
+
+model PremiumPlan {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  priceCents  Int
+  currency    String   @default("USD")
+  interval    String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  payments      Payment[]
+  subscriptions Subscription[]
+}
+
+model Payment {
+  id                String          @id @default(cuid())
+  mongoPaymentId    String?         @unique
+  userId            String
+  planId            String?
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan              PremiumPlan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
+  provider          PaymentProvider @default(MANUAL)
+  status            PaymentStatus   @default(PENDING)
+  amountCents       Int
+  currency          String          @default("USD")
+  providerReference String?
+  metadata          Json?
+  submittedAt       DateTime?
+  approvedAt        DateTime?
+  rejectedAt        DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@index([provider])
+}
+
+model Subscription {
+  id                  String             @id @default(cuid())
+  mongoSubscriptionId String?            @unique
+  userId              String
+  planId              String
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                PremiumPlan        @relation(fields: [planId], references: [id], onDelete: Restrict)
+  status              SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart  DateTime?
+  currentPeriodEnd    DateTime?
+  canceledAt          DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+}
+
+model Referral {
+  id              String         @id @default(cuid())
+  mongoReferralId String?        @unique
+  code            String         @unique
+  referrerId      String
+  referredUserId  String?
+  referrer        User           @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUser    User?          @relation("ReferredUser", fields: [referredUserId], references: [id], onDelete: SetNull)
+  status          ReferralStatus @default(PENDING)
+  rewardGranted   Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  qualifiedAt     DateTime?
+  rewardedAt      DateTime?
+
+  @@index([referrerId])
+  @@index([referredUserId])
+  @@index([status])
+}
+
+model Tournament {
+  id                String           @id @default(cuid())
+  mongoTournamentId String?          @unique
+  name              String
+  description       String?
+  creatorId         String?
+  creator           User?            @relation("TournamentCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  status            TournamentStatus @default(DRAFT)
+  startsAt          DateTime?
+  endsAt            DateTime?
+  rules             Json?
+  maxPlayers        Int?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([creatorId])
+  @@index([status])
+  @@index([startsAt])
+}
