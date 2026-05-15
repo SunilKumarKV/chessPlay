@@ -2,9 +2,42 @@
 
 **ChessPlay** is a production-focused SaaS chess platform built with React, Vite, Node.js, Express, Socket.IO, MongoDB, and Stockfish.
 
-Current release: **v1.3.0-beta**
+Current release: **v1.4.0-beta.1**
 
 ChessPlay supports AI chess, real-time multiplayer, online matchmaking, same-WiFi style room play, game review, analysis, premium plans, supporter payments, ads logic, referrals, tournaments, community features, private/public messaging, profile customization, multilingual UI, and direct backend Telegram/email alerts.
+
+
+---
+
+## Release v1.4.0-beta.1
+
+This release is a final beta release-preparation update. It is focused on production validation, CI readiness, release documentation, and safe public showcase/docs preparation.
+
+### Final Release Commands
+
+```bash
+pnpm install
+pnpm --filter chessplay-backend exec prisma generate
+pnpm build
+pnpm lint
+pnpm test
+```
+
+### Release Safety
+
+Before making anything public, confirm:
+
+- No `.env` files are committed.
+- Public showcase/docs repos do not include backend source code.
+- Public showcase/docs repos do not include auth, admin, payment, referral, database, or socket internals.
+- GitHub Secrets and hosting dashboard secrets are used for production values.
+- The release tag is created only after local checks, CI, and deployed smoke tests pass.
+
+### Public Repository Strategy
+
+- `chessplay-enterprise`: private full production source code.
+- `chessplay-showcase`: public screenshots, feature summary, tech stack, and live demo link only.
+- `chessplay-docs`: public roadmap, changelog, setup guide, architecture overview, and release notes without exposing internals.
 
 ---
 
