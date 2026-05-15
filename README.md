@@ -380,3 +380,76 @@ Read these before deployment:
 ## License
 
 Private/portfolio production project unless you choose to open-source it.
+
+
+---
+
+## CI/CD
+
+This project uses GitHub Actions for production-safe validation.
+
+### Workflow
+
+The CI workflow is located at:
+
+```txt
+.github/workflows/ci.yml
+```
+
+It runs on:
+
+- Pull requests
+- Pushes to `main`
+
+CI checks:
+
+- `pnpm install --frozen-lockfile`
+- Backend Prisma client generation
+- Frontend lint when a lint script exists
+- Backend lint when a lint script exists
+- Backend build
+- Frontend build
+
+### Required GitHub Secrets
+
+Add these in GitHub:
+
+```txt
+Settings → Secrets and variables → Actions → New repository secret
+```
+
+Required secrets:
+
+```txt
+DATABASE_URL
+JWT_ACCESS_SECRET
+JWT_REFRESH_SECRET
+MONGO_URI
+REDIS_URL
+VITE_API_URL
+VITE_SOCKET_URL
+```
+
+Do not hardcode secrets in source code. Keep real production values only in GitHub Secrets and hosting provider environment settings.
+
+### Local CI Test Commands
+
+Run these before opening or merging a pull request:
+
+```bash
+pnpm install
+pnpm --filter chessplay-backend exec prisma generate
+pnpm -C backend build
+pnpm -C frontend build
+```
+
+Optional when lint scripts exist:
+
+```bash
+pnpm -C frontend lint
+pnpm -C backend lint
+```
+
+### Deployment
+
+Automatic deployment is not enabled in Phase 9. Deploy from your hosting providers only after CI passes and the release checklist is complete.

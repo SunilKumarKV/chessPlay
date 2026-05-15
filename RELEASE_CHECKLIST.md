@@ -1,61 +1,71 @@
-# Phase 8 Release Checklist
+# ChessPlay Release Checklist
 
-## Branch safety
+Use this checklist before merging or deploying production changes.
 
-- [ ] Work is committed on a testing branch, not directly on `main`.
-- [ ] `git status` is clean before deployment.
-- [ ] Pull request is created from testing branch to `main` only after checks pass.
+## Branch Safety
 
-## Install/build checks
+- [ ] Work is committed on a feature/testing branch, not directly on `main`.
+- [ ] Pull request is opened into `main`.
+- [ ] CI passes on the pull request.
+- [ ] No app logic, UI redesign, API response format, MongoDB/Mongoose removal, or socket event changes were introduced in Phase 9.
 
-- [ ] `pnpm install` passes.
-- [ ] `pnpm run test:production` passes.
-- [ ] `pnpm build` passes.
-- [ ] `pnpm --filter backend test` passes.
-- [ ] `pnpm --filter backend exec prisma generate` passes.
+## Environment and Secrets
 
-## Environment checks
+- [ ] `.env` files are not committed.
+- [ ] `.env.example`, `backend/.env.example`, and `frontend/.env.example` contain placeholders only.
+- [ ] GitHub Secrets are configured for CI/CD.
+- [ ] Production secrets are configured only in hosting provider dashboards.
+- [ ] No hardcoded database URLs, JWT secrets, Redis URLs, SMTP passwords, payment keys, or API tokens exist in source code.
 
-- [ ] No real `.env` files are committed.
-- [ ] `backend/.env.example` contains all required backend placeholders.
-- [ ] `frontend/.env.example` contains all required frontend placeholders.
-- [ ] Production JWT secrets are strong and different.
-- [ ] Production MongoDB URL is configured only in hosting provider env settings.
-- [ ] Production database/payment/email keys are configured only in hosting provider env settings.
+## Required GitHub Secrets
 
-## Backend checks
+- [ ] `DATABASE_URL`
+- [ ] `JWT_ACCESS_SECRET`
+- [ ] `JWT_REFRESH_SECRET`
+- [ ] `MONGO_URI`
+- [ ] `REDIS_URL`
+- [ ] `VITE_API_URL`
+- [ ] `VITE_SOCKET_URL`
 
-- [ ] Health route works.
-- [ ] MongoDB connection works.
-- [ ] Prisma generate works.
-- [ ] Auth routes do not return unexpected 500 errors.
-- [ ] Profile routes do not return unexpected 500 errors.
-- [ ] Game history routes do not return unexpected 500 errors.
-- [ ] Premium/referral routes do not return unexpected 500 errors.
-- [ ] Socket server accepts frontend connection.
+## Build and Test
 
-## Frontend checks
-
-- [ ] Home page works.
-- [ ] Login/register works.
-- [ ] Dashboard works.
-- [ ] Profile works.
-- [ ] Play vs AI works.
-- [ ] Multiplayer room works.
-- [ ] Leaderboard works.
-- [ ] Premium page works.
-- [ ] Referral page works.
-- [ ] Settings page works.
-- [ ] Mobile responsive checks pass.
-
-## Security checks
-
-Run before pushing:
+Run locally before merge:
 
 ```bash
-git grep -n "MONGODB_URI\|DATABASE_URL\|JWT_SECRET\|JWT_ACCESS_SECRET\|JWT_REFRESH_SECRET\|SMTP_PASS\|TELEGRAM_BOT_TOKEN\|STRIPE\|PAYPAL\|CLOUDINARY_API_SECRET\|PAYMENT_SIGNING_SECRET" -- ':!*.env.example' ':!TESTING.md' ':!RELEASE_CHECKLIST.md'
+pnpm install
+pnpm --filter chessplay-backend exec prisma generate
+pnpm -C backend build
+pnpm -C frontend build
+pnpm dev
 ```
 
-- [ ] No secrets are found in committed files.
-- [ ] Admin/payment/database internals stay private.
-- [ ] Public showcase repo does not receive enterprise backend code.
+Manual checks:
+
+- [ ] Home page
+- [ ] Login/register
+- [ ] Dashboard
+- [ ] Profile
+- [ ] Play vs AI
+- [ ] Multiplayer room
+- [ ] Leaderboard
+- [ ] Premium page
+- [ ] Referral page
+- [ ] Settings page
+- [ ] Mobile responsiveness
+- [ ] Backend health route
+- [ ] Auth routes
+- [ ] Profile routes
+- [ ] Game history routes
+- [ ] Premium/referral routes
+- [ ] Socket connection
+- [ ] Prisma generation
+- [ ] MongoDB connection
+
+## Deployment
+
+- [ ] Deploy backend first.
+- [ ] Verify health route after backend deployment.
+- [ ] Deploy frontend after backend verification.
+- [ ] Confirm frontend environment variables point to production backend/socket URLs.
+- [ ] Test authentication and multiplayer after deployment.
+- [ ] Create release tag only after smoke testing passes.

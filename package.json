@@ -13,11 +13,7 @@
     "test:production": "node TEST_PRODUCTION_SMOKE.js && node TEST_STOCKFISH.js",
     "preview": "pnpm -C frontend preview",
     "install:all": "pnpm install",
-    "start": "pnpm dev:multi",
-    "prisma:generate": "pnpm --filter backend exec prisma generate",
-    "build:backend": "pnpm --filter backend build",
-    "build:frontend": "pnpm --filter frontend build",
-    "phase8:check": "pnpm install && pnpm run test:production && pnpm build && pnpm --filter backend test && pnpm --filter backend exec prisma generate"
+    "start": "pnpm dev:multi"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

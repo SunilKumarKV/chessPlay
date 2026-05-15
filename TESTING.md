@@ -1,130 +1,69 @@
-# Phase 8 Production Testing
+# ChessPlay Production Testing
 
-Phase 8 is for production testing and bug fixing only. Do not add features, redesign UI, change API response formats, remove MongoDB/Mongoose, or rename socket events during this phase.
+This document tracks Phase 8 and Phase 9 production validation. It does not introduce new features or change app behavior.
 
-## 1. Install
+## Local Commands
+
+Run these from the project root:
 
 ```bash
 pnpm install
-```
-
-If registry downloads are slow, retry with a stable network:
-
-```bash
-pnpm install --network-concurrency=3
-```
-
-## 2. Required environment files
-
-Create local env files from examples:
-
-```bash
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-```
-
-For local testing, update at minimum:
-
-```env
-# backend/.env
-MONGODB_URI=mongodb://127.0.0.1:27017/chessplay
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/chessplay?schema=public
-JWT_ACCESS_SECRET=replace-with-local-32-plus-character-secret
-JWT_REFRESH_SECRET=replace-with-local-different-32-plus-character-secret
-FRONTEND_ORIGINS=http://localhost:5173
-```
-
-```env
-# frontend/.env
-VITE_BACKEND_URL=http://localhost:3001
-VITE_SOCKET_URL=http://localhost:3001
-```
-
-## 3. Automated checks
-
-```bash
-pnpm run test:production
-pnpm build
-pnpm --filter backend test
-pnpm --filter backend exec prisma generate
-```
-
-Optional combined Phase 8 check:
-
-```bash
-pnpm run phase8:check
-```
-
-## 4. Run locally
-
-Frontend only:
-
-```bash
+pnpm --filter chessplay-backend exec prisma generate
+pnpm -C backend build
+pnpm -C frontend build
 pnpm dev
 ```
 
-Frontend + backend:
+Optional checks when scripts exist:
 
 ```bash
-pnpm dev:multi
+pnpm -C frontend lint
+pnpm -C backend lint
+pnpm test
 ```
 
-Backend only:
-
-```bash
-pnpm server
-```
-
-## 5. Frontend manual checklist
+## Frontend Manual Testing Checklist
 
 - [ ] Home page loads without console runtime crashes.
-- [ ] Login page renders.
-- [ ] Register page renders.
-- [ ] Dashboard page renders after login.
-- [ ] Profile page loads current user/profile fallback states correctly.
-- [ ] Play vs AI loads board and Stockfish worker does not crash.
-- [ ] Multiplayer room connects to socket server.
-- [ ] Leaderboard page loads and handles empty/error states.
-- [ ] Premium page loads plan data or fallback plans.
-- [ ] Referral page loads current referral state or fallback state.
-- [ ] Settings page saves UI preferences without crashing.
-- [ ] Mobile layout works at 375px, 768px, and desktop widths.
+- [ ] Login page renders correctly.
+- [ ] Register page renders correctly.
+- [ ] Dashboard loads after authentication.
+- [ ] Profile page loads and handles missing/partial user data safely.
+- [ ] Play vs AI page loads and Stockfish worker initializes or fails gracefully.
+- [ ] Multiplayer room page can create/join a room.
+- [ ] Socket connection opens without changing event names.
+- [ ] Leaderboard page loads empty/loading/error states correctly.
+- [ ] Premium page loads without payment secret exposure.
+- [ ] Referral page loads without runtime crash.
+- [ ] Settings page loads and saves only existing settings behavior.
+- [ ] Mobile layout works at 360px, 768px, and desktop widths.
 
-## 6. Backend manual checklist
+## Backend Manual Testing Checklist
 
-Use the backend base URL:
+- [ ] Health route responds successfully.
+- [ ] Auth routes work with existing request/response formats.
+- [ ] Profile routes work with existing request/response formats.
+- [ ] Game history routes work with existing request/response formats.
+- [ ] Premium/referral routes work with existing request/response formats.
+- [ ] Socket connection works with existing event names.
+- [ ] Prisma generate completes.
+- [ ] MongoDB/Mongoose connection succeeds.
+- [ ] Missing optional env variables fail gracefully where supported.
 
-```txt
-http://localhost:3001
-```
+## CI/CD Validation
 
-Check:
+GitHub Actions runs on:
 
-- [ ] Health route returns success.
-- [ ] Auth register/login/logout routes respond without 500 errors.
-- [ ] Profile routes respond with authenticated requests.
-- [ ] Game history routes respond with authenticated requests.
-- [ ] Premium/referral routes respond without changing response format.
-- [ ] Socket connection succeeds from frontend.
-- [ ] Prisma generate succeeds.
-- [ ] MongoDB connection succeeds.
+- Pull requests
+- Pushes to `main`
 
-## 7. Bug-fix scope
+CI validates:
 
-Allowed in Phase 8:
+- pnpm install
+- Backend Prisma client generation
+- Frontend lint when script exists
+- Backend lint when script exists
+- Backend build
+- Frontend build
 
-- Build errors
-- Broken imports
-- Missing env variables
-- Broken routes
-- Prisma command issues
-- TypeScript compile errors
-- Obvious runtime crashes
-
-Not allowed in Phase 8:
-
-- New features
-- UI redesign
-- API response format changes
-- MongoDB/Mongoose removal
-- Socket event name changes
+Deployment is intentionally not automated in Phase 9 to avoid unsafe production pushes before secrets and hosting environments are verified.
