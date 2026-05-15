@@ -8,6 +8,7 @@ const {
   clearSessionCookies,
   getCookie: getSecureCookie,
   getJwtSecret,
+  getRequestAccessToken,
   hashToken,
   issueSession: issueSecureSession,
   randomToken,
@@ -346,7 +347,7 @@ router.post("/logout", (req, res) => {
 // Current session without noisy 401s for first page load
 router.get("/session", async (req, res) => {
   try {
-    const token = getCookie(req, "accessToken") || getCookie(req, "authToken");
+    const token = getRequestAccessToken(req);
     if (!token) {
       return res.json({ user: null });
     }
@@ -358,7 +359,7 @@ router.get("/session", async (req, res) => {
       return res.json({ user: null });
     }
 
-    res.json({ user });
+    res.json({ user: authUserPayload(user) });
   } catch {
     clearSessionCookies(res);
     res.json({ user: null });

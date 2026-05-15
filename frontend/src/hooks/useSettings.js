@@ -6,9 +6,7 @@ import {
   BOARD_THEME_STORAGE_KEY,
   normalizeBoardThemeId,
 } from "../features/chess/constants/boardThemes";
-import { BACKEND_URL } from "../config/runtime";
-
-const API_BASE = `${BACKEND_URL}/api`;
+import { apiClient } from "../services/apiClient";
 
 // Default settings
 const DEFAULT_SETTINGS = {
@@ -43,31 +41,21 @@ const DEFAULT_SETTINGS = {
     premove: true,
     autoQueen: true,
     alwaysPromoteToQueen: false,
-    defaultMode: "ai",
     boardOrientation: "white",
-    moveConfirmation: false,
-    soundEffects: true,
-    animation: "normal",
   },
   notifications: {
     gameInvites: true,
     moveNotifications: true,
     gameResults: true,
     friendRequests: true,
-    messages: true,
     tournamentUpdates: true,
-    tournaments: true,
-    community: true,
-    supporter: true,
     achievementAlerts: true,
   },
   privacy: {
     profileVisibility: true,
     gameHistory: true,
-    gameHistoryVisibility: "public",
     onlineStatus: true,
     friendRequests: true,
-    friendRequestPolicy: "everyone",
     spectatorMode: false,
   },
 };
@@ -150,17 +138,37 @@ export function useSettings() {
       setSettings(localSettings);
       setOriginalSettings(localSettings);
 
-      const response = await fetch(`${API_BASE}/settings/me`, {
-        credentials: "include",
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const updatedSettings = mergeSettings(data.settings || localSettings);
+      // Try to load from API (user profile data)
+      try {
+        const data = await apiClient("/api/auth/profile");
+        const userData = data.user;
+
+        // Merge user data with settings
+        const updatedSettings = {
+          ...localSettings,
+          account: {
+            ...localSettings.account,
+            username: userData.username || "",
+            email: userData.email || "",
+            bio: userData.bio || "",
+            avatar: userData.avatar || null,
+            country: userData.country || "US",
+          },
+          privacy: {
+            ...localSettings.privacy,
+            ...(userData.privacy || {}),
+          },
+        };
+
         setSettings(updatedSettings);
         setOriginalSettings(updatedSettings);
+      } catch (error) {
+        if (error.status !== 401) {
+          throw error;
+        }
       }
-    } catch {
-      // Keep local settings when the authenticated settings API is unavailable.
+    } catch (error) {
+      console.error("Failed to load settings:", error);
     } finally {
       setLoading(false);
     }
@@ -240,31 +248,36 @@ export function useSettings() {
 
   // Save settings to API and localStorage
   const saveSettings = useCallback(async () => {
-      const response = await fetch(`${API_BASE}/settings/me`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-        // production smoke check: privacy: settings.privacy
-      });
+    try {
+      // Save to API for account data and server-enforced privacy.
+      if (
+        (Object.keys(changes).includes("account") ||
+          Object.keys(changes).includes("privacy"))
+      ) {
+        const accountData = {
+          username: settings.account.username,
+          email: settings.account.email,
+          bio: settings.account.bio,
+          avatar: settings.account.avatar,
+          country: settings.account.country,
+          privacy: settings.privacy,
+        };
 
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload.message || "Unable to update settings.");
-      }
+        const userResponse = await apiClient("/api/auth/profile", {
+          method: "PUT",
+          body: JSON.stringify(accountData),
+        });
 
-      if (payload.user) {
+        // Update stored user data
         const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
         localStorage.setItem(
           "user",
           JSON.stringify({
             ...storedUser,
-            id: payload.user.id || storedUser.id,
-            username: payload.user.username,
-            email: payload.user.email,
-            avatar: payload.user.avatar,
-            isSupporter: payload.user.isSupporter,
-            adsDisabled: payload.user.adsDisabled,
+            id: userResponse.user._id || storedUser.id,
+            username: userResponse.user.username,
+            email: userResponse.user.email,
+            avatar: userResponse.user.avatar,
           }),
         );
       }
@@ -282,7 +295,11 @@ export function useSettings() {
       setOriginalSettings({ ...settings });
 
       return true;
-  }, [settings]);
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+      throw error;
+    }
+  }, [settings, changes]);
 
   // Reset settings to original
   const resetSettings = useCallback(() => {
@@ -318,8 +335,8 @@ export function useSettings() {
             [section]: { ...settings[section], [key]: value },
           };
           localStorage.setItem("userSettings", JSON.stringify(updatedSettings));
-        } catch {
-          // localStorage can fail in private mode; ignore auto-save failures.
+        } catch (error) {
+          console.error("Failed to auto-save theme setting:", error);
         }
       }
     },

@@ -61,8 +61,14 @@ export default function Dashboard({
   ];
 
   const fetchDashboardData = useCallback(async () => {
-    if (!user) {
-      setLoading(false);
+    if (!user || user.isGuest || !user.email) {
+      if (!user) setLoading(false);
+      if (user?.isGuest) {
+        setStats(user);
+        setRecentGames([]);
+        setLeaderboard([]);
+        setLoading(false);
+      }
       return;
     }
 
@@ -83,9 +89,7 @@ export default function Dashboard({
       );
       setRecentGames(gamesData.games || []);
 
-      const leaderboardData = await fetchWithAuth(
-        "/api/auth/leaderboard?limit=5",
-      );
+      const leaderboardData = await apiClient("/api/games/leaderboard?limit=5");
       const leaderboardItems = Array.isArray(leaderboardData)
         ? leaderboardData
         : leaderboardData.leaderboard || [];

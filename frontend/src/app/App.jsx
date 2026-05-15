@@ -33,9 +33,19 @@ import MessagesPage from "../pages/MessagesPage";
 import AutomationPage from "../pages/AutomationPage";
 
 function pageFromPathname(pathname) {
+  if (pathname === "/forgot-password") return "forgot-password";
   if (pathname === "/reset-password") return "reset-password";
   if (pathname === "/verify-email") return "verify-email";
   return "dashboard";
+}
+
+function navigateToAppPage(page, setCurrentPage) {
+  if (["forgot-password", "reset-password", "verify-email"].includes(page)) {
+    window.history.pushState({}, "", `/${page}`);
+  } else if (window.location.pathname !== "/") {
+    window.history.pushState({}, "", "/");
+  }
+  setCurrentPage(page);
 }
 
 export default function App() {
@@ -59,6 +69,8 @@ export default function App() {
   );
 
   useEffect(() => {
+    const syncPageFromUrl = () => setCurrentPage(pageFromPathname(window.location.pathname));
+    window.addEventListener("popstate", syncPageFromUrl);
     let cancelled = false;
 
     const fallbackTimer = window.setTimeout(() => {
@@ -99,12 +111,14 @@ export default function App() {
     restoreSession();
     return () => {
       cancelled = true;
+      window.removeEventListener("popstate", syncPageFromUrl);
       window.clearTimeout(fallbackTimer);
     };
   }, []);
 
   const handleLogin = (userData) => {
     localStorage.removeItem("guestMode");
+    window.history.replaceState({}, "", "/");
     setUser(userData);
     notifyUserChanged();
   };
@@ -132,6 +146,8 @@ export default function App() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("guestMode");
+    sessionStorage.removeItem("chessplay_access_token");
+    sessionStorage.removeItem("chessplay_socket_token");
     setUser(null);
     setCurrentPage("dashboard");
     notifyUserChanged();
@@ -141,10 +157,18 @@ export default function App() {
     return <AppSplash />;
   }
 
+  if (currentPage === "forgot-password") {
+    return (
+      <ErrorBoundary>
+        <ForgotPasswordPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+      </ErrorBoundary>
+    );
+  }
+
   if (currentPage === "reset-password") {
     return (
       <ErrorBoundary>
-        <ResetPasswordPage onBack={() => setCurrentPage("dashboard")} />
+        <ResetPasswordPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
       </ErrorBoundary>
     );
   }
@@ -152,7 +176,7 @@ export default function App() {
   if (currentPage === "verify-email") {
     return (
       <ErrorBoundary>
-        <VerifyEmailPage onBack={() => setCurrentPage("dashboard")} />
+        <VerifyEmailPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
       </ErrorBoundary>
     );
   }
@@ -184,7 +208,7 @@ export default function App() {
           <Dashboard
             user={user}
             onStartGame={handleStartGame}
-            onNavigate={setCurrentPage}
+            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
             onAuthError={handleLogout}
           />
         );
@@ -194,7 +218,7 @@ export default function App() {
         return (
           <Chess
             onBack={() => setCurrentPage("dashboard")}
-            onNavigate={setCurrentPage}
+            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
             initialAiEnabled
             timeControl={selectedTimeControl}
           />
@@ -208,7 +232,7 @@ export default function App() {
         return (
           <Chess
             onBack={() => setCurrentPage("dashboard")}
-            onNavigate={setCurrentPage}
+            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
             initialAiEnabled={false}
             timeControl={selectedTimeControl}
             title="Play vs Player"
@@ -242,7 +266,7 @@ export default function App() {
         return (
           <PricingPage
             onBack={() => setCurrentPage("dashboard")}
-            onNavigate={setCurrentPage}
+            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
           />
         );
       case "billing":
@@ -250,7 +274,7 @@ export default function App() {
           <BillingPage
             user={user}
             onBack={() => setCurrentPage("dashboard")}
-            onNavigate={setCurrentPage}
+            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
           />
         );
       case "admin-supporters":
@@ -292,10 +316,10 @@ export default function App() {
           <div className="p-8">
             <div className="bg-[#1a1a1a] rounded-lg p-8 border border-[#2a2a2a] text-center">
               <h2 className="text-2xl font-bold text-[#e0e0e0] mb-4 font-['Montserrat']">
-                Coming Soon
+                Feature unavailable
               </h2>
               <p className="text-[#7a7a7a] font-['Inter']">
-                This feature is under development.
+                This page is not available for your current account or deployment configuration.
               </p>
             </div>
           </div>
@@ -307,7 +331,7 @@ export default function App() {
     <ErrorBoundary>
       <DashboardLayout
         activePage={authTimedOut ? "offline" : currentPage}
-        onNavigate={setCurrentPage}
+        onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
         onLogout={handleLogout}
       >
         {renderContent()}

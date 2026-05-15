@@ -59,7 +59,6 @@ const gameRoutes = require("./routes/games");
 const billingRoutes = require("./routes/billing");
 const socialRoutes = require("./routes/social");
 const automationRoutes = require("./routes/automation");
-const settingsRoutes = require("./routes/settings");
 const User = require("./models/User");
 const Game = require("./models/Game");
 const { updatePlayerStats } = require("./utils/elo");
@@ -283,7 +282,11 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        connectSrc: cspConnectSources,
+        connectSrc: [...cspConnectSources, "https://accounts.google.com", "https://oauth2.googleapis.com"],
+        scriptSrc: ["'self'", "https://accounts.google.com"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com"],
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
+        fontSrc: ["'self'", "data:"],
         workerSrc: ["'self'", "blob:"],
       },
     },
@@ -320,7 +323,6 @@ app.use("/api/games", gameRoutes);
 app.use("/api/billing", billingRoutes);
 app.use("/api/social", socialRoutes);
 app.use("/api/automation", automationRoutes);
-app.use("/api/settings", settingsRoutes);
 
 // Basic health check
 app.get("/health", (req, res) => {

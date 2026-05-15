@@ -3,22 +3,17 @@ import { useSettings } from "../hooks/useSettings";
 import { useTheme } from "../hooks/useTheme";
 import { notifyUserChanged } from "../hooks/useCurrentUser";
 import { BOARD_THEME_OPTIONS } from "../features/chess/constants/boardThemes";
-import { BACKEND_URL } from "../config/runtime";
+import { apiClient } from "../services/apiClient";
 import AvatarUploader from "../components/profile/AvatarUploader";
 import { LANGUAGES } from "../i18n/languages";
 import { useI18n } from "../i18n/useI18n";
 
-const API_BASE = `${BACKEND_URL}/api`;
-
 const SECTIONS = [
   { id: "account", label: "Account", hint: "Profile and sign-in" },
-  { id: "privacy", label: "Privacy", hint: "Visibility and requests" },
+  { id: "board", label: "Board", hint: "Pieces, colors, notation" },
+  { id: "play", label: "Play", hint: "Moves, timers, AI" },
   { id: "notifications", label: "Notifications", hint: "Alerts and updates" },
-  { id: "board", label: "Appearance", hint: "Theme, board, pieces" },
-  { id: "play", label: "Gameplay", hint: "Moves, timers, AI" },
-  { id: "premium", label: "Premium", hint: "Supporter status" },
-  { id: "security", label: "Security", hint: "Password and sessions" },
-  { id: "danger", label: "Danger Zone", hint: "Account actions" },
+  { id: "privacy", label: "Privacy", hint: "Visibility and requests" },
 ];
 
 
@@ -253,9 +248,9 @@ export default function Settings({ user, onBack }) {
             >
               Back to dashboard
             </button>
-            <h1 className="text-3xl font-black font-['Montserrat']">Settings</h1>
+            <h1 className="text-3xl font-black font-['Montserrat']">{t("settings")}</h1>
             <p className="text-sm mt-1" style={{ color: theme.text.secondary }}>
-              Manage your account, privacy, notifications, appearance, gameplay preferences, and supporter status.
+              Control your account, board, play preferences, alerts, and privacy.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -345,9 +340,6 @@ export default function Settings({ user, onBack }) {
                 theme={theme}
               />
             )}
-            {activeSection === "premium" && <PremiumSection user={user} theme={theme} />}
-            {activeSection === "security" && <SecuritySection theme={theme} />}
-            {activeSection === "danger" && <DangerZoneSection theme={theme} />}
           </main>
         </div>
       </div>
@@ -381,21 +373,13 @@ function AccountSection({ user, settings, updateAccount, updateAppearance, theme
 
     setPasswordSaving(true);
     try {
-      const response = await fetch(`${API_BASE}/auth/password`, {
+      await apiClient("/api/auth/password", {
         method: "PUT",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           currentPassword: passwordForm.currentPassword,
           newPassword: passwordForm.newPassword,
         }),
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to update password.");
-      }
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
       setStatus("Password updated.");
     } catch (error) {
@@ -472,7 +456,7 @@ function AccountSection({ user, settings, updateAccount, updateAppearance, theme
         />
       </Card>
 
-      <Card title="Password" description="Update your password for email sign-in. You can also manage security from the Security tab." theme={theme}>
+      <Card title="Security" description="Update your password for email sign-in." theme={theme}>
         <button
           type="button"
           onClick={() => setPasswordOpen((open) => !open)}
@@ -767,10 +751,7 @@ function NotificationsSection({ settings, updateNotifications, theme }) {
     ["moveNotifications", "Move reminders", "When it is your turn in a game."],
     ["gameResults", "Game results", "Win, loss, draw, and rating updates."],
     ["friendRequests", "Friend requests", "New requests and accepted requests."],
-    ["messages", "Messages", "New messages from ChessPlay friends."],
-    ["tournaments", "Tournament updates", "Tournament rounds, starts, and results."],
-    ["community", "Community replies", "Replies to feedback, bugs, and feature requests."],
-    ["supporter", "Supporter/payment updates", "Manual verification and supporter status changes."],
+    ["tournamentUpdates", "Tournament updates", "Tournament rounds, starts, and results."],
     ["achievementAlerts", "Achievements", "New badges and milestones."],
   ];
 
@@ -795,41 +776,15 @@ function NotificationsSection({ settings, updateNotifications, theme }) {
 function PrivacySection({ settings, updatePrivacy, theme }) {
   const rows = [
     ["profileVisibility", "Public profile", "Allow other players to view your profile."],
+    ["gameHistory", "Public game history", "Show your finished games to other players."],
     ["onlineStatus", "Online status", "Show when you are active."],
+    ["friendRequests", "Allow friend requests", "Let players send you connection requests."],
     ["spectatorMode", "Allow spectators", "Let players watch supported live games."],
   ];
 
   return (
     <Card title="Privacy" description="Control what other players can see and do." theme={theme}>
       <div className="space-y-3">
-        <SelectRow
-          label="Game history visibility"
-          value={settings.privacy.gameHistoryVisibility || (settings.privacy.gameHistory ? "public" : "private")}
-          options={[
-            { id: "public", label: "Public" },
-            { id: "friends", label: "Friends only" },
-            { id: "private", label: "Private" },
-          ]}
-          onChange={(value) => {
-            updatePrivacy("gameHistoryVisibility", value);
-            updatePrivacy("gameHistory", value !== "private");
-          }}
-          theme={theme}
-        />
-        <SelectRow
-          label="Friend requests"
-          value={settings.privacy.friendRequestPolicy || (settings.privacy.friendRequests ? "everyone" : "none")}
-          options={[
-            { id: "everyone", label: "Everyone" },
-            { id: "friends_of_friends", label: "Friends of friends" },
-            { id: "none", label: "No one" },
-          ]}
-          onChange={(value) => {
-            updatePrivacy("friendRequestPolicy", value);
-            updatePrivacy("friendRequests", value !== "none");
-          }}
-          theme={theme}
-        />
         {rows.map(([key, label, description]) => (
           <ToggleRow
             key={key}
@@ -840,81 +795,6 @@ function PrivacySection({ settings, updatePrivacy, theme }) {
             theme={theme}
           />
         ))}
-      </div>
-    </Card>
-  );
-}
-
-function PremiumSection({ user, theme }) {
-  const isSupporter = Boolean(user?.isSupporter || user?.adsDisabled || user?.entitlements?.noAds);
-  const planLabel = isSupporter ? "Supporter" : user?.planStatus === "pending" ? "Pending verification" : "Free";
-  return (
-    <div className="space-y-4">
-      <Card title="Supporter Status" description="Supporter access is manually verified by the admin and never changes gameplay fairness." theme={theme}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="rounded-lg p-4" style={{ backgroundColor: theme.bg.tertiary }}>
-            <div className="text-sm" style={{ color: theme.text.secondary }}>Current plan</div>
-            <div className="text-xl font-black mt-1">{planLabel}</div>
-          </div>
-          <div className="rounded-lg p-4" style={{ backgroundColor: theme.bg.tertiary }}>
-            <div className="text-sm" style={{ color: theme.text.secondary }}>Ads status</div>
-            <div className="text-xl font-black mt-1">{isSupporter ? "Ads disabled" : "Ads enabled"}</div>
-          </div>
-          <div className="rounded-lg p-4" style={{ backgroundColor: theme.bg.tertiary }}>
-            <div className="text-sm" style={{ color: theme.text.secondary }}>Badge</div>
-            <div className="text-xl font-black mt-1">{isSupporter ? "Supporter badge active" : "Not active"}</div>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-3 pt-2">
-          <a href="/premium" className="rounded-lg px-4 py-2 font-bold bg-[#81b64c] text-black">View Premium</a>
-          <a href="/billing" className="rounded-lg border px-4 py-2 font-bold" style={{ borderColor: theme.border.secondary }}>Billing history</a>
-          <a href="/support" className="rounded-lg border px-4 py-2 font-bold" style={{ borderColor: theme.border.secondary }}>Support ChessPlay</a>
-        </div>
-      </Card>
-      <Card title="Future supporter preferences" description="These are previews only and will be enabled after the feature is fully available." theme={theme}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          {["Neon board theme", "Wood board theme", "Tournament board theme", "Early feature preferences"].map((item) => (
-            <div key={item} className="rounded-lg p-3 opacity-75" style={{ backgroundColor: theme.bg.tertiary }}>
-              <span className="font-bold">{item}</span> · Supporter preview
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-function SecuritySection({ theme }) {
-  return (
-    <div className="space-y-4">
-      <Card title="Account security" description="Use a strong password and sign out on shared devices." theme={theme}>
-        <p className="text-sm" style={{ color: theme.text.secondary }}>
-          Password changes are available in the Account tab. Active sessions and logout-all-devices will be added after secure session revocation UI is ready.
-        </p>
-        <button
-          type="button"
-          onClick={() => window.dispatchEvent(new CustomEvent("chessplay:logout"))}
-          className="mt-4 rounded-lg border px-4 py-2 font-bold"
-          style={{ borderColor: theme.border.secondary }}
-        >
-          Logout
-        </button>
-      </Card>
-    </div>
-  );
-}
-
-function DangerZoneSection({ theme }) {
-  return (
-    <Card title="Danger Zone" description="Destructive account actions require extra confirmation and backend safety checks." theme={theme}>
-      <div className="rounded-lg p-4" style={{ backgroundColor: theme.bg.tertiary }}>
-        <div className="font-black">Delete account</div>
-        <p className="text-sm mt-1" style={{ color: theme.text.secondary }}>
-          Account deletion is available from the dedicated privacy/account deletion flow when enabled. This page will not show fake destructive controls.
-        </p>
-        <a href="/delete-account" className="inline-block mt-3 rounded-lg border px-4 py-2 font-bold" style={{ borderColor: theme.border.secondary }}>
-          Open account deletion page
-        </a>
       </div>
     </Card>
   );
