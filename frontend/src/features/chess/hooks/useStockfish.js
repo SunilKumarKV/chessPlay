@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 
 const DEFAULT_MOVE_TIMEOUT_MS = 4500;
 const ENGINE_BOOT_TIMEOUT_MS = 3500;
-const DEBUG_STOCKFISH = true;
+const DEBUG_STOCKFISH = false;
 
 function parseEvaluation(message) {
   const cpMatch = message.match(/\bscore cp (-?\d+)/);

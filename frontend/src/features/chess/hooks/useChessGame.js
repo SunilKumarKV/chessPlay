@@ -267,56 +267,19 @@ export function useChessGame({
   ]);
 
   const aiMoveInFlightRef = useRef(false);
+  const lastAiFenRef = useRef(null);
+  const aiRunIdRef = useRef(0);
   const commitMoveRef = useRef(null);
   const moveTimeoutRef = useRef(null);
 
   useEffect(() => {
-    if (!aiEnabled) return undefined;
+    if (!aiEnabled) {
+      aiMoveInFlightRef.current = false;
+      lastAiFenRef.current = null;
+      return undefined;
+    }
     if (turn !== aiColor) return undefined;
     if (!isPlayableStatus(status)) return undefined;
-    if (aiMoveInFlightRef.current) return undefined;
-
-    let cancelled = false;
-
-    const commitAiMove = (selectedMove, delayMs = 300) => {
-      if (cancelled || !selectedMove) return;
-
-      moveTimeoutRef.current = setTimeout(() => {
-        if (cancelled || !commitMoveRef.current) return;
-        commitMoveRef.current(
-          selectedMove.from,
-          selectedMove.to,
-          selectedMove.promotion,
-        );
-      }, delayMs);
-    };
-
-    const getFallbackMove = () => {
-      const fallbackMove = findFallbackAiMove(board, aiColor, enPassant, castling);
-      if (fallbackMove) {
-        console.log("AI fallback used", fallbackMove);
-      } else {
-        console.warn("AI: No legal fallback move available");
-      }
-      return fallbackMove;
-    };
-
-    aiMoveInFlightRef.current = true;
-
-    const playFallbackMove = (delayMs = 350) => {
-      aiMoveInFlightRef.current = false;
-      commitAiMove(getFallbackMove(), delayMs);
-    };
-
-    if (!sfReady) {
-      // Production-safe fallback: Play vs AI must never freeze while Stockfish boots/fails.
-      console.log("AI engine:", sfEngineName || "fallback");
-      playFallbackMove(450);
-      return () => {
-        cancelled = true;
-        if (moveTimeoutRef.current) clearTimeout(moveTimeoutRef.current);
-      };
-    }
 
     const fen = boardToFen(
       board,
@@ -327,41 +290,103 @@ export function useChessGame({
       fullmove,
     );
 
+    // Critical Play vs AI guard: one engine request per exact board position.
+    // This prevents the repeated "AI thinking" loop and console move spam.
+    if (aiMoveInFlightRef.current) return undefined;
+    if (lastAiFenRef.current === fen) return undefined;
+
+    let cancelled = false;
+    const runId = aiRunIdRef.current + 1;
+    aiRunIdRef.current = runId;
+    aiMoveInFlightRef.current = true;
+    lastAiFenRef.current = fen;
+
+    const boardSnapshot = board.map((rank) => [...rank]);
+    const castlingSnapshot = {
+      w: { ...castling.w },
+      b: { ...castling.b },
+    };
+    const enPassantSnapshot = enPassant ? [...enPassant] : null;
+
+    const unlockAi = () => {
+      if (aiRunIdRef.current === runId) {
+        aiMoveInFlightRef.current = false;
+      }
+    };
+
+    const getFallbackMove = () =>
+      findFallbackAiMove(
+        boardSnapshot,
+        aiColor,
+        enPassantSnapshot,
+        castlingSnapshot,
+      );
+
+    const commitAiMoveNow = (selectedMove) => {
+      if (cancelled || aiRunIdRef.current !== runId) {
+        unlockAi();
+        return;
+      }
+
+      if (!selectedMove || !commitMoveRef.current) {
+        unlockAi();
+        return;
+      }
+
+      commitMoveRef.current(
+        selectedMove.from,
+        selectedMove.to,
+        selectedMove.promotion,
+      );
+      unlockAi();
+    };
+
+    const playFallbackMove = () => {
+      const fallbackMove = getFallbackMove();
+      commitAiMoveNow(fallbackMove);
+    };
+
+    if (!sfReady) {
+      playFallbackMove();
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const thinkingTime = 300 + aiDifficulty * 85;
 
     getBestMove(fen, { movetime: thinkingTime })
       .then((uci) => {
-        if (cancelled) return;
-        aiMoveInFlightRef.current = false;
+        if (cancelled || aiRunIdRef.current !== runId) {
+          unlockAi();
+          return;
+        }
 
         let selectedMove = null;
 
-        console.log("AI engine:", sfEngineName || "stockfish");
-        console.log("AI move:", uci || "none");
-
         if (uci) {
-          selectedMove = findLegalMoveFromUci(board, uci, aiColor, enPassant, castling);
-          if (!selectedMove) {
-            console.warn("AI: Stockfish returned invalid/unplayable move, using fallback:", uci);
-          }
-        } else {
-          console.warn("AI: No move returned from Stockfish");
+          selectedMove = findLegalMoveFromUci(
+            boardSnapshot,
+            uci,
+            aiColor,
+            enPassantSnapshot,
+            castlingSnapshot,
+          );
         }
 
         if (!selectedMove) selectedMove = getFallbackMove();
-        if (!selectedMove) return;
-
-        commitAiMove(selectedMove, 300 + Math.random() * 200);
+        commitAiMoveNow(selectedMove);
       })
-      .catch((error) => {
-        if (cancelled) return;
-        console.error("AI: getBestMove error:", error);
-        playFallbackMove(300);
+      .catch(() => {
+        if (cancelled || aiRunIdRef.current !== runId) {
+          unlockAi();
+          return;
+        }
+        playFallbackMove();
       });
 
     return () => {
       cancelled = true;
-      if (moveTimeoutRef.current) clearTimeout(moveTimeoutRef.current);
     };
   }, [
     board,
@@ -376,7 +401,6 @@ export function useChessGame({
     halfmoveClock,
     fullmove,
     aiDifficulty,
-    sfEngineName,
   ]);
 
   const commitMove = useCallback(
@@ -630,6 +654,8 @@ export function useChessGame({
     }
 
     aiMoveInFlightRef.current = false;
+    lastAiFenRef.current = null;
+    aiRunIdRef.current += 1;
   }, [clock]);
 
   const resignGame = useCallback(() => {
