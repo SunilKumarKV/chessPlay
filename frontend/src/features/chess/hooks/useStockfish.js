@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 
-const DEFAULT_MOVE_TIMEOUT_MS = 4500;
-const ENGINE_BOOT_TIMEOUT_MS = 3500;
+const DEFAULT_MOVE_TIMEOUT_MS = 3000;
+const ENGINE_BOOT_TIMEOUT_MS = 3000;
 const DEBUG_STOCKFISH = false;
 
 function parseEvaluation(message) {
@@ -34,8 +34,8 @@ function createWorkerUrl(path) {
 }
 
 const ENGINE_CANDIDATES = [
-  { name: "stable-stockfish-direct", path: "stockfish/stockfish.js" },
-  { name: "stable-stockfish-wrapper", path: "workers/stockfish-worker.js" },
+  { name: "stable-stockfish-classic", path: "stockfish/stockfish.js" },
+  { name: "stockfish-wasm-wrapper", path: "workers/stockfish-worker.js" },
   { name: "legacy-stockfish-root", path: "stockfish.js" },
 ];
 
@@ -256,20 +256,20 @@ export function useStockfish({ enabled = true } = {}) {
         if (options.movetime) {
           const safeMoveTime = Math.max(250, Math.min(2500, Number(options.movetime)));
           goCommand = `go movetime ${safeMoveTime}`;
-          timeoutMs = safeMoveTime + 2500;
+          timeoutMs = Math.min(DEFAULT_MOVE_TIMEOUT_MS, safeMoveTime + 500);
         } else {
           const requestedDepth = Math.max(1, Math.min(16, Number(options.depth || 8)));
           goCommand = `go depth ${requestedDepth}`;
-          timeoutMs = Math.max(DEFAULT_MOVE_TIMEOUT_MS, requestedDepth * 600);
+          timeoutMs = DEFAULT_MOVE_TIMEOUT_MS;
         }
       } else if (typeof options === "number" && options > 100) {
         const safeMoveTime = Math.max(250, Math.min(2500, Number(options)));
         goCommand = `go movetime ${safeMoveTime}`;
-        timeoutMs = safeMoveTime + 2500;
+        timeoutMs = Math.min(DEFAULT_MOVE_TIMEOUT_MS, safeMoveTime + 500);
       } else {
         const requestedDepth = Math.max(1, Math.min(16, Number(options || 8)));
         goCommand = `go depth ${requestedDepth}`;
-        timeoutMs = Math.max(DEFAULT_MOVE_TIMEOUT_MS, requestedDepth * 600);
+        timeoutMs = DEFAULT_MOVE_TIMEOUT_MS;
       }
 
       const timeoutId = setTimeout(() => {
@@ -279,7 +279,7 @@ export function useStockfish({ enabled = true } = {}) {
         setThinking(false);
         movePromiseRef.current.resolve(null);
         movePromiseRef.current = null;
-      }, Math.max(timeoutMs, 2000));
+      }, Math.max(timeoutMs, 1000));
 
       movePromiseRef.current = { resolve, timeoutId };
       setThinking(true);
@@ -288,7 +288,6 @@ export function useStockfish({ enabled = true } = {}) {
       setLastBestMove(null);
 
       try {
-        workerRef.current.postMessage("stop");
         workerRef.current.postMessage("ucinewgame");
         if (skillLevel !== null) {
           workerRef.current.postMessage(`setoption name Skill Level value ${Math.max(0, Math.min(20, skillLevel))}`);

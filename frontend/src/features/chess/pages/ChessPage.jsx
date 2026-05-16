@@ -37,6 +37,44 @@ const TIME_CONTROL_KEY_BY_SETUP = {
   "30+0": "rapid",
 };
 
+function chooseFallbackAiMove(fen, levelId) {
+  const game = new ChessEngine(fen);
+  const legalMoves = game.moves({ verbose: true });
+  if (legalMoves.length === 0) return null;
+
+  const scoredMoves = legalMoves.map((move) => {
+    let score = 0;
+    if (move.captured) score += 10;
+    if (move.flags?.includes("p")) score += 9;
+    if (move.san?.includes("+")) score += 4;
+    if (["d4", "e4", "d5", "e5"].includes(move.to)) score += 2;
+    if (["c4", "f4", "c5", "f5"].includes(move.to)) score += 1;
+    return { move, score };
+  });
+
+  if (levelId === "easy") {
+    return legalMoves[Math.floor(Math.random() * legalMoves.length)];
+  }
+
+  const bestScore = Math.max(...scoredMoves.map(({ score }) => score));
+  const bestMoves = scoredMoves
+    .filter(({ score }) => score === bestScore)
+    .map(({ move }) => move);
+
+  return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+}
+
+function toMovePayload(move) {
+  if (!move) return null;
+  const promotion =
+    move.promotion || (move.flags?.includes("p") ? "q" : undefined);
+  return {
+    from: move.from,
+    to: move.to,
+    promotion,
+  };
+}
+
 export default function Chess({
   onBack,
   initialAiEnabled = true,
@@ -54,9 +92,10 @@ export default function Chess({
   const [resultPopupSeenFen, setResultPopupSeenFen] = useState(null);
   const [pageNotice, setPageNotice] = useState(null);
   const [hintLoading, setHintLoading] = useState(false);
+  const gameTurn = gameState.game.turn();
   const humanColor = gameState.aiColor === "w" ? "b" : "w";
   const isHumanTurn =
-    !gameState.isGameOver && gameState.game.turn() === humanColor;
+    !gameState.isGameOver && gameTurn === humanColor;
   const selectedTimeControlKey =
     Object.entries(TIME_CONTROLS).find(
       ([, control]) =>
@@ -70,12 +109,21 @@ export default function Chess({
   const stockfish = useStockfish({
     enabled: gameState.aiEnabled,
   });
+  const {
+    ready: stockfishReady,
+    thinking: stockfishThinking,
+    error: stockfishError,
+    getBestMove,
+  } = stockfish;
   const aiMoveTimeoutRef = useRef(null);
   const aiRequestInFlightRef = useRef(false);
+  const aiFallbackTimeoutRef = useRef(null);
+  const lastAiFenRef = useRef(null);
+  const aiRunIdRef = useRef(0);
   const isAiTurn =
-    gameState.aiEnabled && !gameState.isGameOver && gameState.game.turn() === gameState.aiColor;
-  const controlsDisabled = stockfish.thinking || Boolean(stockfish.error);
-  const canUseEngine = stockfish.ready && !stockfish.error;
+    gameState.aiEnabled && !gameState.isGameOver && gameTurn === gameState.aiColor;
+  const controlsDisabled = stockfishThinking;
+  const canUseEngine = stockfishReady && !stockfishError;
   const sideOptions = useMemo(() => [
     { label: "Play as White", value: "b" },
     { label: "Play as Black", value: "w" },
@@ -133,86 +181,163 @@ export default function Chess({
       window.clearTimeout(aiMoveTimeoutRef.current);
       aiMoveTimeoutRef.current = null;
     }
+    if (aiFallbackTimeoutRef.current) {
+      window.clearTimeout(aiFallbackTimeoutRef.current);
+      aiFallbackTimeoutRef.current = null;
+    }
+
+    if (!gameState.aiEnabled || gameState.isGameOver) {
+      aiRequestInFlightRef.current = false;
+      lastAiFenRef.current = null;
+      return undefined;
+    }
 
     if (
-      !gameState.aiEnabled ||
-      !stockfish.ready ||
-      stockfish.error ||
       aiRequestInFlightRef.current ||
-      gameState.isGameOver ||
-      gameState.game.turn() !== gameState.aiColor
+      lastAiFenRef.current === gameState.fen ||
+      gameTurn !== gameState.aiColor
     ) {
       return undefined;
     }
 
     let cancelled = false;
+    const runId = aiRunIdRef.current + 1;
+    aiRunIdRef.current = runId;
     aiRequestInFlightRef.current = true;
+    const fenSnapshot = gameState.fen;
 
-    stockfish
-      .getBestMove(gameState.fen, {
-        depth: aiLevel.depth,
-        skill: aiLevel.skill,
-        movetime: aiLevel.movetime,
-      })
-      .then((uci) => {
+    const finishRequest = () => {
+      if (aiRunIdRef.current === runId) {
         aiRequestInFlightRef.current = false;
-        if (cancelled || !uci) return;
+      }
+    };
+
+    const scheduleMove = (payload, delay = aiLevel.moveDelay) => {
+      if (cancelled || aiRunIdRef.current !== runId || !payload) {
+        finishRequest();
+        return;
+      }
+
+      aiMoveTimeoutRef.current = window.setTimeout(() => {
+        if (cancelled || aiRunIdRef.current !== runId) {
+          finishRequest();
+          return;
+        }
+
+        dispatch(makeMove(payload));
+
+        if (settings.playSounds) {
+          const testGame = new ChessEngine(fenSnapshot);
+          const move = testGame.move(payload);
+          if (move?.captured) {
+            soundManager.playCapture();
+          } else {
+            soundManager.playMove();
+          }
+        }
+
+        finishRequest();
+      }, delay);
+    };
+
+    const playFallbackMove = (delay = Math.min(aiLevel.moveDelay, 350)) => {
+      try {
+        lastAiFenRef.current = fenSnapshot;
+        scheduleMove(toMovePayload(chooseFallbackAiMove(fenSnapshot, aiLevel.id)), delay);
+      } catch {
+        finishRequest();
+      }
+    };
+
+    if (!canUseEngine) {
+      if (stockfishError) {
+        playFallbackMove();
+      } else {
+        aiFallbackTimeoutRef.current = window.setTimeout(() => {
+          playFallbackMove(0);
+        }, 3000);
+      }
+
+      return () => {
+        cancelled = true;
+        finishRequest();
+        if (aiMoveTimeoutRef.current) {
+          window.clearTimeout(aiMoveTimeoutRef.current);
+          aiMoveTimeoutRef.current = null;
+        }
+        if (aiFallbackTimeoutRef.current) {
+          window.clearTimeout(aiFallbackTimeoutRef.current);
+          aiFallbackTimeoutRef.current = null;
+        }
+      };
+    }
+
+    lastAiFenRef.current = fenSnapshot;
+    getBestMove(fenSnapshot, {
+      depth: aiLevel.depth,
+      skill: aiLevel.skill,
+      movetime: aiLevel.movetime,
+    })
+      .then((uci) => {
+        if (cancelled || aiRunIdRef.current !== runId) {
+          finishRequest();
+          return;
+        }
+
+        if (!uci) {
+          playFallbackMove();
+          return;
+        }
+
         const from = uci.slice(0, 2);
         const to = uci.slice(2, 4);
         const promotion = uci[4] || undefined;
 
         try {
-          const testGame = new ChessEngine(gameState.fen);
+          const testGame = new ChessEngine(fenSnapshot);
           const move = testGame.move({ from, to, promotion });
-          if (!move) return;
+          if (!move) {
+            playFallbackMove();
+            return;
+          }
 
-          aiMoveTimeoutRef.current = window.setTimeout(() => {
-            if (cancelled) return;
-
-            dispatch(makeMove({ from, to, promotion }));
-
-            if (settings.playSounds) {
-              if (move.captured) {
-                soundManager.playCapture();
-              } else {
-                soundManager.playMove();
-              }
-            }
-          }, aiLevel.moveDelay);
+          scheduleMove({ from, to, promotion });
         } catch {
-          setPageNotice({ type: "error", text: "AI move could not be applied. Start a new game or try again." });
+          playFallbackMove();
         }
       })
-      .catch((error) => {
-        aiRequestInFlightRef.current = false;
-        if (!cancelled) {
-          setPageNotice({ type: "error", text: error?.message || "AI engine is unavailable. Please retry." });
-        }
+      .catch(() => {
+        if (!cancelled && aiRunIdRef.current === runId) playFallbackMove();
       });
 
     return () => {
       cancelled = true;
-      aiRequestInFlightRef.current = false;
+      finishRequest();
       if (aiMoveTimeoutRef.current) {
         window.clearTimeout(aiMoveTimeoutRef.current);
         aiMoveTimeoutRef.current = null;
       }
+      if (aiFallbackTimeoutRef.current) {
+        window.clearTimeout(aiFallbackTimeoutRef.current);
+        aiFallbackTimeoutRef.current = null;
+      }
     };
-    }, [
+  }, [
     aiLevel.depth,
+    aiLevel.id,
     aiLevel.moveDelay,
     aiLevel.movetime,
     aiLevel.skill,
+    canUseEngine,
     dispatch,
     gameState.aiColor,
     gameState.aiEnabled,
     gameState.fen,
-    gameState.game,
     gameState.isGameOver,
+    gameTurn,
+    getBestMove,
     settings.playSounds,
-    stockfish,
-    stockfish.error,
-    stockfish.ready,
+    stockfishError,
   ]);
 
   const moveHistoryPairs = [];
@@ -235,6 +360,11 @@ export default function Chess({
   const handleNewGame = () => {
     setPageNotice(null);
     setResultPopupSeenFen(null);
+    aiRunIdRef.current += 1;
+    aiRequestInFlightRef.current = false;
+    lastAiFenRef.current = null;
+    if (aiMoveTimeoutRef.current) window.clearTimeout(aiMoveTimeoutRef.current);
+    if (aiFallbackTimeoutRef.current) window.clearTimeout(aiFallbackTimeoutRef.current);
     dispatch(resetGame());
     if (settings.playSounds) {
       soundManager.playGameStart();

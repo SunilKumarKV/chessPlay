@@ -38,7 +38,7 @@ const checks = [
   {
     name: "Creates browser Worker",
     source: useStockfishCode,
-    pattern: /new Worker\(workerPath\)/,
+    pattern: /new Worker\(workerUrl\)/,
   },
   {
     name: "Uses public workers path",

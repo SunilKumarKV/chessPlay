@@ -4,18 +4,18 @@
   "description": "Real-time multiplayer chess game with React frontend and Node.js backend",
   "packageManager": "npm@10.8.2",
   "scripts": {
-    "dev": "pnpm -C frontend dev",
-    "dev:multi": "concurrently \"pnpm -C frontend dev\" \"pnpm -C backend dev\"",
-    "server": "pnpm -C backend dev",
-    "build": "pnpm -C backend build && pnpm -C frontend build",
-    "lint": "pnpm -C frontend lint",
-    "test": "pnpm test:production && pnpm -C backend test",
+    "dev": "npm --prefix frontend run dev",
+    "dev:multi": "concurrently \"npm --prefix frontend run dev\" \"npm --prefix backend run dev\"",
+    "server": "npm --prefix backend run dev",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "lint": "npm --prefix frontend run lint",
+    "test": "npm run test:production && npm --prefix backend run test",
     "test:production": "node TEST_PRODUCTION_SMOKE.js && node TEST_STOCKFISH.js",
-    "preview": "pnpm -C frontend preview",
-    "install:all": "pnpm install",
-    "start": "pnpm dev:multi",
-    "build:frontend": "pnpm -C frontend build",
-    "build:backend": "pnpm -C backend build"
+    "preview": "npm --prefix frontend run preview",
+    "install:all": "npm install && npm --prefix frontend install && npm --prefix backend install",
+    "start": "npm run dev:multi",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend run build"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
