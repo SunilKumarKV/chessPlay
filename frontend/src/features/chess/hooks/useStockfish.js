@@ -56,7 +56,7 @@ export function useStockfish({ enabled = true } = {}) {
     let mounted = true;
 
     try {
-      worker = new Worker(workerPath);
+      worker = new Worker(workerPath, { type: "classic" });
     } catch (creationError) {
       if (mounted) {
         setError(`Unable to start chess engine: ${safeErrorMessage(creationError)}`);
@@ -181,10 +181,18 @@ export function useStockfish({ enabled = true } = {}) {
           if (movePromiseRef.current) {
             workerRef.current?.postMessage("stop");
             setThinking(false);
-            const timeoutError = "Chess engine took too long to respond. Please retry.";
+            const timeoutError = "Chess engine took too long to respond. Falling back to a safe move.";
             setError(timeoutError);
-            movePromiseRef.current.reject(new Error(timeoutError));
+            movePromiseRef.current.resolve(null);
             movePromiseRef.current = null;
+            try {
+              workerRef.current?.terminate();
+            } catch {
+              // ignore terminate errors
+            }
+            workerRef.current = null;
+            setReady(false);
+            setRetryKey((value) => value + 1);
           }
         }, Math.max(timeoutMs, 2500));
 

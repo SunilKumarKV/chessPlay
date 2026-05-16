@@ -42,6 +42,23 @@ function hasThreefoldRepetition(positionHistory) {
   });
 }
 
+function getFallbackAiMove(board, color, enPassant, castling) {
+  const moves = [];
+  for (let row = 0; row < 8; row += 1) {
+    for (let col = 0; col < 8; col += 1) {
+      if (colorOf(board[row][col]) !== color) continue;
+      const legalTargets = getLegalMoves(board, row, col, enPassant, castling);
+      for (const target of legalTargets) {
+        moves.push({ from: [row, col], to: target });
+      }
+    }
+  }
+  if (!moves.length) return null;
+  const captureMoves = moves.filter(({ to }) => Boolean(board[to[0]][to[1]]));
+  const pool = captureMoves.length ? captureMoves : moves;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 export function useChessGame({
   initialAiEnabled = false,
   initialAiColor = "b",
@@ -239,24 +256,32 @@ export function useChessGame({
       .then((uci) => {
         aiMoveInFlightRef.current = false;
 
-        if (!uci) {
-          console.warn("AI: No move returned from Stockfish");
-          return;
+        let aiMove = null;
+
+        if (uci) {
+          const stockfishMove = uciToMove(uci);
+          if (stockfishMove) {
+            aiMove = stockfishMove;
+          } else {
+            console.warn("AI: Failed to parse move:", uci);
+          }
+        } else {
+          console.warn("AI: No move returned from Stockfish. Using fallback legal move.");
         }
 
-        const stockfishMove = uciToMove(uci);
-        if (!stockfishMove) {
-          console.warn("AI: Failed to parse move:", uci);
-          return;
+        if (!aiMove) {
+          aiMove = getFallbackAiMove(board, aiColor, enPassant, castling);
         }
+
+        if (!aiMove) return;
 
         const delayMs = 300 + Math.random() * 200;
         moveTimeoutRef.current = setTimeout(() => {
           if (commitMoveRef.current) {
             commitMoveRef.current(
-              stockfishMove.from,
-              stockfishMove.to,
-              stockfishMove.promotion,
+              aiMove.from,
+              aiMove.to,
+              aiMove.promotion || null,
             );
           }
         }, delayMs);
@@ -264,6 +289,10 @@ export function useChessGame({
       .catch((error) => {
         aiMoveInFlightRef.current = false;
         console.error("AI: getBestMove error:", error);
+        const fallbackMove = getFallbackAiMove(board, aiColor, enPassant, castling);
+        if (fallbackMove && commitMoveRef.current) {
+          commitMoveRef.current(fallbackMove.from, fallbackMove.to, fallbackMove.promotion || null);
+        }
       });
 
     return () => {
