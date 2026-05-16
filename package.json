@@ -3,10 +3,6 @@
   "version": "1.3.0",
   "description": "Real-time multiplayer chess game with React frontend and Node.js backend",
   "packageManager": "pnpm@10.15.0",
-  "engines": {
-    "node": "20.x",
-    "pnpm": "10.15.0"
-  },
   "scripts": {
     "dev": "pnpm -C frontend dev",
     "dev:multi": "concurrently \"pnpm -C frontend dev\" \"pnpm -C backend dev\"",
