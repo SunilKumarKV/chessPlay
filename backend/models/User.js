@@ -70,7 +70,7 @@ const userSchema = new mongoose.Schema({
   // v1.2.1 SaaS / supporter plan fields
   plan: {
     type: String,
-    enum: ["free", "supporter_monthly", "supporter_yearly", "pro"],
+    enum: ["free", "supporter_monthly", "supporter_yearly", "pro", "premium", "lifetime"],
     default: "free",
   },
   planStatus: {
@@ -85,7 +85,7 @@ const userSchema = new mongoose.Schema({
   supporterSince: { type: Date, default: null },
   supporterPlan: {
     type: String,
-    enum: ["none", "supporter_monthly", "supporter_yearly", "pro"],
+    enum: ["none", "supporter_monthly", "supporter_yearly", "pro", "premium", "lifetime"],
     default: "none",
   },
   supporterExpiresAt: { type: Date, default: null },

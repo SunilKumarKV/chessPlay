@@ -7,6 +7,7 @@ const GOOGLE_BACKEND_ENDPOINT = "/api/auth/google";
 import { validateProductionEmail } from "../../../utils/emailValidation";
 import { loginWithEmail, loginWithGoogleCredential, registerWithEmail } from "../services/authApi";
 import { persistAuthSession } from "../services/authStorage";
+import { trackEvent } from "../../../services/analytics";
 
 let googleInitializedClientId = "";
 let googleCredentialHandler = null;
@@ -159,6 +160,7 @@ export default function Auth({
         ? await loginWithEmail(payload)
         : await registerWithEmail({ ...payload, username: formData.username.trim(), referralCode });
 
+      trackEvent(isLogin ? "login" : "signup", { method: "email" });
       completeLogin(data, isLogin ? "Welcome back." : data?.referralConnected ? "Account created successfully. Referral connected." : "Account created successfully.");
     } catch (authError) {
       setError(authError.message || "Authentication failed. Please try again.");
@@ -195,6 +197,7 @@ export default function Auth({
       try {
         if (!credential) throw new Error("Google did not return a credential. Please try again.");
         const data = await loginWithGoogleCredential(credential);
+        trackEvent("login", { method: "google" });
         completeLogin(data, "Welcome back.");
       } catch (authError) {
         setError(authError.message || "Google login failed. Please use email login.");

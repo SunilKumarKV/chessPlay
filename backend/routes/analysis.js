@@ -1,8 +1,10 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
+const mongoose = require("mongoose");
 const { Chess } = require("chess.js");
 const auth = require("../middleware/auth");
 const AnalysisNote = require("../models/AnalysisNote");
+const GameAnalysis = require("../models/GameAnalysis");
 
 const router = express.Router();
 
@@ -70,6 +72,23 @@ router.post("/notes", auth, noteLimiter, async (req, res) => {
     res.json({ note, message: "Analysis notes saved." });
   } catch {
     res.status(500).json({ message: "Unable to save analysis notes. Please try again." });
+  }
+});
+
+router.get("/reports/:gameId", auth, async (req, res) => {
+  try {
+    const gameId = safeString(req.params.gameId, 120);
+    if (!mongoose.Types.ObjectId.isValid(gameId)) {
+      return res.json({ report: null, placeholder: true, message: "Premium analysis reports are planned for saved games." });
+    }
+    const report = await GameAnalysis.findOne({ user: req.user.userId, game: gameId }).lean();
+    res.json({
+      report,
+      placeholder: !report,
+      message: report ? "Analysis report loaded." : "Premium analysis reports are planned. Heavy server-side engine analysis is not enabled yet.",
+    });
+  } catch {
+    res.status(500).json({ message: "Unable to load analysis report." });
   }
 });
 

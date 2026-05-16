@@ -10,6 +10,9 @@ const SecurityEvent = require("../models/SecurityEvent");
 const CommunityPost = require("../models/CommunityPost");
 const Tournament = require("../models/Tournament");
 const Referral = require("../models/Referral");
+const Feedback = require("../models/Feedback");
+const Payment = require("../models/Payment");
+const PuzzleDailyUsage = require("../models/PuzzleDailyUsage");
 const auth = require("../middleware/auth");
 const { sanitizeText, isConfiguredAdminEmail } = require("../utils/security");
 
@@ -136,7 +139,7 @@ router.get("/health", asyncRoute(async (req, res) => {
 router.get("/overview", asyncRoute(async (_req, res) => {
   const activeSince = new Date(Date.now() - 15 * 60 * 1000);
   const abandonedFilter = gameStatusFilter("abandoned");
-  const [totalUsers, totalGames, activeUsers, supporterUsers, pendingRequests, openReports, recentGames, suspiciousGames] = await Promise.all([
+  const [totalUsers, totalGames, activeUsers, supporterUsers, pendingRequests, openReports, recentGames, suspiciousGames, premiumUsers, revenueAgg, manualRevenueAgg, paymentsCount, puzzleUsageAgg, feedbackReports] = await Promise.all([
     User.countDocuments({ deletedAt: null }),
     Game.countDocuments(),
     User.countDocuments({ lastLogin: { $gte: activeSince }, deletedAt: null }),
@@ -145,10 +148,19 @@ router.get("/overview", asyncRoute(async (_req, res) => {
     SupportTicket.countDocuments({ status: { $in: ["open", "in_review"] } }).catch(() => 0),
     Game.find().sort({ startTime: -1 }).limit(5).populate("whitePlayer", "username email").populate("blackPlayer", "username email").lean(),
     Game.countDocuments(abandonedFilter),
+    User.countDocuments({ deletedAt: null, $or: [{ isPremium: true }, { isSupporter: true }, { plan: { $in: ["pro", "premium", "lifetime", "supporter_monthly", "supporter_yearly"] } }] }),
+    Payment.aggregate([{ $match: { status: "paid", currency: "INR" } }, { $group: { _id: null, total: { $sum: "$amount" } } }]).catch(() => []),
+    SupporterRequest.aggregate([{ $match: { status: "approved", currency: "INR" } }, { $group: { _id: null, total: { $sum: "$amount" } } }]).catch(() => []),
+    Payment.countDocuments({ status: "paid" }).catch(() => 0),
+    PuzzleDailyUsage.aggregate([{ $match: { dateKey: new Date().toISOString().slice(0, 10) } }, { $group: { _id: null, used: { $sum: "$used" } } }]).catch(() => []),
+    Feedback.countDocuments({ status: { $in: ["open", "in_review"] } }).catch(() => 0),
   ]);
   const latestReports = await SupportTicket.find().sort({ createdAt: -1 }).limit(5).populate("user", "username email").lean().catch(() => []);
+  const revenueInr = (revenueAgg?.[0]?.total || 0) + (manualRevenueAgg?.[0]?.total || 0);
+  const puzzleUsageToday = puzzleUsageAgg?.[0]?.used || 0;
+  const conversionRate = totalUsers ? Math.round((premiumUsers / totalUsers) * 1000) / 10 : 0;
   res.json({
-    stats: { totalUsers, totalGames, activeUsers, supporterUsers, pendingRequests, openReports, latestReports: latestReports.length, suspiciousGames },
+    stats: { totalUsers, totalGames, activeUsers, supporterUsers, pendingRequests, openReports, latestReports: latestReports.length, suspiciousGames, premiumUsers, revenueInr, paymentsCount, puzzleUsageToday, feedbackReports, conversionRate },
     latestReports,
     recentGames,
   });
@@ -262,13 +274,20 @@ router.patch("/games/:id/review", asyncRoute(async (req, res) => {
 
 router.get("/feedback", asyncRoute(async (req, res) => {
   const status = VALID_TICKET_STATUS.has(req.query.status) ? req.query.status : undefined;
-  const tickets = await SupportTicket.find(status ? { status } : {}).sort({ createdAt: -1 }).limit(100).populate("user", "username email plan isPremium").lean().catch(() => []);
+  const [supportTickets, productFeedback] = await Promise.all([
+    SupportTicket.find(status ? { status } : {}).sort({ createdAt: -1 }).limit(100).populate("user", "username email plan isPremium").lean().catch(() => []),
+    Feedback.find(status ? { status } : {}).sort({ createdAt: -1 }).limit(100).populate("user", "username email plan isPremium").lean().catch(() => []),
+  ]);
+  const tickets = [
+    ...supportTickets.map((ticket) => ({ ...ticket, source: "support" })),
+    ...productFeedback.map((ticket) => ({ ...ticket, subject: `${ticket.category} feedback`, type: ticket.category, source: "feedback" })),
+  ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 100);
   res.json({ tickets });
 }));
 
 router.patch("/feedback/:id", asyncRoute(async (req, res) => {
   if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid feedback id." });
-  const ticket = await SupportTicket.findById(req.params.id);
+  const ticket = await SupportTicket.findById(req.params.id) || await Feedback.findById(req.params.id);
   if (!ticket) return res.status(404).json({ message: "Feedback ticket not found." });
   if (VALID_TICKET_STATUS.has(req.body.status)) ticket.status = req.body.status;
   if (typeof req.body.adminNotes === "string") ticket.adminNotes = sanitizeText(req.body.adminNotes, 1000);

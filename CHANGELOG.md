@@ -1,37 +1,17 @@
 # Changelog
 
-All notable ChessPlay production changes are documented here.
+## v1.4.0-beta
 
-## v1.3.0 - Stable Production Release
+- Added monetization foundation with normalized Free, Pro, Premium, and Lifetime plan config.
+- Added Razorpay-safe payment order, verification, webhook, coupon, trial, and payment history APIs.
+- Added subscription, payment, coupon, feature entitlement, feedback, waitlist, and game analysis placeholder models.
+- Added public waitlist and feedback collection endpoints.
+- Added Lichess CC0 puzzle import pipeline, sample puzzle seed, daily limits, hints, and learning explanations.
+- Added legal route coverage for privacy, terms, refunds, cookies, and contact pages.
+- Added SEO and growth placeholder pages for puzzles, online chess, AI chess, analysis, coaching, openings, store, and services.
+- Added environment-driven analytics abstraction and feedback modal.
+- Added admin revenue, premium, payment, puzzle usage, feedback, and conversion summary fields.
 
-### Release Status
+## v1.3.0
 
-- Stable production release prepared for public sharing.
-- Final cleanup completed for release documentation, version naming, testing checklist, security notes, and deployment instructions.
-
-### Fixed
-
-- Stabilized production release naming from beta to `v1.3.0`.
-- Added production-safe testing and release documentation.
-- Improved deployment readiness for Render backend and Vercel frontend.
-- Verified environment templates use placeholders only.
-- Cleaned outdated duplicate release notes and temporary internal report files.
-
-### Infrastructure
-
-- GitHub Actions CI retained.
-- pnpm workspace setup retained.
-- MongoDB/Mongoose retained.
-- Prisma generate workflow retained where configured.
-- Socket.IO event names unchanged.
-
-### Security
-
-- `.env` files remain ignored.
-- Production secrets must stay in GitHub Secrets, Vercel Environment Variables, and Render Environment Variables.
-- Public showcase/docs must not include private backend, payment, auth, database, or admin logic.
-
-### Known Notes
-
-- Final validation should be performed on deployed production URLs before social sharing.
-- Browser extension console warnings should be tested again in incognito mode with extensions disabled.
+- Real-time ChessPlay SaaS baseline with auth, dashboard, Play vs AI, multiplayer, billing supporter flows, and admin tooling.

@@ -51,7 +51,8 @@ function difficultyFromRating(rating) {
 function userPlan(user) {
   if (!user) return "guest";
   if (user.plan === "pro" || user.supporterPlan === "pro") return "premium_pro";
-  if (user.plan === "supporter_yearly" || user.supporterPlan === "supporter_yearly") return "premium_lifetime";
+  if (user.plan === "premium" || user.supporterPlan === "premium") return "premium_pro";
+  if (user.plan === "lifetime" || user.supporterPlan === "lifetime" || user.plan === "supporter_yearly" || user.supporterPlan === "supporter_yearly") return "premium_lifetime";
   if (user.isPremium || user.isSupporter || user.plan === "supporter_monthly" || user.supporterPlan === "supporter_monthly") {
     return "premium_basic";
   }

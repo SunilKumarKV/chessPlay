@@ -242,11 +242,17 @@ function Overview({ data, onSelect }) {
     ["Total games", stats.totalGames],
     ["Active users", stats.activeUsers],
     ["Supporters", stats.supporterUsers],
+    ["Premium users", stats.premiumUsers],
+    ["Revenue", stats.revenueInr ? `₹${stats.revenueInr}` : 0],
+    ["Payments", stats.paymentsCount],
+    ["Puzzle usage", stats.puzzleUsageToday],
+    ["Conversion", `${stats.conversionRate || 0}%`],
     ["Pending payments", stats.pendingRequests],
     ["Open reports", stats.openReports],
+    ["Feedback", stats.feedbackReports],
     ["Suspicious games", stats.suspiciousGames],
   ];
-  return <div className="grid gap-5"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(([label, value]) => <Card key={label}><p className="text-sm font-bold text-slate-400">{label}</p><p className="mt-2 text-3xl font-black text-white">{Number.isFinite(Number(value)) ? value : "Unavailable"}</p></Card>)}</div><div className="grid gap-5 xl:grid-cols-2"><Card><h3 className="mb-4 text-xl font-black">Latest reports</h3>{data.latestReports?.length ? data.latestReports.map((ticket) => <div key={ticket._id} className="mb-3 rounded-2xl border border-white/10 p-3"><b>{ticket.subject}</b><p className="text-sm text-slate-400">{ticket.user?.email || "Unknown"} · {ticket.status}</p></div>) : <EmptyState>No reports found</EmptyState>}<AdminButton variant="ghost" className="mt-3" onClick={() => onSelect("feedback")}>Open feedback</AdminButton></Card><Card><h3 className="mb-4 text-xl font-black">Recent games</h3>{data.recentGames?.length ? data.recentGames.map((game) => <div key={game._id} className="mb-3 rounded-2xl border border-white/10 p-3"><b>{game.whitePlayer?.username || "White"} vs {game.blackPlayer?.username || "Black/AI"}</b><p className="text-sm text-slate-400">{game.result} · {formatDate(game.startTime)}</p></div>) : <EmptyState>No games found</EmptyState>}<AdminButton variant="ghost" className="mt-3" onClick={() => onSelect("games")}>Open games</AdminButton></Card></div></div>;
+  return <div className="grid gap-5"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(([label, value]) => <Card key={label}><p className="text-sm font-bold text-slate-400">{label}</p><p className="mt-2 text-3xl font-black text-white">{value ?? "Unavailable"}</p></Card>)}</div><div className="grid gap-5 xl:grid-cols-2"><Card><h3 className="mb-4 text-xl font-black">Latest reports</h3>{data.latestReports?.length ? data.latestReports.map((ticket) => <div key={ticket._id} className="mb-3 rounded-2xl border border-white/10 p-3"><b>{ticket.subject}</b><p className="text-sm text-slate-400">{ticket.user?.email || "Unknown"} · {ticket.status}</p></div>) : <EmptyState>No reports found</EmptyState>}<AdminButton variant="ghost" className="mt-3" onClick={() => onSelect("feedback")}>Open feedback</AdminButton></Card><Card><h3 className="mb-4 text-xl font-black">Recent games</h3>{data.recentGames?.length ? data.recentGames.map((game) => <div key={game._id} className="mb-3 rounded-2xl border border-white/10 p-3"><b>{game.whitePlayer?.username || "White"} vs {game.blackPlayer?.username || "Black/AI"}</b><p className="text-sm text-slate-400">{game.result} · {formatDate(game.startTime)}</p></div>) : <EmptyState>No games found</EmptyState>}<AdminButton variant="ghost" className="mt-3" onClick={() => onSelect("games")}>Open games</AdminButton></Card></div></div>;
 }
 
 function Users({ data, search, setSearch, userFilter, setUserFilter, busyKey, runAction }) {

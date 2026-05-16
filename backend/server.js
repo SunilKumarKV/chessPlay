@@ -61,6 +61,9 @@ const socialRoutes = require("./routes/social");
 const automationRoutes = require("./routes/automation");
 const adminRoutes = require("./routes/admin");
 const puzzleRoutes = require("./routes/puzzles");
+const feedbackRoutes = require("./routes/feedback");
+const paymentRoutes = require("./routes/payments");
+const waitlistRoutes = require("./routes/waitlist");
 const analysisRoutes = require("./routes/analysis");
 const referralRoutes = require("./routes/referrals");
 const tournamentRoutes = require("./routes/tournaments");
@@ -302,7 +305,12 @@ app.use(
     },
   }),
 );
-app.use(express.json({ limit: "20kb" }));
+app.use(express.json({
+  limit: "20kb",
+  verify: (req, _res, buffer) => {
+    if (req.originalUrl === "/api/payments/webhook") req.rawBody = buffer.toString("utf8");
+  },
+}));
 app.use(mongoSanitize());
 app.use(hpp());
 if (process.env.NODE_ENV === "production") {
@@ -335,6 +343,9 @@ app.use("/api/social", socialRoutes);
 app.use("/api/automation", automationRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/puzzles", puzzleRoutes);
+app.use("/api/feedback", feedbackRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/waitlist", waitlistRoutes);
 app.use("/api/analysis", analysisRoutes);
 app.use("/api/referrals", referralRoutes);
 app.use("/api/tournaments", tournamentRoutes);

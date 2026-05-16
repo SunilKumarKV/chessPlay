@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const allowedPlans = ["supporter_monthly", "supporter_yearly", "pro"];
+const allowedPlans = ["supporter_monthly", "supporter_yearly", "pro", "premium", "lifetime"];
 const allowedMethods = ["upi", "bank", "paypal"];
 
 const supporterRequestSchema = new mongoose.Schema(

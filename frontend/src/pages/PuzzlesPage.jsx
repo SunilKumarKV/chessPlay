@@ -8,6 +8,7 @@ import PuzzleDifficultyTabs from "../features/puzzles/components/PuzzleDifficult
 import PuzzleLimitModal from "../features/puzzles/components/PuzzleLimitModal";
 import PuzzleResultModal from "../features/puzzles/components/PuzzleResultModal";
 import PuzzleStatsCard from "../features/puzzles/components/PuzzleStatsCard";
+import { trackEvent } from "../services/analytics";
 
 function squareFromCoords(row, col) {
   return `${String.fromCharCode(97 + col)}${8 - row}`;
@@ -110,6 +111,7 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
         return;
       }
       setPuzzle(data.puzzle);
+      trackEvent("puzzle_start", { difficulty: nextDifficulty, puzzleId: data.puzzle.puzzleId });
       setGame(makeGame(data.puzzle.fen));
       setMoveIndex(data.puzzle.moveIndex || 1);
       setLastMove(data.puzzle.initialMove ? { from: data.puzzle.initialMove.slice(0, 2), to: data.puzzle.initialMove.slice(2, 4) } : null);

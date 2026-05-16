@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiClient } from "../../services/apiClient";
+import WaitlistForm from "../../components/waitlist/WaitlistForm";
+import { trackEvent } from "../../services/analytics";
 
 const FALLBACK_PLANS = {
   free: {
@@ -8,6 +10,27 @@ const FALLBACK_PLANS = {
     usdAmount: 0,
     days: 0,
     benefits: ["Play vs AI", "Play Online", "Play vs Player", "Puzzles", "Basic analysis", "Game history"],
+  },
+  pro: {
+    label: "Pro",
+    amount: 99,
+    usdAmount: 3,
+    days: 30,
+    benefits: ["25 puzzles/day", "No ads", "Premium sounds", "Early feature access"],
+  },
+  premium: {
+    label: "Premium",
+    amount: 299,
+    usdAmount: 8,
+    days: 30,
+    benefits: ["100 puzzles/day", "Advanced filters", "Analysis placeholders", "Priority feedback"],
+  },
+  lifetime: {
+    label: "Lifetime",
+    amount: 2999,
+    usdAmount: 79,
+    days: 36500,
+    benefits: ["200 puzzles/day", "Lifetime badge", "All premium placeholders", "Roadmap voting"],
   },
   supporter_monthly: {
     label: "Supporter Monthly",
@@ -39,6 +62,9 @@ const FALLBACK_BANK = import.meta.env.VITE_SUPPORT_BANK_LABEL || "";
 function normalizePlans(plans) {
   return {
     free: FALLBACK_PLANS.free,
+    pro: plans?.pro || FALLBACK_PLANS.pro,
+    premium: plans?.premium || FALLBACK_PLANS.premium,
+    lifetime: plans?.lifetime || FALLBACK_PLANS.lifetime,
     supporter_monthly: plans?.supporter_monthly || FALLBACK_PLANS.supporter_monthly,
     supporter_yearly: plans?.supporter_yearly || FALLBACK_PLANS.supporter_yearly,
   };
@@ -234,7 +260,7 @@ export default function PricingPage({ user, onBack, onNavigate }) {
                 {(plan.benefits || []).map((benefit) => <li key={benefit}>✓ {benefit}</li>)}
               </ul>
               {!isFree && (
-                <button type="button" onClick={() => setSelectedPlan(key)} className="mt-5 w-full rounded-xl bg-amber-300 px-4 py-3 font-black text-black hover:bg-amber-200">Choose {plan.label}</button>
+                <button type="button" onClick={() => { trackEvent("premium_click", { plan: key }); setSelectedPlan(key); }} className="mt-5 w-full rounded-xl bg-amber-300 px-4 py-3 font-black text-black hover:bg-amber-200">Choose {plan.label}</button>
               )}
             </article>
           );
@@ -381,6 +407,11 @@ export default function PricingPage({ user, onBack, onNavigate }) {
           </div>
         </section>
       </div>
+      <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+        <h2 className="text-xl font-black">Premium waitlist</h2>
+        <p className="mt-1 text-sm text-slate-400">Get updates for trials, Razorpay checkout, AI Coach, and deeper analysis features.</p>
+        <WaitlistForm source="pricing" interest="premium" />
+      </section>
     </div>
   );
 }
