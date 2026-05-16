@@ -1,6 +1,6 @@
 {
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm -C frontend build",
-  "outputDirectory": "dist",
+  "outputDirectory": "frontend/dist",
   "framework": "vite"
 }

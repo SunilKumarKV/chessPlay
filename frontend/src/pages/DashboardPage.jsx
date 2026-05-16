@@ -245,7 +245,17 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
     localStorage.setItem("selectedTimeControl", value);
   };
 
+  const requireLoginForGuest = (feature = "this feature") => {
+    if (!isGuest) return false;
+    setToast({ type: "error", message: `Please login to use ${feature}. Guest mode is limited to basic Play vs AI and local board practice.` });
+    return true;
+  };
+
   const startGame = (type) => {
+    if (isGuest && type === "multi") {
+      requireLoginForGuest("online multiplayer");
+      return;
+    }
     localStorage.setItem("selectedTimeControl", selectedTimeControl);
     onStartGame?.(type, selectedTimeControl);
   };
@@ -273,6 +283,15 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
     <div className="relative mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6 xl:p-8" style={{ color: theme.text.primary }}>
       <Toast toast={toast} onClose={() => setToast(null)} />
       <UpgradeModal open={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onNavigate={onNavigate} />
+
+      {isGuest && (
+        <div className="rounded-xl border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100" role="status">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span><strong>Guest Mode:</strong> You can play basic AI/local games. Login to save progress and unlock multiplayer, history, leaderboard, profile, friends, messages, tournaments, and premium modes.</span>
+            <button type="button" onClick={() => onNavigate?.("settings")} className="rounded-lg bg-amber-200 px-3 py-2 font-black text-amber-950">Login to unlock</button>
+          </div>
+        </div>
+      )}
 
       {errorMessage && (
         <div className="rounded-xl border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100" role="alert">
@@ -321,7 +340,7 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
                 Play vs AI
                 <span className="block text-xs font-semibold opacity-80">Stockfish · {selectedTimeControl}</span>
               </button>
-              <button type="button" onClick={() => (isGuest ? onNavigate?.("settings") : startGame("multi"))} className="rounded-xl border border-white/10 bg-white/10 px-5 py-4 text-left font-bold text-white transition-all hover:-translate-y-1 hover:border-cyan-300/40 hover:bg-cyan-300/10" aria-label="Play online multiplayer">
+              <button type="button" onClick={() => startGame("multi")} className="rounded-xl border border-white/10 bg-white/10 px-5 py-4 text-left font-bold text-white transition-all hover:-translate-y-1 hover:border-cyan-300/40 hover:bg-cyan-300/10" aria-label="Play online multiplayer">
                 {isGuest ? "Login for Online" : "Play Online"}
                 <span className="block text-xs font-semibold text-slate-400">Real-time multiplayer rooms</span>
               </button>
@@ -340,11 +359,11 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
             </div>
           </div>
           <div className="mt-5 grid grid-cols-2 gap-3">
-            <button type="button" onClick={() => onNavigate?.("profile")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">View Profile</button>
-            <button type="button" onClick={() => onNavigate?.("history")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Game History</button>
-            <button type="button" onClick={copyInvite} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">{inviteCopied ? "Copied" : "Invite"}</button>
-            <button type="button" onClick={() => onNavigate?.("leaderboard")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Leaderboard</button>
-            <button type="button" onClick={() => onNavigate?.("puzzles")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Puzzles</button>
+            <button type="button" onClick={() => requireLoginForGuest("profile stats") || onNavigate?.("profile")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">View Profile</button>
+            <button type="button" onClick={() => requireLoginForGuest("game history") || onNavigate?.("history")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Game History</button>
+            <button type="button" onClick={() => requireLoginForGuest("invites") || copyInvite()} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">{inviteCopied ? "Copied" : "Invite"}</button>
+            <button type="button" onClick={() => requireLoginForGuest("leaderboard") || onNavigate?.("leaderboard")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Leaderboard</button>
+            <button type="button" onClick={() => requireLoginForGuest("saved puzzle progress") || onNavigate?.("puzzles")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Puzzles</button>
             {isAdmin && (
               <button type="button" onClick={() => onNavigate?.("admin")} className="col-span-2 rounded-lg border border-[#81b64c]/40 bg-[#81b64c]/15 px-3 py-3 text-left text-sm font-black text-[#dcf8c6] transition hover:bg-[#81b64c]/20">Open Admin Panel</button>
             )}
@@ -375,9 +394,9 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {[
                 { title: "Play vs AI", meta: "Practice instantly", action: () => startGame("ai"), accent: "#81b64c" },
-                { title: "Play Online", meta: isGuest ? "Login required" : "Live rooms", action: () => (isGuest ? onNavigate?.("settings") : startGame("multi")), accent: "#38bdf8" },
+                { title: "Play Online", meta: isGuest ? "Login required" : "Live rooms", action: () => startGame("multi"), accent: "#38bdf8" },
                 { title: "Puzzles", meta: "Train tactics", action: () => onNavigate?.("puzzles"), accent: "#a78bfa" },
-                { title: "Game History", meta: "Recent results", action: () => onNavigate?.("history"), accent: "#f59e0b" },
+                { title: "Game History", meta: "Recent results", action: () => requireLoginForGuest("game history") || onNavigate?.("history"), accent: "#f59e0b" },
               ].map((item) => (
                 <button key={item.title} type="button" onClick={item.action} className="group rounded-xl border border-white/10 bg-black/20 p-4 text-left transition-all hover:-translate-y-1 hover:bg-white/10">
                   <div className="mb-4 grid h-10 w-10 place-items-center rounded-lg text-lg font-black text-[#07100a]" style={{ backgroundColor: item.accent }}>{item.title.charAt(0)}</div>
@@ -394,7 +413,7 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
                 <h2 className="font-['Montserrat'] text-xl font-black text-white">Recent Games</h2>
                 <p className="mt-1 text-sm text-slate-400">Your latest completed and active games.</p>
               </div>
-              <button type="button" onClick={() => onNavigate?.("history")} className="rounded-lg border border-white/10 px-4 py-2 text-sm font-bold text-slate-200 transition hover:bg-white/10">View all</button>
+              <button type="button" onClick={() => requireLoginForGuest("game history") || onNavigate?.("history")} className="rounded-lg border border-white/10 px-4 py-2 text-sm font-bold text-slate-200 transition hover:bg-white/10">View all</button>
             </div>
             {recentGames.length === 0 ? (
               <EmptyState title="No games yet" message="Start your first match to build your game history and rating profile." actionLabel="Play vs AI" onAction={() => startGame("ai")} />
@@ -407,7 +426,7 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
                   {recentGames.map((game) => {
                     const result = getGameResult(game, userId);
                     return (
-                      <button key={game._id || game.id || `${game.createdAt}-${game.result}`} type="button" onClick={() => onNavigate?.("history")} className="grid w-full gap-2 px-4 py-4 text-left transition hover:bg-white/5 md:grid-cols-[1fr_120px_120px_100px] md:items-center">
+                      <button key={game._id || game.id || `${game.createdAt}-${game.result}`} type="button" onClick={() => requireLoginForGuest("game history") || onNavigate?.("history")} className="grid w-full gap-2 px-4 py-4 text-left transition hover:bg-white/5 md:grid-cols-[1fr_120px_120px_100px] md:items-center">
                         <div className="min-w-0">
                           <div className="truncate font-bold text-white">vs {getOpponent(game, userId)}</div>
                           <div className="text-xs text-slate-500 md:hidden">{game.aiOpponent ? "AI" : "Online"} · {formatDate(game.createdAt)}</div>
@@ -431,11 +450,11 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
                 <h2 className="font-['Montserrat'] text-xl font-black text-white">Leaderboard</h2>
                 <p className="mt-1 text-sm text-slate-400">Top active players.</p>
               </div>
-              <button type="button" onClick={() => onNavigate?.("leaderboard")} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-white/10">Open</button>
+              <button type="button" onClick={() => requireLoginForGuest("leaderboard") || onNavigate?.("leaderboard")} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-white/10">Open</button>
             </div>
             <div className="space-y-2">
               {leaderboard.slice(0, 5).map((player, index) => (
-                <button key={player._id || player.id || player.username || index} type="button" onClick={() => onNavigate?.("leaderboard")} className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left transition hover:bg-white/10">
+                <button key={player._id || player.id || player.username || index} type="button" onClick={() => requireLoginForGuest("leaderboard") || onNavigate?.("leaderboard")} className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left transition hover:bg-white/10">
                   <span className="flex min-w-0 items-center gap-2">
                     <span className="grid h-8 w-8 place-items-center rounded-md bg-white/10 text-xs font-black text-slate-300">{index + 1}</span>
                     <span className="truncate text-sm font-bold text-slate-100">{player.username || "Player"}</span>
