@@ -1,95 +1,117 @@
-# ChessPlay Release Checklist - v1.4.0-beta.1
+# ChessPlay v1.3.0 Release Checklist
 
-Use this checklist before merging, tagging, or deploying the release.
+## Version
 
-## Branch Safety
+```txt
+v1.3.0
+```
 
-- [ ] Work is committed on a release branch, not directly on `main`.
-- [ ] Pull request is opened into `main`.
-- [ ] CI passes on the pull request.
-- [ ] Final review confirms no new features were added in Phase 10.
-- [ ] Final review confirms no UI redesign was introduced in Phase 10.
-- [ ] Final review confirms API response formats were not changed.
-- [ ] Final review confirms MongoDB/Mongoose was not removed.
-- [ ] Final review confirms socket event names were not changed.
+## Pre-Release Checks
 
-## Environment and Secrets
+- [ ] Confirm current branch is correct.
+- [ ] Confirm release version is `1.3.0` in root, backend, and frontend `package.json`.
+- [ ] Confirm no old beta release references remain.
+- [ ] Confirm `.env` files are not committed.
+- [ ] Confirm `.env.example` files contain placeholders only.
 
-- [ ] No `.env` files are committed.
-- [ ] `.env.example`, `backend/.env.example`, and `frontend/.env.example` contain placeholders only.
-- [ ] Production secrets are configured only in hosting provider dashboards or GitHub Secrets.
-- [ ] No hardcoded database URLs, JWT secrets, Redis URLs, SMTP passwords, payment keys, or API tokens exist in source code.
-- [ ] Public showcase/docs repos do not contain backend, payment, auth, database, or admin logic.
-
-## Required GitHub Secrets
-
-- [ ] `DATABASE_URL`
-- [ ] `JWT_ACCESS_SECRET`
-- [ ] `JWT_REFRESH_SECRET`
-- [ ] `MONGO_URI`
-- [ ] `REDIS_URL`
-- [ ] `VITE_API_URL`
-- [ ] `VITE_SOCKET_URL`
-
-## Final Local Commands
+## Build Checks
 
 ```bash
 pnpm install
-pnpm --filter chessplay-backend exec prisma generate
+pnpm --filter ./backend exec prisma generate
+pnpm -C backend build
+pnpm -C frontend lint
+pnpm -C frontend build
 pnpm build
-pnpm lint
-pnpm test
 ```
 
-## Manual Frontend Testing
+- [ ] Backend build passes.
+- [ ] Frontend lint passes.
+- [ ] Frontend build passes.
+- [ ] Full build passes.
 
-- [ ] Home page loads.
-- [ ] Login page loads.
-- [ ] Register flow works.
-- [ ] Dashboard loads after login.
-- [ ] Profile page loads and handles missing/partial user data safely.
-- [ ] Play vs AI starts a game.
-- [ ] Multiplayer room can be created/joined.
-- [ ] Leaderboard loads without crashing.
-- [ ] Premium page loads without exposing secrets.
-- [ ] Referral page loads without crashing.
-- [ ] Settings page saves/loads expected settings.
-- [ ] Mobile layout works on small screen widths.
+## Secret Scan
 
-## Manual Backend Testing
+```bash
+git grep -n "JWT_ACCESS_SECRET\|JWT_REFRESH_SECRET\|MONGO_URI\|MONGODB_URI\|DATABASE_URL\|SMTP_PASS\|TELEGRAM_BOT_TOKEN\|CLOUDINARY_API_SECRET\|STRIPE_SECRET_KEY\|PAYPAL_CLIENT_SECRET\|PAYMENT_SIGNING_SECRET"
+```
 
-- [ ] Health route returns success.
-- [ ] Auth routes work for login/register/current user.
-- [ ] Profile routes return safe data.
-- [ ] Game history routes do not crash when empty.
-- [ ] Premium/referral routes return expected existing response format.
-- [ ] Socket connection succeeds.
-- [ ] Prisma generate succeeds.
-- [ ] MongoDB connection succeeds.
+- [ ] Only placeholders or variable names are found.
+- [ ] No real secret values are found.
 
-## Deployment Order
+## Backend Deploy Check
 
-- [ ] Deploy backend first.
-- [ ] Verify backend health route.
-- [ ] Verify backend MongoDB connection.
-- [ ] Verify socket connection.
-- [ ] Deploy frontend.
-- [ ] Confirm frontend production env vars point to production backend/socket URLs.
-- [ ] Smoke test auth, dashboard, Play vs AI, multiplayer, premium, referral, and settings.
-- [ ] Create tag only after smoke testing passes.
+Render settings:
 
-## Public Showcase Update Safety
+```txt
+Root Directory: backend
+Build Command: npm install && npm run build
+Start Command: npm run start
+Node: 20.x
+```
 
-- [ ] Feature summary only.
-- [ ] Screenshots only.
-- [ ] Live demo link only.
-- [ ] No backend source code.
-- [ ] No auth/payment/admin/database logic.
-- [ ] No `.env` files or real secrets.
+- [ ] Render build succeeds.
+- [ ] Render start succeeds.
+- [ ] Health route works.
+- [ ] MongoDB connects.
+- [ ] Socket.IO connects.
+
+## Frontend Deploy Check
+
+Vercel settings:
+
+```txt
+Root Directory: frontend
+Build Command: pnpm build
+Output Directory: dist
+```
+
+- [ ] Vercel build succeeds.
+- [ ] Frontend opens correctly.
+- [ ] API URL points to backend production URL.
+- [ ] Socket URL points to backend production URL.
+
+## Manual Production Testing
+
+- [ ] Home page
+- [ ] Login/register
+- [ ] Dashboard
+- [ ] Profile
+- [ ] Play vs AI
+- [ ] Multiplayer room
+- [ ] Leaderboard
+- [ ] Premium page
+- [ ] Referral page
+- [ ] Settings page
+- [ ] Mobile responsiveness
+
+## Public Sharing Safety
+
+- [ ] Public showcase has screenshots and feature summary only.
+- [ ] No backend logic in public showcase.
+- [ ] No auth/payment/database/admin internals in public showcase.
+- [ ] No production secrets in public files.
+
+## Release Commands
+
+```bash
+git add .
+git commit -m "chore: finalize ChessPlay v1.3.0 production release"
+git push origin main
+git tag -a v1.3.0 -m "ChessPlay stable release v1.3.0"
+git push origin v1.3.0
+```
 
 ## Rollback
 
-- [ ] Previous stable deployment is known.
-- [ ] Previous stable Git tag/commit is known.
-- [ ] Hosting dashboard rollback option is available.
-- [ ] Database backups/snapshots are verified before production changes.
+```bash
+git revert <release-commit-sha>
+git push origin main
+```
+
+If tag rollback is needed:
+
+```bash
+git tag -d v1.3.0
+git push origin :refs/tags/v1.3.0
+```

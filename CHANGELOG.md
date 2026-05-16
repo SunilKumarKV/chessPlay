@@ -1,23 +1,37 @@
 # Changelog
 
-## v1.4.0-beta.1 - Final Release Preparation
+All notable ChessPlay production changes are documented here.
 
-Phase 10 is focused on final release preparation only. No new features, UI redesigns, API response changes, MongoDB/Mongoose removal, or socket event name changes were introduced.
+## v1.3.0 - Stable Production Release
 
-### Release Preparation
+### Release Status
 
-- Updated project version to `v1.4.0-beta.1`.
-- Added final release notes, known issues, and rollback plan.
-- Updated release checklist for final pre-merge and pre-tag verification.
-- Confirmed `.env.example` files remain placeholder-only.
-- Prepared safe public showcase and docs update templates.
+- Stable production release prepared for public sharing.
+- Final cleanup completed for release documentation, version naming, testing checklist, security notes, and deployment instructions.
 
-### Bug Fixes
+### Fixed
 
-- Fixed the React Hooks lint warning in `TournamentsPage.jsx` by memoizing the existing `load` function with `useCallback` and using it in the effect dependency list.
-- Updated root build script to run backend build first and frontend build second, so `pnpm build` verifies the complete app instead of only the frontend.
+- Stabilized production release naming from beta to `v1.3.0`.
+- Added production-safe testing and release documentation.
+- Improved deployment readiness for Render backend and Vercel frontend.
+- Verified environment templates use placeholders only.
+- Cleaned outdated duplicate release notes and temporary internal report files.
 
-### Safety Notes
+### Infrastructure
 
-- Private backend, payment, auth, database, and admin implementation details must remain only in the private `chessPlay` repository.
-- Public showcase/docs updates must contain feature summaries, screenshots, roadmap, and release notes only.
+- GitHub Actions CI retained.
+- pnpm workspace setup retained.
+- MongoDB/Mongoose retained.
+- Prisma generate workflow retained where configured.
+- Socket.IO event names unchanged.
+
+### Security
+
+- `.env` files remain ignored.
+- Production secrets must stay in GitHub Secrets, Vercel Environment Variables, and Render Environment Variables.
+- Public showcase/docs must not include private backend, payment, auth, database, or admin logic.
+
+### Known Notes
+
+- Final validation should be performed on deployed production URLs before social sharing.
+- Browser extension console warnings should be tested again in incognito mode with extensions disabled.
