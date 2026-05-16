@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 import {
   resetGame,
