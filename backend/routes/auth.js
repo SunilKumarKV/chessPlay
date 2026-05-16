@@ -310,7 +310,7 @@ router.post("/register", authLimiter, async (req, res) => {
 // Login
 router.post("/login", authLimiter, async (req, res) => {
   try {
-    const { password } = req.body;
+    const { password, referralCode } = req.body;
     const email = normalizeEmail(req.body.email);
 
     // Find user
@@ -335,7 +335,9 @@ router.post("/login", authLimiter, async (req, res) => {
     // Update last login
     user.lastLogin = new Date();
     await user.save();
-    const referralConnected = await connectReferralForNewUser(user, referralCode);
+    if (referralCode) {
+      await connectReferralForNewUser(user, referralCode);
+    }
 
     await issueSession(res, user);
     await recordSecurityEvent(req, { type: user.isAdmin ? "admin_login" : "login_success", email: user.email, user: user._id });
