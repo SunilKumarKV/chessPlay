@@ -34,6 +34,31 @@ function getPositionKey(board, turn, castling, enPassant) {
 }
 
 
+function findLegalMoveFromUci(board, uci, aiColor, enPassant, castling) {
+  const parsedMove = uciToMove(uci);
+  if (!parsedMove) return null;
+
+  const [fromRow, fromCol] = parsedMove.from;
+  const [toRow, toCol] = parsedMove.to;
+  const piece = board[fromRow]?.[fromCol];
+
+  if (!piece || colorOf(piece) !== aiColor) return null;
+
+  const legalMoves = getLegalMoves(board, fromRow, fromCol, enPassant, castling);
+  const isLegalDestination = legalMoves.some(
+    ([legalRow, legalCol]) => legalRow === toRow && legalCol === toCol,
+  );
+
+  if (!isLegalDestination) return null;
+
+  const isPromotion = typeOf(piece) === "P" && (toRow === 0 || toRow === 7);
+  return {
+    from: parsedMove.from,
+    to: parsedMove.to,
+    promotion: isPromotion ? (parsedMove.promotion || "Q").toUpperCase() : null,
+  };
+}
+
 function findFallbackAiMove(board, aiColor, enPassant, castling) {
   const legalCandidates = [];
 
@@ -116,6 +141,7 @@ export function useChessGame({
   const {
     ready: sfReady,
     thinking: sfThinking,
+    engineName: sfEngineName,
     getBestMove,
   } = useStockfish({
     enabled: aiEnabled,
@@ -267,7 +293,9 @@ export function useChessGame({
 
     const getFallbackMove = () => {
       const fallbackMove = findFallbackAiMove(board, aiColor, enPassant, castling);
-      if (!fallbackMove) {
+      if (fallbackMove) {
+        console.log("AI fallback used", fallbackMove);
+      } else {
         console.warn("AI: No legal fallback move available");
       }
       return fallbackMove;
@@ -281,8 +309,8 @@ export function useChessGame({
     };
 
     if (!sfReady) {
-      // Production-safe fallback: if Stockfish is still loading or failed to boot,
-      // Play vs AI must not freeze. Use a legal local move until the engine is ready.
+      // Production-safe fallback: Play vs AI must never freeze while Stockfish boots/fails.
+      console.log("AI engine:", sfEngineName || "fallback");
       playFallbackMove(450);
       return () => {
         cancelled = true;
@@ -308,12 +336,13 @@ export function useChessGame({
 
         let selectedMove = null;
 
+        console.log("AI engine:", sfEngineName || "stockfish");
+        console.log("AI move:", uci || "none");
+
         if (uci) {
-          const stockfishMove = uciToMove(uci);
-          if (stockfishMove) {
-            selectedMove = stockfishMove;
-          } else {
-            console.warn("AI: Failed to parse move:", uci);
+          selectedMove = findLegalMoveFromUci(board, uci, aiColor, enPassant, castling);
+          if (!selectedMove) {
+            console.warn("AI: Stockfish returned invalid/unplayable move, using fallback:", uci);
           }
         } else {
           console.warn("AI: No move returned from Stockfish");
@@ -347,6 +376,7 @@ export function useChessGame({
     halfmoveClock,
     fullmove,
     aiDifficulty,
+    sfEngineName,
   ]);
 
   const commitMove = useCallback(
@@ -747,6 +777,7 @@ export function useChessGame({
 
     sfReady,
     sfThinking,
+    sfEngineName,
 
     clock,
     timeControl,

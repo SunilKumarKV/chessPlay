@@ -1,14 +1,8 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 
-const DEFAULT_MOVE_TIMEOUT_MS = 8000;
-const ENGINE_BOOT_TIMEOUT_MS = 7000;
-const DEBUG_STOCKFISH = import.meta.env.DEV;
-
-const ENGINE_WORKERS = [
-  { name: "stable-wasm", path: "workers/stockfish-stable-worker.js" },
-  { name: "legacy-js", path: "workers/stockfish-legacy-worker.js" },
-  { name: "original", path: "workers/stockfish-worker.js" },
-];
+const DEFAULT_MOVE_TIMEOUT_MS = 4500;
+const ENGINE_BOOT_TIMEOUT_MS = 3500;
+const DEBUG_STOCKFISH = true;
 
 function parseEvaluation(message) {
   const cpMatch = message.match(/\bscore cp (-?\d+)/);
@@ -25,7 +19,7 @@ function safeErrorMessage(error) {
 }
 
 function debugStockfish(...args) {
-  if (DEBUG_STOCKFISH) console.info("[Stockfish]", ...args);
+  if (DEBUG_STOCKFISH) console.info("[ChessPlay AI]", ...args);
 }
 
 function resolveBestMove(message) {
@@ -35,15 +29,22 @@ function resolveBestMove(message) {
   return /^[a-h][1-8][a-h][1-8][qrbn]?$/i.test(bestMove) ? bestMove.toLowerCase() : null;
 }
 
-function workerUrl(path) {
-  const base = import.meta.env.BASE_URL || "/";
-  return new URL(`${base}${path}`.replace(/\/+/g, "/"), window.location.origin).toString();
+function createWorkerUrl(path) {
+  return new URL(`${import.meta.env.BASE_URL}${path}`.replace(/\/+/g, "/"), window.location.origin).toString();
 }
+
+const ENGINE_CANDIDATES = [
+  { name: "stable-stockfish-direct", path: "stockfish/stockfish.js" },
+  { name: "stable-stockfish-wrapper", path: "workers/stockfish-worker.js" },
+  { name: "legacy-stockfish-root", path: "stockfish.js" },
+];
 
 export function useStockfish({ enabled = true } = {}) {
   const workerRef = useRef(null);
+  const mountedRef = useRef(false);
   const movePromiseRef = useRef(null);
-  const activeEngineRef = useRef(null);
+  const engineIndexRef = useRef(0);
+  const bootTimeoutRef = useRef(null);
 
   const [ready, setReady] = useState(false);
   const [thinking, setThinking] = useState(false);
@@ -51,21 +52,24 @@ export function useStockfish({ enabled = true } = {}) {
   const [evaluation, setEvaluation] = useState(null);
   const [lastBestMove, setLastBestMove] = useState(null);
   const [error, setError] = useState(null);
-  const [engineName, setEngineName] = useState(null);
+  const [engineName, setEngineName] = useState("fallback");
   const [retryKey, setRetryKey] = useState(0);
 
-  const resolvePendingMove = useCallback((value) => {
-    if (!movePromiseRef.current) return;
-    clearTimeout(movePromiseRef.current.timeoutId);
-    movePromiseRef.current.resolve(value);
-    movePromiseRef.current = null;
-  }, []);
-
-  const rejectPendingMove = useCallback((reason) => {
-    if (!movePromiseRef.current) return;
-    clearTimeout(movePromiseRef.current.timeoutId);
-    movePromiseRef.current.reject(new Error(reason));
-    movePromiseRef.current = null;
+  const cleanupWorker = useCallback(() => {
+    if (bootTimeoutRef.current) {
+      clearTimeout(bootTimeoutRef.current);
+      bootTimeoutRef.current = null;
+    }
+    if (movePromiseRef.current) {
+      clearTimeout(movePromiseRef.current.timeoutId);
+      movePromiseRef.current.resolve(null);
+      movePromiseRef.current = null;
+    }
+    if (workerRef.current) {
+      try { workerRef.current.postMessage("quit"); } catch { /* noop */ }
+      try { workerRef.current.terminate(); } catch { /* noop */ }
+      workerRef.current = null;
+    }
   }, []);
 
   const sendCommand = useCallback((command) => {
@@ -73,96 +77,109 @@ export function useStockfish({ enabled = true } = {}) {
   }, []);
 
   const retry = useCallback(() => {
+    cleanupWorker();
+    engineIndexRef.current = 0;
     setError(null);
     setReady(false);
     setThinking(false);
     setDepth(0);
     setEvaluation(null);
     setLastBestMove(null);
-    setEngineName(null);
+    setEngineName("fallback");
     setRetryKey((value) => value + 1);
+  }, [cleanupWorker]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
   }, []);
 
   useEffect(() => {
-    if (!enabled) return undefined;
+    if (!enabled) {
+      cleanupWorker();
+      setReady(false);
+      setThinking(false);
+      setEngineName("fallback");
+      return undefined;
+    }
 
-    let mounted = true;
-    let bootTimeoutId = null;
-    let candidateIndex = 0;
+    let disposed = false;
 
-    const cleanupWorker = () => {
-      if (bootTimeoutId) {
-        clearTimeout(bootTimeoutId);
-        bootTimeoutId = null;
-      }
-      if (workerRef.current) {
-        try { workerRef.current.postMessage("quit"); } catch { /* noop */ }
-        try { workerRef.current.terminate(); } catch { /* noop */ }
-        workerRef.current = null;
+    const failCurrentMove = () => {
+      if (movePromiseRef.current) {
+        clearTimeout(movePromiseRef.current.timeoutId);
+        movePromiseRef.current.resolve(null);
+        movePromiseRef.current = null;
       }
     };
 
-    const startCandidate = () => {
-      if (!mounted) return;
+    const tryStartEngine = () => {
+      if (disposed || !mountedRef.current) return;
       cleanupWorker();
 
-      const candidate = ENGINE_WORKERS[candidateIndex];
+      const candidate = ENGINE_CANDIDATES[engineIndexRef.current];
       if (!candidate) {
+        debugStockfish("all Stockfish engines failed, built-in legal AI fallback active");
         setReady(false);
         setThinking(false);
-        setEngineName(null);
-        // Do not hard-block Play vs AI. ChessPage will use local legal AI fallback.
-        setError("Stockfish engine unavailable; using built-in fallback AI.");
-        resolvePendingMove(null);
+        setEngineName("fallback");
+        setError("Stockfish unavailable. Built-in legal AI fallback is active.");
         return;
       }
 
+      const workerUrl = createWorkerUrl(candidate.path);
+      debugStockfish("loading engine:", candidate.name, workerUrl);
+      setReady(false);
+      setThinking(false);
+      setDepth(0);
+      setEvaluation(null);
+      setLastBestMove(null);
+      setEngineName(candidate.name);
+      setError(null);
+
       let worker;
+      let booted = false;
+
+      const moveToNextEngine = (reason) => {
+        if (disposed || !mountedRef.current) return;
+        debugStockfish(`${candidate.name} failed:`, reason);
+        failCurrentMove();
+        engineIndexRef.current += 1;
+        tryStartEngine();
+      };
+
       try {
-        worker = new Worker(workerUrl(candidate.path));
+        worker = new Worker(workerUrl);
       } catch (creationError) {
-        debugStockfish(`${candidate.name} worker create failed`, creationError);
-        candidateIndex += 1;
-        startCandidate();
+        moveToNextEngine(safeErrorMessage(creationError));
         return;
       }
 
       workerRef.current = worker;
-      activeEngineRef.current = candidate.name;
-      setEngineName(candidate.name);
-      setReady(false);
-      setThinking(false);
-      setError(null);
-      setDepth(0);
-      setEvaluation(null);
-      setLastBestMove(null);
 
-      bootTimeoutId = setTimeout(() => {
-        if (!mounted || workerRef.current !== worker) return;
-        debugStockfish(`${candidate.name} boot timeout; trying next engine`);
-        candidateIndex += 1;
-        startCandidate();
+      bootTimeoutRef.current = setTimeout(() => {
+        if (booted || disposed) return;
+        moveToNextEngine("boot timeout");
       }, ENGINE_BOOT_TIMEOUT_MS);
 
       worker.onmessage = (event) => {
-        if (!mounted || workerRef.current !== worker) return;
+        if (disposed || !mountedRef.current) return;
         const msg = typeof event.data === "string" ? event.data.trim() : "";
         if (!msg) return;
 
         debugStockfish(candidate.name, msg);
 
-        if (msg.startsWith("[stockfish-")) return;
+        if (msg.startsWith("[stockfish-worker]")) return;
 
-        if (msg.startsWith("error")) {
-          debugStockfish(`${candidate.name} error; trying next engine`, msg);
-          candidateIndex += 1;
-          startCandidate();
+        if (/^(error|abort\(|exception thrown|failed)/i.test(msg)) {
+          setError(msg);
+          moveToNextEngine(msg);
           return;
         }
 
         if (msg === "uciok") {
-          if (bootTimeoutId) clearTimeout(bootTimeoutId);
-          bootTimeoutId = null;
+          booted = true;
+          if (bootTimeoutRef.current) clearTimeout(bootTimeoutRef.current);
           setReady(true);
           setError(null);
           worker.postMessage("isready");
@@ -170,8 +187,8 @@ export function useStockfish({ enabled = true } = {}) {
         }
 
         if (msg === "readyok") {
-          if (bootTimeoutId) clearTimeout(bootTimeoutId);
-          bootTimeoutId = null;
+          booted = true;
+          if (bootTimeoutRef.current) clearTimeout(bootTimeoutRef.current);
           setReady(true);
           setError(null);
           return;
@@ -181,7 +198,11 @@ export function useStockfish({ enabled = true } = {}) {
           setThinking(false);
           const bestMove = resolveBestMove(msg);
           setLastBestMove(bestMove);
-          resolvePendingMove(bestMove);
+          if (movePromiseRef.current) {
+            clearTimeout(movePromiseRef.current.timeoutId);
+            movePromiseRef.current.resolve(bestMove);
+            movePromiseRef.current = null;
+          }
           return;
         }
 
@@ -195,83 +216,95 @@ export function useStockfish({ enabled = true } = {}) {
       };
 
       worker.onerror = (event) => {
-        if (!mounted || workerRef.current !== worker) return;
-        debugStockfish(`${candidate.name} worker error`, event?.message || event);
-        candidateIndex += 1;
-        startCandidate();
+        moveToNextEngine(event?.message || "worker error");
       };
 
       worker.postMessage("uci");
     };
 
-    startCandidate();
+    engineIndexRef.current = 0;
+    tryStartEngine();
 
     return () => {
-      mounted = false;
-      if (bootTimeoutId) clearTimeout(bootTimeoutId);
-      resolvePendingMove(null);
+      disposed = true;
       cleanupWorker();
       setReady(false);
       setThinking(false);
     };
-  }, [enabled, retryKey, resolvePendingMove]);
+  }, [enabled, retryKey, cleanupWorker]);
 
   const getBestMove = useCallback(
-    (fen, options = 10) => {
-      return new Promise((resolve, reject) => {
-        if (!workerRef.current || !ready || error) {
-          reject(new Error(error || "Stockfish not ready"));
-          return;
-        }
+    (fen, options = 10) => new Promise((resolve) => {
+      if (!workerRef.current || !ready || error) {
+        debugStockfish("engine not ready, caller should use fallback", { ready, error, engineName });
+        resolve(null);
+        return;
+      }
 
-        if (movePromiseRef.current) resolvePendingMove(null);
+      if (movePromiseRef.current) {
+        clearTimeout(movePromiseRef.current.timeoutId);
+        movePromiseRef.current.resolve(null);
+        movePromiseRef.current = null;
+      }
 
-        let goCommand = "";
-        let timeoutMs = DEFAULT_MOVE_TIMEOUT_MS;
-        let skillLevel = null;
+      let goCommand = "";
+      let timeoutMs = DEFAULT_MOVE_TIMEOUT_MS;
+      let skillLevel = null;
 
-        if (typeof options === "object") {
-          skillLevel = Number.isFinite(Number(options.skill)) ? Number(options.skill) : null;
-          if (options.movetime) {
-            const safeMoveTime = Math.max(300, Math.min(3000, Number(options.movetime)));
-            goCommand = `go movetime ${safeMoveTime}`;
-            timeoutMs = safeMoveTime + 5000;
-          } else {
-            const requestedDepth = Math.max(1, Math.min(24, Number(options.depth || 10)));
-            goCommand = `go depth ${requestedDepth}`;
-            timeoutMs = Math.max(DEFAULT_MOVE_TIMEOUT_MS, requestedDepth * 900);
-          }
-        } else if (typeof options === "number" && options > 100) {
-          const safeMoveTime = Math.max(300, Math.min(3000, Number(options)));
+      if (typeof options === "object") {
+        skillLevel = Number.isFinite(Number(options.skill)) ? Number(options.skill) : null;
+        if (options.movetime) {
+          const safeMoveTime = Math.max(250, Math.min(2500, Number(options.movetime)));
           goCommand = `go movetime ${safeMoveTime}`;
-          timeoutMs = safeMoveTime + 5000;
+          timeoutMs = safeMoveTime + 2500;
         } else {
-          const requestedDepth = Math.max(1, Math.min(24, Number(options || 10)));
+          const requestedDepth = Math.max(1, Math.min(16, Number(options.depth || 8)));
           goCommand = `go depth ${requestedDepth}`;
-          timeoutMs = Math.max(DEFAULT_MOVE_TIMEOUT_MS, requestedDepth * 900);
+          timeoutMs = Math.max(DEFAULT_MOVE_TIMEOUT_MS, requestedDepth * 600);
         }
+      } else if (typeof options === "number" && options > 100) {
+        const safeMoveTime = Math.max(250, Math.min(2500, Number(options)));
+        goCommand = `go movetime ${safeMoveTime}`;
+        timeoutMs = safeMoveTime + 2500;
+      } else {
+        const requestedDepth = Math.max(1, Math.min(16, Number(options || 8)));
+        goCommand = `go depth ${requestedDepth}`;
+        timeoutMs = Math.max(DEFAULT_MOVE_TIMEOUT_MS, requestedDepth * 600);
+      }
 
-        const timeoutId = setTimeout(() => {
-          workerRef.current?.postMessage("stop");
-          setThinking(false);
-          rejectPendingMove("Stockfish took too long; using fallback AI.");
-        }, Math.max(timeoutMs, 2500));
+      const timeoutId = setTimeout(() => {
+        if (!movePromiseRef.current) return;
+        debugStockfish("bestmove timeout, using fallback");
+        try { workerRef.current?.postMessage("stop"); } catch { /* noop */ }
+        setThinking(false);
+        movePromiseRef.current.resolve(null);
+        movePromiseRef.current = null;
+      }, Math.max(timeoutMs, 2000));
 
-        movePromiseRef.current = { resolve, reject, timeoutId };
-        setThinking(true);
-        setDepth(0);
-        setEvaluation(null);
-        setLastBestMove(null);
+      movePromiseRef.current = { resolve, timeoutId };
+      setThinking(true);
+      setDepth(0);
+      setEvaluation(null);
+      setLastBestMove(null);
 
+      try {
         workerRef.current.postMessage("stop");
+        workerRef.current.postMessage("ucinewgame");
         if (skillLevel !== null) {
           workerRef.current.postMessage(`setoption name Skill Level value ${Math.max(0, Math.min(20, skillLevel))}`);
         }
         workerRef.current.postMessage(`position fen ${fen}`);
         workerRef.current.postMessage(goCommand);
-      });
-    },
-    [ready, error, resolvePendingMove, rejectPendingMove],
+        debugStockfish("AI engine:", engineName, "command:", goCommand);
+      } catch (commandError) {
+        clearTimeout(timeoutId);
+        setThinking(false);
+        movePromiseRef.current = null;
+        debugStockfish("engine command failed, using fallback", commandError);
+        resolve(null);
+      }
+    }),
+    [ready, error, engineName],
   );
 
   return {

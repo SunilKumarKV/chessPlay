@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 import {
   resetGame,
@@ -81,44 +81,6 @@ export default function Chess({
     { label: "Play as Black", value: "w" },
   ], []);
 
-  const getFallbackAiMove = useCallback(() => {
-    try {
-      const testGame = new ChessEngine(gameState.fen);
-      const legalMoves = testGame.moves({ verbose: true });
-      if (!legalMoves.length) return null;
-
-      // Prefer useful moves so the fallback still feels like an AI, not a random click.
-      const checks = legalMoves.filter((move) => move.san.includes("+"));
-      const captures = legalMoves.filter((move) => Boolean(move.captured));
-      const promotions = legalMoves.filter((move) => Boolean(move.promotion));
-      const pool = promotions.length ? promotions : checks.length ? checks : captures.length ? captures : legalMoves;
-      return pool[Math.floor(Math.random() * pool.length)];
-    } catch (error) {
-      console.error("Fallback AI failed:", error);
-      return null;
-    }
-  }, [gameState.fen]);
-
-  const applyAiMove = useCallback((move, delayMs = aiLevel.moveDelay) => {
-    if (!move) return;
-
-    aiMoveTimeoutRef.current = window.setTimeout(() => {
-      dispatch(makeMove({
-        from: move.from,
-        to: move.to,
-        promotion: move.promotion || undefined,
-      }));
-
-      if (settings.playSounds) {
-        if (move.captured) {
-          soundManager.playCapture();
-        } else {
-          soundManager.playMove();
-        }
-      }
-    }, delayMs);
-  }, [aiLevel.moveDelay, dispatch, settings.playSounds]);
-
   useEffect(() => {
     loadSettings();
   }, []);
@@ -174,6 +136,8 @@ export default function Chess({
 
     if (
       !gameState.aiEnabled ||
+      !stockfish.ready ||
+      stockfish.error ||
       aiRequestInFlightRef.current ||
       gameState.isGameOver ||
       gameState.game.turn() !== gameState.aiColor
@@ -184,29 +148,6 @@ export default function Chess({
     let cancelled = false;
     aiRequestInFlightRef.current = true;
 
-    const playFallback = (delayMs = Math.max(250, aiLevel.moveDelay)) => {
-      if (cancelled) return;
-      const fallbackMove = getFallbackAiMove();
-      aiRequestInFlightRef.current = false;
-      if (!fallbackMove) return;
-      setPageNotice((notice) => notice?.type === "error" ? null : notice);
-      applyAiMove(fallbackMove, delayMs);
-    };
-
-    if (!stockfish.ready || stockfish.error) {
-      // Never block Play vs AI just because the browser engine failed to boot.
-      // This keeps production playable on Vercel, mobile browsers, and strict WASM environments.
-      playFallback(450);
-      return () => {
-        cancelled = true;
-        aiRequestInFlightRef.current = false;
-        if (aiMoveTimeoutRef.current) {
-          window.clearTimeout(aiMoveTimeoutRef.current);
-          aiMoveTimeoutRef.current = null;
-        }
-      };
-    }
-
     stockfish
       .getBestMove(gameState.fen, {
         depth: aiLevel.depth,
@@ -215,13 +156,7 @@ export default function Chess({
       })
       .then((uci) => {
         aiRequestInFlightRef.current = false;
-        if (cancelled) return;
-
-        if (!uci) {
-          playFallback(300);
-          return;
-        }
-
+        if (cancelled || !uci) return;
         const from = uci.slice(0, 2);
         const to = uci.slice(2, 4);
         const promotion = uci[4] || undefined;
@@ -229,21 +164,29 @@ export default function Chess({
         try {
           const testGame = new ChessEngine(gameState.fen);
           const move = testGame.move({ from, to, promotion });
-          if (!move) {
-            playFallback(300);
-            return;
-          }
-          applyAiMove(move, aiLevel.moveDelay);
-        } catch (error) {
-          console.error("AI move could not be applied:", error);
-          playFallback(300);
+          if (!move) return;
+
+          aiMoveTimeoutRef.current = window.setTimeout(() => {
+            if (cancelled) return;
+
+            dispatch(makeMove({ from, to, promotion }));
+
+            if (settings.playSounds) {
+              if (move.captured) {
+                soundManager.playCapture();
+              } else {
+                soundManager.playMove();
+              }
+            }
+          }, aiLevel.moveDelay);
+        } catch {
+          setPageNotice({ type: "error", text: "AI move could not be applied. Start a new game or try again." });
         }
       })
       .catch((error) => {
         aiRequestInFlightRef.current = false;
         if (!cancelled) {
-          console.warn("Stockfish unavailable, using fallback AI:", error);
-          playFallback(300);
+          setPageNotice({ type: "error", text: error?.message || "AI engine is unavailable. Please retry." });
         }
       });
 
@@ -260,13 +203,13 @@ export default function Chess({
     aiLevel.moveDelay,
     aiLevel.movetime,
     aiLevel.skill,
-    applyAiMove,
+    dispatch,
     gameState.aiColor,
     gameState.aiEnabled,
     gameState.fen,
     gameState.game,
     gameState.isGameOver,
-    getFallbackAiMove,
+    settings.playSounds,
     stockfish,
     stockfish.error,
     stockfish.ready,
