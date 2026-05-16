@@ -34,6 +34,7 @@ import TournamentsPage from "../pages/billing/TournamentsPage";
 import CommunityPage from "../pages/CommunityPage";
 import MessagesPage from "../pages/MessagesPage";
 import AutomationPage from "../pages/AutomationPage";
+import { getGuestFeatureMessage, isGuestRestrictedFeature, isGuestUser } from "../utils/guestAccess";
 
 const routeMap = {
   admin: "/admin",
@@ -184,6 +185,16 @@ export default function App() {
     notifyUserChanged();
   };
 
+  const isGuestSession = isGuestUser(user);
+
+  const guardedNavigate = (page) => {
+    if (isGuestUser(user) && isGuestRestrictedFeature(page)) {
+      navigateToAppPage(page, setCurrentPage);
+      return;
+    }
+    navigateToAppPage(page, setCurrentPage);
+  };
+
   const handleLogout = async () => {
     try {
       await apiClient("/api/auth/logout", { method: "POST" });
@@ -235,7 +246,7 @@ export default function App() {
         <LocalChessPage
           timeControl={selectedTimeControl}
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
-          onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+          onNavigate={guardedNavigate}
         />
       </ErrorBoundary>
     );
@@ -247,7 +258,7 @@ export default function App() {
         <AnalysisPage
           user={null}
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
-          onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+          onNavigate={guardedNavigate}
         />
       </ErrorBoundary>
     );
@@ -260,13 +271,13 @@ export default function App() {
           <MonetizationPage
             user={null}
             onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
-            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+            onNavigate={guardedNavigate}
           />
         ) : (
         <PricingPage
           user={null}
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
-          onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+          onNavigate={guardedNavigate}
         />
         )}
       </ErrorBoundary>
@@ -279,7 +290,7 @@ export default function App() {
         <Leaderboard
           user={null}
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
-          onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+          onNavigate={guardedNavigate}
         />
       </ErrorBoundary>
     );
@@ -291,7 +302,7 @@ export default function App() {
         <PuzzlesPage
           user={null}
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
-          onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+          onNavigate={guardedNavigate}
         />
       </ErrorBoundary>
     );
@@ -304,7 +315,7 @@ export default function App() {
           user={null}
           username={profileUsernameFromPathname(window.location.pathname)}
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
-          onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+          onNavigate={guardedNavigate}
         />
       </ErrorBoundary>
     );
@@ -321,19 +332,40 @@ export default function App() {
   const handleStartGame = (gameType, timeControl) => {
     const nextPage = gameType === "multi" ? "multi" : gameType === "local" ? "local" : "ai";
     localStorage.setItem("selectedTimeControl", timeControl);
-    navigateToAppPage(nextPage, setCurrentPage);
+    guardedNavigate(nextPage);
   };
 
   const goDashboard = () => navigateToAppPage("dashboard", setCurrentPage);
 
+  const renderGuestAccessPrompt = () => (
+    <ComingSoonPage
+      feature="Login Required"
+      onBack={goDashboard}
+      onPlay={() => handleStartGame("ai", localStorage.getItem("selectedTimeControl") || "3+0")}
+    />
+  );
+
   const renderContent = () => {
+    if (isGuestSession && isGuestRestrictedFeature(currentPage)) {
+      return (
+        <div className="w-full">
+          <div className="mx-auto mt-4 max-w-5xl px-4">
+            <div className="rounded-xl border border-amber-300/30 bg-amber-300/10 p-4 text-sm font-bold text-amber-100">
+              {getGuestFeatureMessage(currentPage)} Guest mode is limited to basic Play vs AI and local board practice.
+            </div>
+          </div>
+          {renderGuestAccessPrompt()}
+        </div>
+      );
+    }
+
     switch (currentPage) {
       case "dashboard":
         return (
           <Dashboard
             user={user}
             onStartGame={handleStartGame}
-            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+            onNavigate={guardedNavigate}
             onAuthError={handleLogout}
           />
         );
@@ -343,21 +375,21 @@ export default function App() {
         return (
           <Chess
             onBack={goDashboard}
-            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+            onNavigate={guardedNavigate}
             initialAiEnabled
             timeControl={selectedTimeControl}
           />
         );
       }
       case "multi":
-        return <MultiplayerChess onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
+        return <MultiplayerChess onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "local": {
         const selectedTimeControl =
           localStorage.getItem("selectedTimeControl") || "3+0";
         return (
           <LocalChessPage
             onBack={goDashboard}
-            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+            onNavigate={guardedNavigate}
             timeControl={selectedTimeControl}
           />
         );
@@ -367,16 +399,16 @@ export default function App() {
           <LanPlayPage
             user={user}
             onBack={goDashboard}
-            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+            onNavigate={guardedNavigate}
           />
         );
       case "history":
         return <GameHistory onBack={goDashboard} />;
       case "leaderboard":
-        return <Leaderboard user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
+        return <Leaderboard user={user} onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "profile":
         return (
-          <Profile user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />
+          <Profile user={user} onBack={goDashboard} onNavigate={guardedNavigate} />
         );
       case "profile-public":
         return (
@@ -384,22 +416,22 @@ export default function App() {
             user={user}
             username={profileUsernameFromPathname(window.location.pathname)}
             onBack={goDashboard}
-            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+            onNavigate={guardedNavigate}
           />
         );
       case "settings":
         return (
-          <Settings user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />
+          <Settings user={user} onBack={goDashboard} onNavigate={guardedNavigate} />
         );
       case "analysis":
-        return <AnalysisPage user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
+        return <AnalysisPage user={user} onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "pricing":
       case "support":
         return (
           <PricingPage
             user={user}
             onBack={goDashboard}
-            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+            onNavigate={guardedNavigate}
           />
         );
       case "billing":
@@ -407,7 +439,7 @@ export default function App() {
           <BillingPage
             user={user}
             onBack={goDashboard}
-            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+            onNavigate={guardedNavigate}
           />
         );
       case "admin":
@@ -426,9 +458,9 @@ export default function App() {
           <AdminSupportersPage onBack={() => navigateToAppPage("billing", setCurrentPage)} />
         );
       case "community":
-        return <CommunityPage user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
+        return <CommunityPage user={user} onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "messages":
-        return <MessagesPage onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
+        return <MessagesPage onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "automation":
         if (!user?.isAdmin) {
           return (
@@ -441,19 +473,19 @@ export default function App() {
         }
         return <AutomationPage onBack={goDashboard} />;
       case "help":
-        return <HelpCenterPage onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
+        return <HelpCenterPage onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "monetization":
-        return <MonetizationPage user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
+        return <MonetizationPage user={user} onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "referral":
-        return <ReferralPage onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
+        return <ReferralPage onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "tournaments":
-        return <TournamentsPage user={user} onBack={goDashboard} onNavigate={(page) => navigateToAppPage(page, setCurrentPage)} />;
+        return <TournamentsPage user={user} onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "puzzles":
         return (
           <PuzzlesPage
             user={user}
             onBack={goDashboard}
-            onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+            onNavigate={guardedNavigate}
           />
         );
       case "privacy":
@@ -484,7 +516,7 @@ export default function App() {
     <ErrorBoundary>
       <DashboardLayout
         activePage={authTimedOut ? "offline" : currentPage}
-        onNavigate={(page) => navigateToAppPage(page, setCurrentPage)}
+        onNavigate={guardedNavigate}
         onLogout={handleLogout}
       >
         {renderContent()}

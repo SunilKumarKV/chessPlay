@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: chessplay-backend
+    env: node
+    rootDir: backend
+    plan: free
+    buildCommand: corepack enable && corepack prepare pnpm@10.15.0 --activate && pnpm install --no-frozen-lockfile && pnpm run build
+    startCommand: pnpm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.20.2
+      - key: NODE_ENV
+        value: production

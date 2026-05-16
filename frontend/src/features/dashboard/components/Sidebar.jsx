@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { useTheme } from "../../../hooks/useTheme";
 import PlanBadge from "../../../components/billing/PlanBadge";
+import { isGuestRestrictedFeature, isGuestUser } from "../../../utils/guestAccess";
 
 const ROUTE_GROUPS = [
   {
@@ -62,9 +63,10 @@ function isVisible(item, user) {
   return true;
 }
 
-function NavButton({ item, activePage, isCollapsed, onNavigate }) {
+function NavButton({ item, activePage, isCollapsed, onNavigate, user }) {
   const { theme } = useTheme();
   const active = activePage === item.id;
+  const lockedForGuest = isGuestUser(user) && isGuestRestrictedFeature(item.id);
 
   return (
     <button
@@ -98,7 +100,14 @@ function NavButton({ item, activePage, isCollapsed, onNavigate }) {
       <span className="grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg text-base" style={{ backgroundColor: active ? `${theme.primary}18` : "rgba(255,255,255,0.04)" }}>
         {item.icon}
       </span>
-      {!isCollapsed && <span className="truncate">{item.label}</span>}
+      {!isCollapsed && (
+        <>
+          <span className="truncate">{item.label}</span>
+          {lockedForGuest && (
+            <span className="ml-auto rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-0.5 text-[10px] font-black text-amber-200">Login</span>
+          )}
+        </>
+      )}
     </button>
   );
 }
@@ -229,6 +238,7 @@ export default function Sidebar({
                       activePage={activePage}
                       isCollapsed={isCollapsed}
                       onNavigate={handleNavigate}
+                      user={user}
                     />
                   ))}
                 </div>
@@ -269,7 +279,7 @@ export default function Sidebar({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-black">{user.username || "Player"}</span>
                   <span className="block truncate text-xs" style={{ color: theme.text.tertiary }}>
-                    {user.rating || 1200} rating
+                    {user?.isGuest ? "Guest mode · limited" : `${user.rating || 1200} rating`}
                   </span>
                   <PlanBadge user={user} compact />
                 </span>

@@ -48,6 +48,7 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
   const [isLogin, setIsLogin] = useState(true);
   const [loadingAction, setLoadingAction] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showGuestConfirm, setShowGuestConfirm] = useState(false);
 
   const floatingPieces = useMemo(() => ["♔", "♕", "♘", "♜", "♟", "♗"], []);
 
@@ -84,6 +85,11 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
 
   const playNow = () => {
     setMobileMenuOpen(false);
+    setShowGuestConfirm(true);
+  };
+
+  const continueAsGuest = () => {
+    setShowGuestConfirm(false);
     if (onNavigatePath) onNavigatePath("/play");
     onGuestPlay();
   };
@@ -327,6 +333,21 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
           </div>
         </div>
       </footer>
+
+      <Modal isOpen={showGuestConfirm} onClose={() => setShowGuestConfirm(false)} title="Continue as Guest?" className="max-w-md">
+        <div className="space-y-4 text-slate-200">
+          <p className="text-sm leading-6 text-slate-300">
+            Guest games are not saved. You can play basic Play vs AI and local board practice, but multiplayer, history, leaderboard, profile, friends, messages, tournaments, and saved stats require login.
+          </p>
+          <div className="rounded-xl border border-amber-300/30 bg-amber-300/10 p-3 text-sm font-bold text-amber-100">
+            Login anytime to unlock full ChessPlay features.
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button type="button" onClick={continueAsGuest} className="rounded-xl bg-[#81b64c] px-4 py-3 text-sm font-black text-[#07100d]">Continue as Guest</button>
+            <button type="button" onClick={() => { setShowGuestConfirm(false); openLogin(); }} className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-black text-white">Login Instead</button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal isOpen={showAuth} onClose={() => setShowAuth(false)} title={isLogin ? "Sign in to ChessPlay" : "Create your ChessPlay account"} className="max-w-md">
         <Auth onLogin={handleAuthSuccess} isModal initialIsLogin={isLogin} onToggleMode={() => setIsLogin(!isLogin)} onNavigatePath={onNavigatePath} />
