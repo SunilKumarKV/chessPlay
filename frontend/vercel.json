@@ -1,6 +1,9 @@
 {
-  "buildCommand": "corepack enable && corepack prepare pnpm@10.15.0 --activate && pnpm run build",
+  "version": 2,
+  "installCommand": "npm install --legacy-peer-deps",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "framework": "vite",
   "headers": [
     {
       "source": "/(.*)",
@@ -68,6 +71,5 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "installCommand": "corepack enable && corepack prepare pnpm@10.15.0 --activate && pnpm install --frozen-lockfile"
+  ]
 }
