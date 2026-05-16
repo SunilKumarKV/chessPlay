@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 import {
   resetGame,
@@ -70,6 +70,8 @@ export default function Chess({
   const stockfish = useStockfish({
     enabled: gameState.aiEnabled,
   });
+  const aiMoveTimeoutRef = useRef(null);
+  const aiRequestInFlightRef = useRef(false);
   const isAiTurn =
     gameState.aiEnabled && !gameState.isGameOver && gameState.game.turn() === gameState.aiColor;
   const controlsDisabled = stockfish.thinking || Boolean(stockfish.error);
@@ -127,21 +129,34 @@ export default function Chess({
   ]);
 
   useEffect(() => {
+    if (aiMoveTimeoutRef.current) {
+      window.clearTimeout(aiMoveTimeoutRef.current);
+      aiMoveTimeoutRef.current = null;
+    }
+
     if (
       !gameState.aiEnabled ||
       !stockfish.ready ||
-      stockfish.thinking ||
       stockfish.error ||
+      aiRequestInFlightRef.current ||
       gameState.isGameOver ||
       gameState.game.turn() !== gameState.aiColor
     ) {
-      return;
+      return undefined;
     }
 
+    let cancelled = false;
+    aiRequestInFlightRef.current = true;
+
     stockfish
-      .getBestMove(gameState.fen, { depth: aiLevel.depth, skill: aiLevel.skill })
+      .getBestMove(gameState.fen, {
+        depth: aiLevel.depth,
+        skill: aiLevel.skill,
+        movetime: aiLevel.movetime,
+      })
       .then((uci) => {
-        if (!uci) return;
+        aiRequestInFlightRef.current = false;
+        if (cancelled || !uci) return;
         const from = uci.slice(0, 2);
         const to = uci.slice(2, 4);
         const promotion = uci[4] || undefined;
@@ -149,7 +164,11 @@ export default function Chess({
         try {
           const testGame = new ChessEngine(gameState.fen);
           const move = testGame.move({ from, to, promotion });
-          if (move) {
+          if (!move) return;
+
+          aiMoveTimeoutRef.current = window.setTimeout(() => {
+            if (cancelled) return;
+
             dispatch(makeMove({ from, to, promotion }));
 
             if (settings.playSounds) {
@@ -159,16 +178,27 @@ export default function Chess({
                 soundManager.playMove();
               }
             }
-          }
+          }, aiLevel.moveDelay);
         } catch {
           setPageNotice({ type: "error", text: "AI move could not be applied. Start a new game or try again." });
         }
       })
       .catch((error) => {
-        setPageNotice({ type: "error", text: error?.message || "AI engine is unavailable. Please retry." });
+        aiRequestInFlightRef.current = false;
+        if (!cancelled) {
+          setPageNotice({ type: "error", text: error?.message || "AI engine is unavailable. Please retry." });
+        }
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState.fen, gameState.aiEnabled, gameState.isGameOver, gameState.aiColor, stockfish.ready, stockfish.thinking, stockfish.error, aiLevel.depth, aiLevel.skill, dispatch, settings.playSounds]);
+
+    return () => {
+      cancelled = true;
+      aiRequestInFlightRef.current = false;
+      if (aiMoveTimeoutRef.current) {
+        window.clearTimeout(aiMoveTimeoutRef.current);
+        aiMoveTimeoutRef.current = null;
+      }
+    };
+  }, [gameState.fen, gameState.aiEnabled, gameState.isGameOver, gameState.aiColor, stockfish.ready, stockfish.error, aiLevel.depth, aiLevel.skill, aiLevel.movetime, aiLevel.moveDelay, dispatch, settings.playSounds]);
 
   const moveHistoryPairs = [];
   for (
@@ -206,6 +236,7 @@ export default function Chess({
       const uci = await stockfish.getBestMove(gameState.fen, {
         depth: Math.max(aiLevel.depth, settings.evaluationDepth),
         skill: aiLevel.skill,
+        movetime: Math.max(aiLevel.movetime, 900),
       });
       if (!uci) return;
 
