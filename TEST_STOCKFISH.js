@@ -53,7 +53,7 @@ const checks = [
   {
     name: "Loads local Stockfish bundle",
     source: workerCode,
-    pattern: /importScripts\("\/stockfish\/stockfish\.js"\)/,
+    pattern: /stockfish\/stockfish\.js|new URL\("\.\.\/stockfish\/stockfish\.js"/,
   },
   {
     name: "Does not load third-party CDN code",
