@@ -96,7 +96,7 @@ if (process.exitCode) {
 
 console.log("✓ All checked components are wired for Stockfish");
 console.log("\nNext steps:");
-console.log("1. npm run dev (development)");
+console.log("1. pnpm dev (development)");
 console.log("2. Check browser console for: '[Stockfish] Engine loaded'");
 console.log("3. AI should return a bestmove from the worker");
 console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");

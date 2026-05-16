@@ -14,20 +14,20 @@ Real-time multiplayer chess game backend using Node.js and Socket.IO.
 1. Install dependencies:
 
 ```bash
-npm install
+pnpm install
 ```
 
 
 2. Start the server:
 
 ```bash
-npm start
+pnpm start
 ```
 
 For development with auto-restart:
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 The server will run on `http://localhost:3001`
@@ -94,13 +94,13 @@ To run both frontend and backend together:
 
 ```bash
 cd backend
-npm run dev
+pnpm dev
 ```
 
 2. In another terminal, start the frontend:
 
 ```bash
-npm run dev
+pnpm --filter frontend dev
 ```
 
 The frontend will connect to the backend automatically.

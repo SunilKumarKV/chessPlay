@@ -1,5 +1,5 @@
 {
-  "name": "chessplay-backend",
+  "name": "backend",
   "version": "1.3.0",
   "description": "Real-time multiplayer chess game backend",
   "main": "dist/server.js",
@@ -46,7 +46,8 @@
     "typescript": "^6.0.3"
   },
   "engines": {
-    "node": "20.x"
+    "node": "20.x",
+    "pnpm": "10.15.0"
   },
   "packageManager": "pnpm@10.15.0"
 }

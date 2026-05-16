@@ -45,8 +45,8 @@ Render settings:
 
 ```txt
 Root Directory: backend
-Build Command: npm install && npm run build
-Start Command: npm run start
+Build Command: corepack enable && corepack prepare pnpm@10.15.0 --activate && pnpm install --frozen-lockfile && pnpm build
+Start Command: pnpm start
 Node: 20.x
 ```
 
@@ -62,6 +62,7 @@ Vercel settings:
 
 ```txt
 Root Directory: frontend
+Install Command: corepack enable && corepack prepare pnpm@10.15.0 --activate && pnpm install --frozen-lockfile
 Build Command: pnpm build
 Output Directory: dist
 ```
