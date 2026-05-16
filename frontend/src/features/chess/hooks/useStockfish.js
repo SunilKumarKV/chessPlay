@@ -1,6 +1,8 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 
-const DEFAULT_MOVE_TIMEOUT_MS = 5000;
+const DEFAULT_MOVE_TIMEOUT_MS = 8000;
+const ENGINE_BOOT_TIMEOUT_MS = 8000;
+const DEBUG_STOCKFISH = import.meta.env.DEV;
 
 function parseEvaluation(message) {
   const cpMatch = message.match(/\bscore cp (-?\d+)/);
@@ -18,6 +20,17 @@ function safeErrorMessage(error) {
   if (error?.message) return error.message;
   if (typeof error === "string") return error;
   return "Chess engine is temporarily unavailable.";
+}
+
+function debugStockfish(...args) {
+  if (DEBUG_STOCKFISH) console.info("[Stockfish]", ...args);
+}
+
+function resolveBestMove(message) {
+  if (!message.startsWith("bestmove")) return undefined;
+  const [, bestMove] = message.split(/\s+/);
+  if (!bestMove || bestMove === "0000" || bestMove === "(none)") return null;
+  return /^[a-h][1-8][a-h][1-8][qrbn]?$/i.test(bestMove) ? bestMove.toLowerCase() : null;
 }
 
 export function useStockfish({ enabled = true } = {}) {
@@ -51,12 +64,14 @@ export function useStockfish({ enabled = true } = {}) {
   useEffect(() => {
     if (!enabled) return undefined;
 
-    const workerPath = `${import.meta.env.BASE_URL}workers/stockfish-worker.js`;
+    const workerPath = new URL(`${import.meta.env.BASE_URL}workers/stockfish-worker.js`, window.location.origin).toString();
     let worker;
     let mounted = true;
+    let engineReady = false;
+    let bootTimeoutId = null;
 
     try {
-      worker = new Worker(workerPath, { type: "classic" });
+      worker = new Worker(workerPath);
     } catch (creationError) {
       if (mounted) {
         setError(`Unable to start chess engine: ${safeErrorMessage(creationError)}`);
@@ -74,13 +89,29 @@ export function useStockfish({ enabled = true } = {}) {
     setEvaluation(null);
     setLastBestMove(null);
 
+    bootTimeoutId = setTimeout(() => {
+      if (!mounted || engineReady) return;
+      setError("Chess engine did not finish loading. Please retry.");
+      setReady(false);
+      setThinking(false);
+      try { worker.terminate(); } catch { /* noop */ }
+      if (workerRef.current === worker) workerRef.current = null;
+    }, ENGINE_BOOT_TIMEOUT_MS);
+
     worker.onmessage = (event) => {
       if (!mounted) return;
       const msg = typeof event.data === "string" ? event.data.trim() : "";
       if (!msg) return;
 
+      debugStockfish(msg);
+
+      if (msg.startsWith("[stockfish-worker]")) {
+        return;
+      }
+
       if (msg.startsWith("error")) {
         setError("Chess engine failed to load. Please refresh or try again.");
+        setReady(false);
         setThinking(false);
         if (movePromiseRef.current) {
           clearTimeout(movePromiseRef.current.timeoutId);
@@ -91,12 +122,17 @@ export function useStockfish({ enabled = true } = {}) {
       }
 
       if (msg === "uciok") {
+        engineReady = true;
+        if (bootTimeoutId) clearTimeout(bootTimeoutId);
         setReady(true);
         worker.postMessage("isready");
+      } else if (msg === "readyok") {
+        engineReady = true;
+        if (bootTimeoutId) clearTimeout(bootTimeoutId);
+        setReady(true);
       } else if (msg.startsWith("bestmove")) {
         setThinking(false);
-        const match = msg.match(/^bestmove\s+([a-h][1-8][a-h][1-8][qrbn]?)/i);
-        const bestMove = match ? match[1] : null;
+        const bestMove = resolveBestMove(msg);
         setLastBestMove(bestMove);
         if (movePromiseRef.current) {
           clearTimeout(movePromiseRef.current.timeoutId);
@@ -112,8 +148,9 @@ export function useStockfish({ enabled = true } = {}) {
       }
     };
 
-    worker.onerror = () => {
+    worker.onerror = (event) => {
       if (!mounted) return;
+      debugStockfish("worker error", event?.message || event);
       setError("Chess engine stopped unexpectedly. Please retry.");
       setReady(false);
       setThinking(false);
@@ -128,6 +165,7 @@ export function useStockfish({ enabled = true } = {}) {
 
     return () => {
       mounted = false;
+      if (bootTimeoutId) clearTimeout(bootTimeoutId);
       if (movePromiseRef.current) {
         clearTimeout(movePromiseRef.current.timeoutId);
         movePromiseRef.current.resolve(null);
@@ -161,16 +199,18 @@ export function useStockfish({ enabled = true } = {}) {
         if (typeof options === "object") {
           skillLevel = Number.isFinite(Number(options.skill)) ? Number(options.skill) : null;
           if (options.movetime) {
-            goCommand = `go movetime ${options.movetime}`;
-            timeoutMs = Number(options.movetime) + 2500;
+            const safeMoveTime = Math.max(300, Math.min(3000, Number(options.movetime)));
+            goCommand = `go movetime ${safeMoveTime}`;
+            timeoutMs = safeMoveTime + 5000;
           } else {
             const requestedDepth = Math.max(1, Math.min(24, Number(options.depth || 10)));
             goCommand = `go depth ${requestedDepth}`;
             timeoutMs = Math.max(DEFAULT_MOVE_TIMEOUT_MS, requestedDepth * 900);
           }
         } else if (typeof options === "number" && options > 100) {
-          goCommand = `go movetime ${options}`;
-          timeoutMs = options + 2500;
+          const safeMoveTime = Math.max(300, Math.min(3000, Number(options)));
+          goCommand = `go movetime ${safeMoveTime}`;
+          timeoutMs = safeMoveTime + 5000;
         } else {
           const requestedDepth = Math.max(1, Math.min(24, Number(options || 10)));
           goCommand = `go depth ${requestedDepth}`;
@@ -181,18 +221,10 @@ export function useStockfish({ enabled = true } = {}) {
           if (movePromiseRef.current) {
             workerRef.current?.postMessage("stop");
             setThinking(false);
-            const timeoutError = "Chess engine took too long to respond. Falling back to a safe move.";
+            const timeoutError = "Chess engine took too long to respond. Please retry.";
             setError(timeoutError);
-            movePromiseRef.current.resolve(null);
+            movePromiseRef.current.reject(new Error(timeoutError));
             movePromiseRef.current = null;
-            try {
-              workerRef.current?.terminate();
-            } catch {
-              // ignore terminate errors
-            }
-            workerRef.current = null;
-            setReady(false);
-            setRetryKey((value) => value + 1);
           }
         }, Math.max(timeoutMs, 2500));
 
@@ -202,6 +234,7 @@ export function useStockfish({ enabled = true } = {}) {
         setEvaluation(null);
         setLastBestMove(null);
 
+        workerRef.current.postMessage("stop");
         if (skillLevel !== null) {
           workerRef.current.postMessage(`setoption name Skill Level value ${Math.max(0, Math.min(20, skillLevel))}`);
         }

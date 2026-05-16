@@ -311,7 +311,6 @@ router.post("/register", authLimiter, async (req, res) => {
 router.post("/login", authLimiter, async (req, res) => {
   try {
     const { password } = req.body;
-    const referralCode = req.body.referralCode || req.body.ref || "";
     const email = normalizeEmail(req.body.email);
 
     // Find user
