@@ -11,6 +11,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx src/scripts/seedPremiumPlans.ts",
     "prisma:studio": "prisma studio",
+    "import:puzzles": "node scripts/importLichessPuzzles.js",
+    "seed:puzzles:sample": "node scripts/seedSamplePuzzles.js",
+    "puzzles:stats": "node scripts/puzzleStats.js",
     "test": "find . \\( -path ./node_modules -o -path ./dist \\) -prune -o -name '*.js' -exec node -c {} \\;"
   },
   "dependencies": {

@@ -50,3 +50,7 @@ backend/.env.*
 frontend/.env
 frontend/.env.*
 !frontend/.env.example
+
+# Large optional Lichess puzzle database downloads
+backend/data/lichess_db_puzzle.csv
+backend/data/lichess_db_puzzle.csv.zst
