@@ -118,7 +118,7 @@ export function useMultiplayerChess(serverUrl = null, soundEnabled = true, optio
       }
 
       newSocket = io(targetUrl, {
-        transports: ["websocket", "polling"],
+        transports: ["polling", "websocket"],
         upgrade: true,
         rememberUpgrade: false,
         reconnection: true,
