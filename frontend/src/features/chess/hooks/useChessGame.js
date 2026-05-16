@@ -33,6 +33,35 @@ function getPositionKey(board, turn, castling, enPassant) {
     .join(" ");
 }
 
+
+function findFallbackAiMove(board, aiColor, enPassant, castling) {
+  const legalCandidates = [];
+
+  for (let row = 0; row < 8; row += 1) {
+    for (let col = 0; col < 8; col += 1) {
+      const piece = board[row][col];
+      if (!piece || colorOf(piece) !== aiColor) continue;
+
+      const moves = getLegalMoves(board, row, col, enPassant, castling);
+      for (const [toRow, toCol] of moves) {
+        const isPromotion = typeOf(piece) === "P" && (toRow === 0 || toRow === 7);
+        legalCandidates.push({
+          from: [row, col],
+          to: [toRow, toCol],
+          promotion: isPromotion ? "Q" : null,
+          isCapture: Boolean(board[toRow][toCol]),
+        });
+      }
+    }
+  }
+
+  if (legalCandidates.length === 0) return null;
+
+  const captures = legalCandidates.filter((move) => move.isCapture);
+  const pool = captures.length > 0 ? captures : legalCandidates;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function hasThreefoldRepetition(positionHistory) {
   const counts = new Map();
   return positionHistory.some((position) => {
@@ -40,23 +69,6 @@ function hasThreefoldRepetition(positionHistory) {
     counts.set(position, nextCount);
     return nextCount >= 3;
   });
-}
-
-function getFallbackAiMove(board, color, enPassant, castling) {
-  const moves = [];
-  for (let row = 0; row < 8; row += 1) {
-    for (let col = 0; col < 8; col += 1) {
-      if (colorOf(board[row][col]) !== color) continue;
-      const legalTargets = getLegalMoves(board, row, col, enPassant, castling);
-      for (const target of legalTargets) {
-        moves.push({ from: [row, col], to: target });
-      }
-    }
-  }
-  if (!moves.length) return null;
-  const captureMoves = moves.filter(({ to }) => Boolean(board[to[0]][to[1]]));
-  const pool = captureMoves.length ? captureMoves : moves;
-  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 export function useChessGame({
@@ -256,32 +268,35 @@ export function useChessGame({
       .then((uci) => {
         aiMoveInFlightRef.current = false;
 
-        let aiMove = null;
+        let selectedMove = null;
 
         if (uci) {
           const stockfishMove = uciToMove(uci);
           if (stockfishMove) {
-            aiMove = stockfishMove;
+            selectedMove = stockfishMove;
           } else {
             console.warn("AI: Failed to parse move:", uci);
           }
         } else {
-          console.warn("AI: No move returned from Stockfish. Using fallback legal move.");
+          console.warn("AI: No move returned from Stockfish");
         }
 
-        if (!aiMove) {
-          aiMove = getFallbackAiMove(board, aiColor, enPassant, castling);
+        if (!selectedMove) {
+          selectedMove = findFallbackAiMove(board, aiColor, enPassant, castling);
         }
 
-        if (!aiMove) return;
+        if (!selectedMove) {
+          console.warn("AI: No legal fallback move available");
+          return;
+        }
 
         const delayMs = 300 + Math.random() * 200;
         moveTimeoutRef.current = setTimeout(() => {
           if (commitMoveRef.current) {
             commitMoveRef.current(
-              aiMove.from,
-              aiMove.to,
-              aiMove.promotion || null,
+              selectedMove.from,
+              selectedMove.to,
+              selectedMove.promotion,
             );
           }
         }, delayMs);
@@ -289,10 +304,19 @@ export function useChessGame({
       .catch((error) => {
         aiMoveInFlightRef.current = false;
         console.error("AI: getBestMove error:", error);
-        const fallbackMove = getFallbackAiMove(board, aiColor, enPassant, castling);
-        if (fallbackMove && commitMoveRef.current) {
-          commitMoveRef.current(fallbackMove.from, fallbackMove.to, fallbackMove.promotion || null);
-        }
+
+        const fallbackMove = findFallbackAiMove(board, aiColor, enPassant, castling);
+        if (!fallbackMove) return;
+
+        moveTimeoutRef.current = setTimeout(() => {
+          if (commitMoveRef.current) {
+            commitMoveRef.current(
+              fallbackMove.from,
+              fallbackMove.to,
+              fallbackMove.promotion,
+            );
+          }
+        }, 300);
       });
 
     return () => {
