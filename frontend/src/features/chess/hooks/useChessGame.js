@@ -245,13 +245,50 @@ export function useChessGame({
   const moveTimeoutRef = useRef(null);
 
   useEffect(() => {
-    if (!aiEnabled) return;
-    if (!sfReady) return;
-    if (turn !== aiColor) return;
-    if (!isPlayableStatus(status)) return;
-    if (aiMoveInFlightRef.current) return;
+    if (!aiEnabled) return undefined;
+    if (turn !== aiColor) return undefined;
+    if (!isPlayableStatus(status)) return undefined;
+    if (aiMoveInFlightRef.current) return undefined;
+
+    let cancelled = false;
+
+    const commitAiMove = (selectedMove, delayMs = 300) => {
+      if (cancelled || !selectedMove) return;
+
+      moveTimeoutRef.current = setTimeout(() => {
+        if (cancelled || !commitMoveRef.current) return;
+        commitMoveRef.current(
+          selectedMove.from,
+          selectedMove.to,
+          selectedMove.promotion,
+        );
+      }, delayMs);
+    };
+
+    const getFallbackMove = () => {
+      const fallbackMove = findFallbackAiMove(board, aiColor, enPassant, castling);
+      if (!fallbackMove) {
+        console.warn("AI: No legal fallback move available");
+      }
+      return fallbackMove;
+    };
 
     aiMoveInFlightRef.current = true;
+
+    const playFallbackMove = (delayMs = 350) => {
+      aiMoveInFlightRef.current = false;
+      commitAiMove(getFallbackMove(), delayMs);
+    };
+
+    if (!sfReady) {
+      // Production-safe fallback: if Stockfish is still loading or failed to boot,
+      // Play vs AI must not freeze. Use a legal local move until the engine is ready.
+      playFallbackMove(450);
+      return () => {
+        cancelled = true;
+        if (moveTimeoutRef.current) clearTimeout(moveTimeoutRef.current);
+      };
+    }
 
     const fen = boardToFen(
       board,
@@ -266,6 +303,7 @@ export function useChessGame({
 
     getBestMove(fen, { movetime: thinkingTime })
       .then((uci) => {
+        if (cancelled) return;
         aiMoveInFlightRef.current = false;
 
         let selectedMove = null;
@@ -281,48 +319,20 @@ export function useChessGame({
           console.warn("AI: No move returned from Stockfish");
         }
 
-        if (!selectedMove) {
-          selectedMove = findFallbackAiMove(board, aiColor, enPassant, castling);
-        }
+        if (!selectedMove) selectedMove = getFallbackMove();
+        if (!selectedMove) return;
 
-        if (!selectedMove) {
-          console.warn("AI: No legal fallback move available");
-          return;
-        }
-
-        const delayMs = 300 + Math.random() * 200;
-        moveTimeoutRef.current = setTimeout(() => {
-          if (commitMoveRef.current) {
-            commitMoveRef.current(
-              selectedMove.from,
-              selectedMove.to,
-              selectedMove.promotion,
-            );
-          }
-        }, delayMs);
+        commitAiMove(selectedMove, 300 + Math.random() * 200);
       })
       .catch((error) => {
-        aiMoveInFlightRef.current = false;
+        if (cancelled) return;
         console.error("AI: getBestMove error:", error);
-
-        const fallbackMove = findFallbackAiMove(board, aiColor, enPassant, castling);
-        if (!fallbackMove) return;
-
-        moveTimeoutRef.current = setTimeout(() => {
-          if (commitMoveRef.current) {
-            commitMoveRef.current(
-              fallbackMove.from,
-              fallbackMove.to,
-              fallbackMove.promotion,
-            );
-          }
-        }, 300);
+        playFallbackMove(300);
       });
 
     return () => {
-      if (moveTimeoutRef.current) {
-        clearTimeout(moveTimeoutRef.current);
-      }
+      cancelled = true;
+      if (moveTimeoutRef.current) clearTimeout(moveTimeoutRef.current);
     };
   }, [
     board,
