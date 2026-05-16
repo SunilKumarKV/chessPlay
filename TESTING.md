@@ -1,69 +1,87 @@
-# ChessPlay Production Testing
+# ChessPlay v1.3.0 Testing Guide
 
-This document tracks Phase 8 and Phase 9 production validation. It does not introduce new features or change app behavior.
+Use this checklist before deploying or sharing the production link.
 
-## Local Commands
-
-Run these from the project root:
+## 1. Install and Build
 
 ```bash
 pnpm install
-pnpm --filter chessplay-backend exec prisma generate
+pnpm --filter ./backend exec prisma generate
 pnpm -C backend build
-pnpm -C frontend build
-pnpm dev
-```
-
-Optional checks when scripts exist:
-
-```bash
 pnpm -C frontend lint
-pnpm -C backend lint
-pnpm test
+pnpm -C frontend build
+pnpm build
 ```
 
-## Frontend Manual Testing Checklist
+## 2. Backend Testing
 
-- [ ] Home page loads without console runtime crashes.
-- [ ] Login page renders correctly.
-- [ ] Register page renders correctly.
-- [ ] Dashboard loads after authentication.
-- [ ] Profile page loads and handles missing/partial user data safely.
-- [ ] Play vs AI page loads and Stockfish worker initializes or fails gracefully.
-- [ ] Multiplayer room page can create/join a room.
-- [ ] Socket connection opens without changing event names.
-- [ ] Leaderboard page loads empty/loading/error states correctly.
-- [ ] Premium page loads without payment secret exposure.
-- [ ] Referral page loads without runtime crash.
-- [ ] Settings page loads and saves only existing settings behavior.
-- [ ] Mobile layout works at 360px, 768px, and desktop widths.
+Verify these routes and services:
 
-## Backend Manual Testing Checklist
+- Health route returns success.
+- Auth register/login/logout/refresh behavior works.
+- Profile route works after login.
+- Settings route works after login.
+- Game history route works after login.
+- Billing/premium route handles unauthenticated and authenticated states correctly.
+- Referral route handles unauthenticated and authenticated states correctly.
+- Socket.IO connection works on deployed backend.
+- MongoDB connection works in production.
+- Prisma generate works where configured.
 
-- [ ] Health route responds successfully.
-- [ ] Auth routes work with existing request/response formats.
-- [ ] Profile routes work with existing request/response formats.
-- [ ] Game history routes work with existing request/response formats.
-- [ ] Premium/referral routes work with existing request/response formats.
-- [ ] Socket connection works with existing event names.
-- [ ] Prisma generate completes.
-- [ ] MongoDB/Mongoose connection succeeds.
-- [ ] Missing optional env variables fail gracefully where supported.
+## 3. Frontend Testing
 
-## CI/CD Validation
+Check these pages manually:
 
-GitHub Actions runs on:
+- Home page
+- Login/Register
+- Dashboard
+- Profile
+- Play vs AI
+- Multiplayer room
+- Leaderboard
+- Premium page
+- Referral page
+- Settings page
+- Mobile responsiveness
 
-- Pull requests
-- Pushes to `main`
+## 4. Play vs AI Testing
 
-CI validates:
+- Easy mode should not reply instantly.
+- Medium/hard modes should feel stronger than easy.
+- AI moves should not freeze the board.
+- Undo/resign/game-over states should remain stable.
 
-- pnpm install
-- Backend Prisma client generation
-- Frontend lint when script exists
-- Backend lint when script exists
-- Backend build
-- Frontend build
+## 5. Multiplayer Testing
 
-Deployment is intentionally not automated in Phase 9 to avoid unsafe production pushes before secrets and hosting environments are verified.
+- Create room.
+- Join room from another browser/incognito window.
+- Make legal moves.
+- Test disconnect/reconnect behavior.
+- Test resign/game-end state.
+
+## 6. Console Testing
+
+Test in a normal browser and incognito mode. Confirm no release-blocking errors remain.
+
+Expected non-blockers may include browser extension warnings from `contentScript.bundle.js`. Validate again with extensions disabled.
+
+## 7. Production URLs
+
+Check deployed URLs:
+
+```txt
+Frontend: Vercel production URL
+Backend: Render production URL
+Socket: Render websocket/socket endpoint
+```
+
+## 8. Final Pass
+
+Before public sharing:
+
+- No real `.env` files committed.
+- No secrets in README/docs.
+- No backend private logic copied to public showcase.
+- CI passes.
+- Vercel deployment passes.
+- Render deployment passes.

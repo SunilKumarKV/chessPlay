@@ -1,20 +1,17 @@
 # ChessPlay Roadmap
 
-## Current Focus
+## Current
 
-- Production stability testing
-- Safe release workflow
-- Public showcase/docs separation
-- Final deployment smoke testing
+- Stable web release v1.3.0.
+- Production deployment validation.
+- Public showcase and documentation preparation.
 
-## Next Safe Steps
+## Next
 
-- Verify production auth flow
-- Verify Play vs AI stability
-- Verify multiplayer socket reliability
-- Verify premium/supporter flow with test credentials only
-- Collect user feedback after beta launch
+- Improve user feedback collection.
+- Add more public screenshots and demo content.
+- Continue production monitoring and bug fixes.
 
-## Not Public
+## Private/Internal
 
-Detailed backend internals, payment workflows, database models, admin implementation, and private socket logic remain in the private repository only.
+Private backend, payment, auth, database, and admin implementation details are intentionally excluded from public docs.

@@ -1,8 +1,7 @@
-# ChessPlay Public Changelog
+# ChessPlay Public Docs Changelog
 
-## v1.4.0-beta.1
+## v1.3.0
 
-- Prepared release documentation for production beta validation.
-- Updated public roadmap and release notes templates.
-- Confirmed public docs should contain product-level information only.
-- No private backend, payment, auth, database, admin, or socket internals are included.
+- Published stable release documentation summary.
+- Added roadmap and release notes for public readers.
+- Kept private backend, payment, auth, database, and admin internals excluded.

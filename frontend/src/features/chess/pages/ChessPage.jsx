@@ -198,7 +198,22 @@ export default function Chess({
         aiMoveTimeoutRef.current = null;
       }
     };
-  }, [gameState.fen, gameState.aiEnabled, gameState.isGameOver, gameState.aiColor, stockfish.ready, stockfish.error, aiLevel.depth, aiLevel.skill, aiLevel.movetime, aiLevel.moveDelay, dispatch, settings.playSounds]);
+    }, [
+    aiLevel.depth,
+    aiLevel.moveDelay,
+    aiLevel.movetime,
+    aiLevel.skill,
+    dispatch,
+    gameState.aiColor,
+    gameState.aiEnabled,
+    gameState.fen,
+    gameState.game,
+    gameState.isGameOver,
+    settings.playSounds,
+    stockfish,
+    stockfish.error,
+    stockfish.ready,
+  ]);
 
   const moveHistoryPairs = [];
   for (
