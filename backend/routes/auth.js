@@ -21,6 +21,7 @@ const {
 } = require("../utils/security");
 const { sendSecurityEmail } = require("../utils/email");
 const auth = require("../middleware/auth");
+const { queueEmailEvent } = require("../services/emailEventService");
 
 const router = express.Router();
 const PUBLIC_USER_FIELDS = "username avatar country title rating gamesPlayed gamesWon privacy friends";
@@ -159,9 +160,10 @@ async function connectReferralForNewUser(user, referralCode) {
   await user.save();
   await Referral.updateOne(
     { referrer: referrer._id, referred: user._id },
-    { $setOnInsert: { referrer: referrer._id, referred: user._id, code, status: "joined", rewardNote: "Joined through referral. Reward is manually reviewed." } },
+    { $setOnInsert: { referrer: referrer._id, referred: user._id, code, status: "joined", rewardNote: "Joined through referral. Referrer received 3 bonus puzzle credits." } },
     { upsert: true },
   );
+  await User.findByIdAndUpdate(referrer._id, { $inc: { bonusPuzzleCredits: 3 } }).catch(() => {});
   return true;
 }
 
@@ -299,6 +301,7 @@ router.post("/register", authLimiter, async (req, res) => {
 
     await issueSession(res, user);
     await recordSecurityEvent(req, { type: "register_success", email: user.email, user: user._id });
+    await queueEmailEvent("welcome", { user: user._id, email: user.email, payload: { username: user.username } });
 
     res.status(201).json({ ...buildAuthResponse("Account created successfully", user), referralConnected });
   } catch (error) {
@@ -364,6 +367,7 @@ router.post("/google", authLimiter, async (req, res) => {
     const email = emailValidation.email;
 
     let user = await User.findOne({ email });
+    const isNewUser = !user;
     if (!user) {
       user = new User({
         username: await buildUniqueUsername(profile.name || email.split("@")[0]),
@@ -384,6 +388,7 @@ router.post("/google", authLimiter, async (req, res) => {
     await user.save();
     await issueSession(res, user);
     await recordSecurityEvent(req, { type: user.isAdmin ? "admin_login" : "login_success", email: user.email, user: user._id });
+    if (isNewUser) await queueEmailEvent("welcome", { user: user._id, email: user.email, payload: { username: user.username, provider: "google" } });
 
     res.json(buildAuthResponse("Google login successful", user));
   } catch (error) {

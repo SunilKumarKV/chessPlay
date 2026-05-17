@@ -13,8 +13,11 @@ const Referral = require("../models/Referral");
 const Feedback = require("../models/Feedback");
 const Payment = require("../models/Payment");
 const PuzzleDailyUsage = require("../models/PuzzleDailyUsage");
+const Subscription = require("../models/Subscription");
+const Waitlist = require("../models/Waitlist");
 const auth = require("../middleware/auth");
 const { sanitizeText, isConfiguredAdminEmail } = require("../utils/security");
+const { normalizePlan, planConfig } = require("../config/plans");
 
 const router = express.Router();
 const VALID_GAME_STATUS = new Set(["all", "active", "completed", "abandoned", "draw", "checkmate"]);
@@ -166,6 +169,32 @@ router.get("/overview", asyncRoute(async (_req, res) => {
   });
 }));
 
+router.get("/revenue", asyncRoute(async (_req, res) => {
+  const activePlans = ["pro", "premium", "lifetime", "supporter_monthly", "supporter_yearly"];
+  const [totalUsers, premiumUsers, paymentsCount, revenueAgg, activeSubscriptions, puzzleUsageAgg] = await Promise.all([
+    User.countDocuments({ deletedAt: null }),
+    User.countDocuments({ deletedAt: null, $or: [{ isPremium: true }, { isSupporter: true }, { plan: { $in: activePlans } }] }),
+    Payment.countDocuments({ status: "paid" }).catch(() => 0),
+    Payment.aggregate([{ $match: { status: "paid", currency: "INR" } }, { $group: { _id: "$plan", total: { $sum: "$amount" }, count: { $sum: 1 } } }]).catch(() => []),
+    Subscription.find({ status: { $in: ["active", "trialing"] } }).select("plan status currentPeriodEnd").lean().catch(() => []),
+    PuzzleDailyUsage.aggregate([{ $group: { _id: "$plan", used: { $sum: "$used" }, days: { $sum: 1 } } }]).catch(() => []),
+  ]);
+  const revenueInr = revenueAgg.reduce((sum, row) => sum + (row.total || 0), 0);
+  const mrrEstimate = activeSubscriptions.reduce((sum, sub) => {
+    const config = planConfig(sub.plan);
+    if (normalizePlan(sub.plan) === "lifetime") return sum;
+    return sum + (config.amountInr || 0);
+  }, 0);
+  res.json({
+    totalUsers,
+    premiumUsers,
+    payments: { count: paymentsCount, revenueInr, byPlan: revenueAgg },
+    mrrEstimate,
+    puzzleUsage: puzzleUsageAgg,
+    conversionRate: totalUsers ? Math.round((premiumUsers / totalUsers) * 1000) / 10 : 0,
+  });
+}));
+
 router.get("/users", asyncRoute(async (req, res) => {
   const q = String(req.query.q || "").trim();
   const type = String(req.query.type || "all");
@@ -233,6 +262,43 @@ router.patch("/users/:id/ban", asyncRoute(async (req, res) => {
   res.json({ message: banned ? "User banned successfully." : "User unbanned successfully.", user: safeUser(user) });
 }));
 
+router.get("/users/:id/subscription", asyncRoute(async (req, res) => {
+  if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid user id." });
+  const [user, subscriptions, payments] = await Promise.all([
+    User.findById(req.params.id).select("username email plan planStatus planStartedAt planExpiresAt isSupporter isPremium supporterPlan supporterExpiresAt entitlements"),
+    Subscription.find({ user: req.params.id }).sort({ createdAt: -1 }).limit(20),
+    Payment.find({ user: req.params.id }).sort({ createdAt: -1 }).limit(20).select("-raw"),
+  ]);
+  if (!user) return res.status(404).json({ message: "User not found." });
+  res.json({ user: safeUser(user), subscription: { plan: user.plan, status: user.planStatus, startedAt: user.planStartedAt, expiresAt: user.planExpiresAt, entitlements: user.entitlements }, subscriptions, payments });
+}));
+
+router.patch("/users/:id/subscription", asyncRoute(async (req, res) => {
+  if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid user id." });
+  const plan = normalizePlan(req.body.plan);
+  const status = ["active", "expired", "pending", "cancelled"].includes(req.body.status) ? req.body.status : "active";
+  const config = planConfig(plan);
+  const now = new Date();
+  const expiresAt = req.body.expiresAt ? new Date(req.body.expiresAt) : plan === "free" ? null : new Date(now.getTime() + config.durationDays * 24 * 60 * 60 * 1000);
+  if (expiresAt && Number.isNaN(expiresAt.getTime())) return res.status(400).json({ message: "Invalid expiry date." });
+  const user = await User.findById(req.params.id);
+  if (!user) return res.status(404).json({ message: "User not found." });
+  user.plan = plan;
+  user.planStatus = status;
+  user.planStartedAt = status === "active" ? now : user.planStartedAt;
+  user.planExpiresAt = expiresAt;
+  user.isPremium = plan !== "free" && status === "active";
+  user.isSupporter = plan !== "free" && status === "active";
+  user.supporterPlan = plan === "free" ? "none" : plan;
+  user.supporterExpiresAt = expiresAt;
+  user.adsDisabled = Boolean(config.entitlements.noAds);
+  user.entitlements = status === "active" ? config.entitlements : {};
+  await user.save();
+  await Subscription.create({ user: user._id, plan, status: status === "active" ? "active" : status, provider: "admin", currentPeriodStart: now, currentPeriodEnd: expiresAt, metadata: { changedBy: req.adminUser._id, note: sanitizeText(req.body.note || "", 500) } }).catch(() => {});
+  await writeAudit(req, "subscription_admin_updated", "User", user._id, { plan, status, expiresAt, note: sanitizeText(req.body.note || "", 500) });
+  res.json({ message: "User subscription updated.", user: safeUser(user) });
+}));
+
 router.get("/payments", asyncRoute(async (req, res) => {
   const status = ["pending", "approved", "rejected"].includes(req.query.status) ? req.query.status : undefined;
   const q = String(req.query.q || "").trim();
@@ -294,6 +360,29 @@ router.patch("/feedback/:id", asyncRoute(async (req, res) => {
   await ticket.save();
   await writeAudit(req, "feedback_status_updated", "SupportTicket", ticket._id, { status: ticket.status });
   res.json({ message: "Feedback updated successfully.", ticket });
+}));
+
+router.delete("/feedback/:id", asyncRoute(async (req, res) => {
+  if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid feedback id." });
+  const ticket = await SupportTicket.findByIdAndDelete(req.params.id) || await Feedback.findByIdAndDelete(req.params.id);
+  if (!ticket) return res.status(404).json({ message: "Feedback ticket not found." });
+  await writeAudit(req, "feedback_deleted", ticket.constructor?.modelName || "Feedback", ticket._id, {});
+  res.json({ message: "Feedback deleted." });
+}));
+
+router.get("/waitlist", asyncRoute(async (req, res) => {
+  const interest = sanitizeText(req.query.interest || "", 60);
+  const filter = interest ? { interest } : {};
+  const rows = await Waitlist.find(filter).sort({ createdAt: -1 }).limit(500).lean();
+  res.json({ waitlist: rows });
+}));
+
+router.get("/waitlist/export", asyncRoute(async (_req, res) => {
+  const rows = await Waitlist.find().sort({ createdAt: -1 }).limit(5000).lean();
+  res.json({
+    count: rows.length,
+    csv: ["email,source,interest,createdAt", ...rows.map((row) => [row.email, row.source, row.interest, row.createdAt?.toISOString?.() || ""].map((value) => `"${String(value || "").replace(/"/g, '""')}"`).join(","))].join("\n"),
+  });
 }));
 
 router.get("/community", asyncRoute(async (req, res) => {

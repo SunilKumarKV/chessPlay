@@ -92,4 +92,30 @@ router.get("/reports/:gameId", auth, async (req, res) => {
   }
 });
 
+router.post("/reports", auth, noteLimiter, async (req, res) => {
+  try {
+    const gameId = safeString(req.body.gameId, 120);
+    const report = await GameAnalysis.findOneAndUpdate(
+      {
+        user: req.user.userId,
+        game: mongoose.Types.ObjectId.isValid(gameId) ? gameId : null,
+      },
+      {
+        user: req.user.userId,
+        game: mongoose.Types.ObjectId.isValid(gameId) ? gameId : null,
+        accuracy: Math.min(100, Math.max(0, Number(req.body.accuracy || 0))),
+        mistakes: Math.max(0, Number(req.body.mistakes || 0)),
+        blunders: Math.max(0, Number(req.body.blunders || 0)),
+        bestMoves: Array.isArray(req.body.bestMoves) ? req.body.bestMoves.map((move) => safeString(move, 12)).filter(Boolean).slice(0, 80) : [],
+        status: ["placeholder", "queued", "complete", "failed"].includes(req.body.status) ? req.body.status : "placeholder",
+        summary: safeString(req.body.summary || "Analysis report saved for future premium review.", 1000),
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+    res.status(201).json({ report });
+  } catch {
+    res.status(500).json({ message: "Unable to save analysis report." });
+  }
+});
+
 module.exports = router;

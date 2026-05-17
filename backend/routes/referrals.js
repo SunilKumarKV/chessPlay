@@ -118,9 +118,10 @@ async function applyReferralForUser(req, res, rawCode) {
   await user.save();
   await Referral.updateOne(
     { referrer: referrer._id, referred: user._id },
-    { $setOnInsert: { referrer: referrer._id, referred: user._id, code, status: "joined", rewardNote: "Joined through referral. Reward is manually reviewed." } },
+    { $setOnInsert: { referrer: referrer._id, referred: user._id, code, status: "joined", rewardNote: "Joined through referral. Referrer received 3 bonus puzzle credits." } },
     { upsert: true },
   );
+  await User.findByIdAndUpdate(referrer._id, { $inc: { bonusPuzzleCredits: 3 } }).catch(() => {});
   await writeAudit(req, "referral_created", "Referral", user._id, { referrer: String(referrer._id) });
   return res.json({ message: "Referral connected successfully. Rewards are reviewed manually." });
 }

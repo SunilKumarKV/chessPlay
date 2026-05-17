@@ -17,7 +17,7 @@ const PLANS = {
     durationDays: 30,
     puzzleLimit: 25,
     features: ["no_ads", "premium_sounds", "pro_puzzles", "basic_analysis"],
-    entitlements: { noAds: true, premiumSounds: true, premiumThemes: true, earlyAccess: true },
+    entitlements: { noAds: true, premiumSounds: true, premiumThemes: true, earlyAccess: true, premiumPuzzleFilters: true },
   },
   premium: {
     id: "premium",
@@ -37,6 +37,8 @@ const PLANS = {
       advancedStats: true,
       unlimitedGameReview: true,
       earlyAccess: true,
+      premiumPuzzleFilters: true,
+      advancedAnalysis: true,
     },
   },
   lifetime: {
@@ -58,6 +60,8 @@ const PLANS = {
       unlimitedGameReview: true,
       tournaments: true,
       earlyAccess: true,
+      premiumPuzzleFilters: true,
+      advancedAnalysis: true,
     },
   },
 };
@@ -76,6 +80,16 @@ function planConfig(plan) {
   return PLANS[normalizePlan(plan)] || PLANS.free;
 }
 
+function getPlanLimits(plan) {
+  const config = planConfig(plan);
+  return {
+    puzzleLimit: config.puzzleLimit,
+    durationDays: config.durationDays,
+    amountInr: config.amountInr,
+    amountUsd: config.amountUsd,
+  };
+}
+
 function entitlementsForPlan(plan, userEntitlements = {}) {
   return { ...planConfig(plan).entitlements, ...(userEntitlements || {}) };
 }
@@ -84,6 +98,7 @@ module.exports = {
   LEGACY_PLAN_ALIASES,
   PLANS,
   entitlementsForPlan,
+  getPlanLimits,
   normalizePlan,
   planConfig,
 };

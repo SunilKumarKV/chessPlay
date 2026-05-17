@@ -1,16 +1,38 @@
 const User = require("../models/User");
-const { entitlementsForPlan, normalizePlan } = require("../config/plans");
+const { entitlementsForPlan, getPlanLimits, normalizePlan } = require("../config/plans");
+
+async function syncExpiredPlan(user) {
+  if (!user?.planExpiresAt || new Date(user.planExpiresAt).getTime() >= Date.now()) return false;
+  user.plan = "free";
+  user.planStatus = "expired";
+  user.isPremium = false;
+  user.isSupporter = false;
+  user.supporterPlan = "none";
+  user.adsDisabled = false;
+  user.entitlements = {};
+  await user.save().catch(() => {});
+  return true;
+}
 
 async function getUserEntitlements(userId) {
-  const user = await User.findById(userId).select("plan isPremium isSupporter entitlements planExpiresAt");
-  if (!user) return { plan: "free", entitlements: {} };
-  const expired = user.planExpiresAt && new Date(user.planExpiresAt).getTime() < Date.now();
+  const user = await User.findById(userId).select("plan planStatus isPremium isSupporter entitlements planExpiresAt");
+  if (!user) return { plan: "free", entitlements: {}, limits: getPlanLimits("free") };
+  const expired = await syncExpiredPlan(user);
   const plan = expired ? "free" : normalizePlan(user.plan);
   return {
     plan,
     entitlements: expired ? {} : entitlementsForPlan(plan, user.entitlements),
+    limits: getPlanLimits(plan),
+    planStatus: user.planStatus || "active",
+    planExpiresAt: user.planExpiresAt || null,
     isPremium: !expired && Boolean(user.isPremium || user.isSupporter || plan !== "free"),
   };
+}
+
+function getUserPlan(user) {
+  if (!user) return "free";
+  const expired = user.planExpiresAt && new Date(user.planExpiresAt).getTime() < Date.now();
+  return expired ? "free" : normalizePlan(user.plan);
 }
 
 function requirePlan(allowedPlans = []) {
@@ -44,8 +66,14 @@ function hasFeature(feature) {
   };
 }
 
+const requireFeature = hasFeature;
+
 module.exports = {
+  getPlanLimits,
+  getUserPlan,
   getUserEntitlements,
   hasFeature,
+  requireFeature,
   requirePlan,
+  syncExpiredPlan,
 };
