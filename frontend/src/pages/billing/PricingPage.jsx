@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { apiClient } from "../../services/apiClient";
 import WaitlistForm from "../../components/waitlist/WaitlistForm";
 import { trackEvent } from "../../services/analytics";
+import EmptyState from "../../components/common/EmptyState";
+import { CardSkeleton } from "../../components/common/Skeleton";
+import ErrorBanner from "../../components/common/ErrorBanner";
 
 const FALLBACK_PLANS = {
   free: {
@@ -52,6 +55,16 @@ const PAYMENT_METHODS = [
   { id: "upi", label: "UPI", currency: "INR" },
   { id: "paypal", label: "PayPal", currency: "USD" },
   { id: "bank", label: "Bank transfer", currency: "INR" },
+];
+
+const CORE_PLANS = ["free", "pro", "premium", "lifetime"];
+const COMPARISON = [
+  ["Daily puzzles", "5", "25", "100", "200"],
+  ["Hints per puzzle", "1", "1", "3", "3"],
+  ["AI Coach", "Locked", "Coming soon", "Included soon", "Included soon"],
+  ["Analysis reports", "Basic", "Basic", "Premium soon", "Premium soon"],
+  ["Premium themes", "Locked", "Included", "Included", "Included"],
+  ["Opening explorer", "Preview", "Preview", "Premium filters soon", "Premium filters soon"],
 ];
 
 const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || "devwithsunilyt@gmail.com";
@@ -122,6 +135,11 @@ export default function PricingPage({ user, onBack, onNavigate }) {
     return () => {
       active = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem("chessplay_selected_plan");
+    if (stored && FALLBACK_PLANS[stored]) setSelectedPlan(stored);
   }, []);
 
   useEffect(() => {
@@ -242,11 +260,15 @@ export default function PricingPage({ user, onBack, onNavigate }) {
         <button type="button" onClick={onBack} className="rounded-xl border border-white/10 px-4 py-2 font-bold text-slate-200 hover:bg-white/10">← Back</button>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {loadingPlans ? <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 text-slate-400 lg:col-span-3">Loading pricing details...</div> : null}
-        {!loadingPlans && Object.entries(plans).map(([key, plan]) => {
+      {error ? <ErrorBanner message={error} onRetry={() => window.location.reload()} /> : null}
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {loadingPlans ? <div className="md:col-span-2 xl:col-span-4"><CardSkeleton count={4} /></div> : null}
+        {!loadingPlans && CORE_PLANS.map((key) => {
+          const plan = plans[key] || FALLBACK_PLANS[key];
           const isFree = key === "free";
           const active = selectedPlan === key;
+          const comingSoon = key !== "free";
           return (
             <article key={key} className={`rounded-3xl border p-5 ${active && !isFree ? "border-amber-300 bg-amber-300/10" : "border-white/10 bg-white/[0.04]"}`}>
               <div className="flex items-start justify-between gap-3">
@@ -254,21 +276,50 @@ export default function PricingPage({ user, onBack, onNavigate }) {
                   <h2 className="text-xl font-black text-white">{plan.label}</h2>
                   <p className="mt-1 text-sm text-slate-400">{isFree ? "Always available" : `${plan.days} days supporter access`}</p>
                 </div>
-                <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-sm font-black text-amber-200">{isFree ? "₹0" : `₹${plan.amount}`}</span>
+                <div className="grid justify-items-end gap-2">
+                  <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-sm font-black text-amber-200">{isFree ? "₹0" : `₹${plan.amount}`}</span>
+                  {comingSoon ? <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-sky-100">Checkout soon</span> : null}
+                </div>
               </div>
               <ul className="mt-5 space-y-2 text-sm text-slate-300">
                 {(plan.benefits || []).map((benefit) => <li key={benefit}>✓ {benefit}</li>)}
               </ul>
               {!isFree && (
-                <button type="button" onClick={() => { trackEvent("premium_click", { plan: key }); setSelectedPlan(key); }} className="mt-5 w-full rounded-xl bg-amber-300 px-4 py-3 font-black text-black hover:bg-amber-200">Choose {plan.label}</button>
+                <button type="button" onClick={() => { trackEvent("premium_click", { plan: key }); setSelectedPlan(key); document.getElementById("supporter-request")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="mt-5 w-full rounded-xl bg-amber-300 px-4 py-3 font-black text-black hover:bg-amber-200">Choose {plan.label}</button>
               )}
             </article>
           );
         })}
       </div>
 
+      <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-black">Plan comparison</h2>
+            <p className="mt-1 text-sm text-slate-400">Premium UI is connected safely. Live checkout still depends on configured payment keys and backend verification.</p>
+          </div>
+          <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 text-xs font-black text-amber-100">No fake activation</span>
+        </div>
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-[760px] w-full text-left text-sm">
+            <thead className="text-slate-400">
+              <tr>{["Feature", "Free", "Pro", "Premium", "Lifetime"].map((head) => <th key={head} className="border-b border-white/10 py-3 pr-4">{head}</th>)}</tr>
+            </thead>
+            <tbody>
+              {COMPARISON.map(([feature, free, pro, premium, lifetime]) => (
+                <tr key={feature} className="border-b border-white/5">
+                  {[feature, free, pro, premium, lifetime].map((cell, index) => (
+                    <td key={`${feature}-${index}`} className={index === 0 ? "py-3 pr-4 font-black text-white" : "py-3 pr-4 text-slate-300"}>{cell}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <div className="mt-6 grid gap-5 xl:grid-cols-[1fr_1.15fr]">
-        <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+        <section id="supporter-request" className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-black">Payment options</h2>
@@ -371,7 +422,7 @@ export default function PricingPage({ user, onBack, onNavigate }) {
             <thead className="text-slate-400"><tr><th className="py-2 pr-4">Plan</th><th className="py-2 pr-4">Method</th><th className="py-2 pr-4">Amount</th><th className="py-2 pr-4">Reference</th><th className="py-2 pr-4">Status</th><th className="py-2 pr-4">Note</th></tr></thead>
             <tbody>
               {loadingBilling ? <tr><td colSpan="6" className="py-6 text-slate-500">Loading payment history...</td></tr> : null}
-              {!loadingBilling && requests.length === 0 ? <tr><td colSpan="6" className="py-6 text-slate-500">No payment requests yet.</td></tr> : null}
+              {!loadingBilling && requests.length === 0 ? <tr><td colSpan="6" className="py-6"><EmptyState title="No payments yet" message="Submitted payment requests and verification results will appear here." /></td></tr> : null}
               {requests.map((request) => (
                 <tr key={request._id || request.utr} className="border-t border-white/10">
                   <td className="py-3 pr-4 font-bold">{request.plan}</td>

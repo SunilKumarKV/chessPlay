@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal } from "../components/ui";
 import Auth from "../features/auth/components/Auth";
+import LegalFooter from "../components/common/LegalFooter";
 
 const BOARD = [
   ["r", "n", "b", "q", "k", "b", "n", "r"],
@@ -330,9 +331,12 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
             <button type="button" onClick={openLogin} className="hover:text-white">Login</button>
             <button type="button" onClick={openSignup} className="hover:text-white">Register</button>
             <a href="#features" className="hover:text-white">Features</a>
+            <a href="/privacy-policy" onClick={(event) => { event.preventDefault(); onNavigatePath?.("/privacy-policy"); }} className="hover:text-white">Privacy</a>
+            <a href="/terms" onClick={(event) => { event.preventDefault(); onNavigatePath?.("/terms"); }} className="hover:text-white">Terms</a>
           </div>
         </div>
       </footer>
+      <LegalFooter onNavigatePath={onNavigatePath} />
 
       <Modal isOpen={showGuestConfirm} onClose={() => setShowGuestConfirm(false)} title="Continue as Guest?" className="max-w-md">
         <div className="space-y-4 text-slate-200">

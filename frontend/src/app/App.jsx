@@ -43,6 +43,7 @@ import CoachingPage from "../pages/growth/CoachingPage";
 import StorePage from "../pages/growth/StorePage";
 import ServicesPage from "../pages/growth/ServicesPage";
 import OpeningExplorerPage from "../pages/growth/OpeningExplorerPage";
+import PaymentStatusPage from "../pages/billing/PaymentStatusPage";
 import { getGuestFeatureMessage, isGuestRestrictedFeature, isGuestUser } from "../utils/guestAccess";
 import { trackEvent } from "../services/analytics";
 
@@ -64,6 +65,7 @@ const routeMap = {
   billing: "/billing",
   monetization: "/premium",
   referral: "/referral",
+  referrals: "/referrals",
   tournaments: "/tournaments",
   community: "/community",
   messages: "/messages",
@@ -90,12 +92,17 @@ const routeMap = {
   "forgot-password": "/forgot-password",
   "reset-password": "/reset-password",
   "verify-email": "/verify-email",
+  "payment-success": "/payment/success",
+  "payment-failed": "/payment/failed",
 };
 
 function pageFromPathname(pathname) {
   const normalized = pathname.replace(/\/$/, "") || "/";
   if (normalized === "/") return "dashboard";
   if (normalized === "/privacy-policy") return "privacy-policy";
+  if (normalized === "/payment/success") return "payment-success";
+  if (normalized === "/payment/failed") return "payment-failed";
+  if (normalized === "/referrals") return "referrals";
   if (normalized === "/privacy") return "privacy";
   if (normalized === "/admin" || normalized === "/admin/dashboard") return "admin";
   if (normalized.startsWith("/profile/") && normalized.split("/")[2]) return "profile-public";
@@ -265,6 +272,15 @@ export default function App() {
     );
   }
 
+  if (currentPage === "payment-success" || currentPage === "payment-failed") {
+    return (
+      <ErrorBoundary>
+        <PaymentStatusPage status={currentPage === "payment-success" ? "success" : "failed"} onNavigate={guardedNavigate} />
+        <FeedbackButton user={user} />
+      </ErrorBoundary>
+    );
+  }
+
   if (["privacy", "privacy-policy", "terms", "refund-policy", "cookie-policy", "contact", "chess-puzzles", "play-chess-online", "chess-ai", "chess-analysis", "coaching", "openings", "opening-explorer", "store", "hire-me", "services"].includes(currentPage)) {
     const page = currentPage === "privacy" || currentPage === "privacy-policy"
       ? <PrivacyPolicyPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
@@ -353,6 +369,18 @@ export default function App() {
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
           onNavigate={guardedNavigate}
         />
+      </ErrorBoundary>
+    );
+  }
+
+  if (!user && (currentPage === "referral" || currentPage === "referrals")) {
+    return (
+      <ErrorBoundary>
+        <ReferralPage
+          onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
+          onNavigate={guardedNavigate}
+        />
+        <FeedbackButton user={null} />
       </ErrorBoundary>
     );
   }
@@ -527,6 +555,7 @@ export default function App() {
       case "monetization":
         return <MonetizationPage user={user} onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "referral":
+      case "referrals":
         return <ReferralPage onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "tournaments":
         return <TournamentsPage user={user} onBack={goDashboard} onNavigate={guardedNavigate} />;

@@ -1,14 +1,14 @@
 import { useEffect } from "react";
 
 const BENEFITS = [
-  ["No Ads", "Clean game flow after every match"],
-  ["Premium sounds", "Tournament, luxury, neon and cyber packs"],
-  ["Faster AI", "Higher Stockfish depth for stronger practice"],
-  ["Community access", "Join clubs, feedback and beta features"],
-  ["Advanced analysis", "Deeper eval, review and move quality labels"],
+  ["More puzzles", "Pro starts at 25 puzzles/day; Premium raises that to 100/day"],
+  ["Extra hints", "Premium training gets more guided hints per puzzle"],
+  ["AI Coach", "Premium coaching foundation with safe placeholders while engine coaching matures"],
+  ["Analysis", "Premium analysis reports and mistake review foundations"],
+  ["Themes", "Premium board/theme unlock logic without changing the default board"],
 ];
 
-export default function UpgradeModal({ open, onClose, onNavigate }) {
+export default function UpgradeModal({ open, onClose, onNavigate, feature = "premium training" }) {
   useEffect(() => {
     if (!open) return undefined;
     const onKeyDown = (event) => {
@@ -46,13 +46,12 @@ export default function UpgradeModal({ open, onClose, onNavigate }) {
             Unlock a cleaner, faster and more premium chess experience.
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
-            Continue free anytime, or support development to unlock premium sounds, no ads, faster AI and deeper analysis.
+            Continue free anytime, or upgrade when you want {feature}, richer puzzle limits, AI Coach foundations, analysis reports and premium themes.
           </p>
 
           <div className="mt-6 grid gap-3 md:grid-cols-5">
             {BENEFITS.map(([title, copy]) => (
               <div key={title} className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
-                <div className="text-lg">✅</div>
                 <div className="mt-2 text-sm font-black text-white">{title}</div>
                 <div className="mt-1 text-xs leading-5 text-slate-400">{copy}</div>
               </div>
@@ -69,17 +68,17 @@ export default function UpgradeModal({ open, onClose, onNavigate }) {
             </button>
             <button
               type="button"
-              onClick={() => goToPlan("supporter_monthly")}
+              onClick={() => goToPlan("pro")}
               className="rounded-2xl bg-[#81b64c] px-5 py-4 font-black text-[#07100a] shadow-xl shadow-[#81b64c]/20 transition hover:-translate-y-0.5 hover:bg-[#93c85f]"
             >
-              Upgrade monthly
+              View Pro
             </button>
             <button
               type="button"
-              onClick={() => goToPlan("supporter_yearly")}
+              onClick={() => goToPlan("premium")}
               className="rounded-2xl bg-amber-300 px-5 py-4 font-black text-black shadow-xl shadow-amber-300/20 transition hover:-translate-y-0.5 hover:bg-amber-200"
             >
-              Upgrade yearly
+              View Premium
             </button>
           </div>
         </div>

@@ -1,4 +1,9 @@
+import EmptyState from "../../../components/common/EmptyState";
+
 export default function PuzzleStatsCard({ stats, limits, history = [] }) {
+  const limit = limits?.limit || 0;
+  const used = limits?.used || 0;
+  const remaining = limits?.remaining ?? Math.max(limit - used, 0);
   return (
     <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-xl shadow-black/20">
       <h2 className="font-['Montserrat'] text-xl font-black text-white">Puzzle stats</h2>
@@ -12,7 +17,7 @@ export default function PuzzleStatsCard({ stats, limits, history = [] }) {
           <div className="text-xs text-slate-400">Accuracy</div>
         </div>
         <div className="rounded-2xl bg-black/20 p-3">
-          <div className="text-xl font-black text-white">{limits?.remaining ?? 0}</div>
+          <div className="text-xl font-black text-white">{remaining}/{limit || "?"}</div>
           <div className="text-xs text-slate-400">Left today</div>
         </div>
       </div>
@@ -26,7 +31,7 @@ export default function PuzzleStatsCard({ stats, limits, history = [] }) {
               <span className={item.status === "solved" ? "text-[#b8f28f]" : "text-slate-400"}>{item.status}</span>
             </div>
           )) : (
-            <p className="rounded-xl bg-black/20 px-3 py-3 text-sm leading-6 text-slate-400">No puzzle history yet.</p>
+            <EmptyState title="No puzzle history" message="Solved and attempted puzzles will appear here." />
           )}
         </div>
       </div>

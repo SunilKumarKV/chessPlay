@@ -7,6 +7,10 @@
 - Added subscription, payment, coupon, feature entitlement, feedback, waitlist, and game analysis placeholder models.
 - Added public waitlist and feedback collection endpoints.
 - Added Lichess CC0 puzzle import pipeline, sample puzzle seed, daily limits, hints, and learning explanations.
+- Added premium UI surfaces: plan comparison cards, upgrade modal, entitlement-backed plan badges, and locked-feature messaging.
+- Improved puzzle UI with remaining daily counter, wrong-move feedback, hint levels, success animation, and learning summary.
+- Added payment success/failure pages that do not fake plan activation.
+- Added referral dashboard UI, floating feedback button, reusable empty/loading/error states, and legal footer links.
 - Added legal route coverage for privacy, terms, refunds, cookies, and contact pages.
 - Added SEO and growth placeholder pages for puzzles, online chess, AI chess, analysis, coaching, openings, store, and services.
 - Added environment-driven analytics abstraction and feedback modal.

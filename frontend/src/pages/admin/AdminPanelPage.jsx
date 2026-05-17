@@ -237,6 +237,7 @@ function AccessState({ title, message, onBack }) {
 
 function Overview({ data, onSelect }) {
   const stats = data.stats || {};
+  const maxCard = Math.max(stats.totalUsers || 0, stats.totalGames || 0, stats.puzzleUsageToday || 0, stats.paymentsCount || 0, 1);
   const cards = [
     ["Total users", stats.totalUsers],
     ["Total games", stats.totalGames],
@@ -252,7 +253,11 @@ function Overview({ data, onSelect }) {
     ["Feedback", stats.feedbackReports],
     ["Suspicious games", stats.suspiciousGames],
   ];
-  return <div className="grid gap-5"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(([label, value]) => <Card key={label}><p className="text-sm font-bold text-slate-400">{label}</p><p className="mt-2 text-3xl font-black text-white">{value ?? "Unavailable"}</p></Card>)}</div><div className="grid gap-5 xl:grid-cols-2"><Card><h3 className="mb-4 text-xl font-black">Latest reports</h3>{data.latestReports?.length ? data.latestReports.map((ticket) => <div key={ticket._id} className="mb-3 rounded-2xl border border-white/10 p-3"><b>{ticket.subject}</b><p className="text-sm text-slate-400">{ticket.user?.email || "Unknown"} · {ticket.status}</p></div>) : <EmptyState>No reports found</EmptyState>}<AdminButton variant="ghost" className="mt-3" onClick={() => onSelect("feedback")}>Open feedback</AdminButton></Card><Card><h3 className="mb-4 text-xl font-black">Recent games</h3>{data.recentGames?.length ? data.recentGames.map((game) => <div key={game._id} className="mb-3 rounded-2xl border border-white/10 p-3"><b>{game.whitePlayer?.username || "White"} vs {game.blackPlayer?.username || "Black/AI"}</b><p className="text-sm text-slate-400">{game.result} · {formatDate(game.startTime)}</p></div>) : <EmptyState>No games found</EmptyState>}<AdminButton variant="ghost" className="mt-3" onClick={() => onSelect("games")}>Open games</AdminButton></Card></div></div>;
+  return <div className="grid gap-5"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(([label, value]) => {
+    const numeric = Number(String(value).replace(/[^0-9.]/g, ""));
+    const width = Number.isFinite(numeric) ? Math.min(100, Math.round((numeric / maxCard) * 100)) : 0;
+    return <Card key={label}><p className="text-sm font-bold text-slate-400">{label}</p><p className="mt-2 text-3xl font-black text-white">{value ?? "Unavailable"}</p><div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-amber-300" style={{ width: `${width}%` }} /></div></Card>;
+  })}</div><div className="grid gap-5 xl:grid-cols-2"><Card><h3 className="mb-4 text-xl font-black">Latest reports</h3>{data.latestReports?.length ? data.latestReports.map((ticket) => <div key={ticket._id} className="mb-3 rounded-2xl border border-white/10 p-3"><b>{ticket.subject}</b><p className="text-sm text-slate-400">{ticket.user?.email || "Unknown"} · {ticket.status}</p></div>) : <EmptyState>No reports found</EmptyState>}<AdminButton variant="ghost" className="mt-3" onClick={() => onSelect("feedback")}>Open feedback</AdminButton></Card><Card><h3 className="mb-4 text-xl font-black">Recent games</h3>{data.recentGames?.length ? data.recentGames.map((game) => <div key={game._id} className="mb-3 rounded-2xl border border-white/10 p-3"><b>{game.whitePlayer?.username || "White"} vs {game.blackPlayer?.username || "Black/AI"}</b><p className="text-sm text-slate-400">{game.result} · {formatDate(game.startTime)}</p></div>) : <EmptyState>No games found</EmptyState>}<AdminButton variant="ghost" className="mt-3" onClick={() => onSelect("games")}>Open games</AdminButton></Card></div></div>;
 }
 
 function Users({ data, search, setSearch, userFilter, setUserFilter, busyKey, runAction }) {
