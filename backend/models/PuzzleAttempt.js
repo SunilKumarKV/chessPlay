@@ -17,6 +17,7 @@ const puzzleAttemptSchema = new mongoose.Schema({
   currentIndex: { type: Number, default: 1, min: 1 },
   hintsUsed: { type: Number, default: 0, min: 0 },
   mistakeCount: { type: Number, default: 0, min: 0 },
+  timeSpentMs: { type: Number, default: 0, min: 0 },
   lastMove: { type: String, trim: true, lowercase: true, default: "" },
   startedAt: { type: Date, default: Date.now },
   completedAt: { type: Date, default: null },

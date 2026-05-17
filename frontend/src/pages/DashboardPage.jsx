@@ -114,6 +114,9 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
   const [inviteCopied, setInviteCopied] = useState(false);
   const [backendStatus, setBackendStatus] = useState(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [entitlements, setEntitlements] = useState(null);
+  const [puzzleLimits, setPuzzleLimits] = useState(null);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(() => localStorage.getItem("chessplay_onboarding_dismissed") === "1");
 
   const showDebugStatus = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -206,6 +209,20 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
   }, [loadDashboard]);
 
   useEffect(() => {
+    if (!user || isGuest) return undefined;
+    let active = true;
+    Promise.allSettled([
+      apiClient("/api/me/entitlements"),
+      apiClient("/api/puzzles/limits/me", { skipAuthRefresh: true }),
+    ]).then(([entitlementResult, limitsResult]) => {
+      if (!active) return;
+      if (entitlementResult.status === "fulfilled") setEntitlements(entitlementResult.value);
+      if (limitsResult.status === "fulfilled") setPuzzleLimits(limitsResult.value.limits || null);
+    });
+    return () => { active = false; };
+  }, [isGuest, user]);
+
+  useEffect(() => {
     if (!showDebugStatus) return undefined;
     const controller = new AbortController();
     fetch(`${BACKEND_URL}/healthz`, { signal: controller.signal })
@@ -239,6 +256,8 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
     { label: "Current Rating", value: rating, accent: "#a78bfa" },
     { label: "Win Rate", value: `${winRate}%`, accent: "#22c55e" },
   ];
+  const trialEndsAt = entitlements?.planStatus === "trialing" ? entitlements.planExpiresAt : null;
+  const trialDaysLeft = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000)) : 0;
 
   const setTimeControl = (value) => {
     setSelectedTimeControl(value);
@@ -304,6 +323,39 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
         </div>
       )}
 
+      {trialEndsAt ? (
+        <div className="rounded-xl border border-sky-300/30 bg-sky-300/10 p-4 text-sm font-bold text-sky-100" role="status">
+          Pro trial ends in {trialDaysLeft} day{trialDaysLeft === 1 ? "" : "s"}. Your free gameplay stays available either way.
+        </div>
+      ) : null}
+
+      {!onboardingDismissed && !isGuest && gamesPlayed < 2 ? (
+        <section className="rounded-2xl border border-[#81b64c]/25 bg-[#81b64c]/10 p-5 text-white">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#b8f28f]">Welcome checklist</p>
+              <h2 className="mt-2 font-['Montserrat'] text-2xl font-black">Set up your ChessPlay rhythm</h2>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                {[
+                  ["Play vs AI", () => startGame("ai")],
+                  ["Try puzzles", () => onNavigate?.("puzzles")],
+                  ["Complete profile", () => onNavigate?.("profile")],
+                  ["Invite friend", () => onNavigate?.("referrals")],
+                  ["View pricing", () => onNavigate?.("pricing")],
+                ].map(([label, action]) => (
+                  <button key={label} type="button" onClick={action} className="rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-black text-white transition hover:bg-white/10">
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button type="button" onClick={() => { localStorage.setItem("chessplay_onboarding_dismissed", "1"); setOnboardingDismissed(true); }} className="rounded-xl border border-white/10 px-3 py-2 text-sm font-bold text-slate-200">
+              Dismiss
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-5 shadow-2xl shadow-black/25 backdrop-blur-xl md:p-7">
           <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "linear-gradient(45deg, rgba(129,182,76,.22) 25%, transparent 25%, transparent 75%, rgba(129,182,76,.22) 75%), linear-gradient(45deg, rgba(56,189,248,.16) 25%, transparent 25%, transparent 75%, rgba(56,189,248,.16) 75%)", backgroundPosition: "0 0, 18px 18px", backgroundSize: "36px 36px" }} aria-hidden="true" />
@@ -334,6 +386,11 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
                   </button>
                 ))}
               </div>
+              {puzzleLimits ? (
+                <div className="mt-4 inline-flex rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm font-black text-slate-200">
+                  {puzzleLimits.remaining}/{puzzleLimits.limit} puzzles remaining today
+                </div>
+              ) : null}
             </div>
             <div className="grid gap-3">
               <button type="button" onClick={() => startGame("ai")} className="rounded-xl bg-[#81b64c] px-5 py-4 text-left font-['Montserrat'] text-lg font-black text-[#07100a] shadow-lg shadow-[#81b64c]/20 transition-all hover:-translate-y-1 hover:bg-[#93c85f]" aria-label="Play against AI">

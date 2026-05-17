@@ -8,6 +8,9 @@ import PuzzleDifficultyTabs from "../features/puzzles/components/PuzzleDifficult
 import PuzzleLimitModal from "../features/puzzles/components/PuzzleLimitModal";
 import PuzzleResultModal from "../features/puzzles/components/PuzzleResultModal";
 import PuzzleStatsCard from "../features/puzzles/components/PuzzleStatsCard";
+import { trackEvent } from "../services/analytics";
+import UpgradeModal from "../components/billing/UpgradeModal";
+import ErrorBanner from "../components/common/ErrorBanner";
 
 function squareFromCoords(row, col) {
   return `${String.fromCharCode(97 + col)}${8 - row}`;
@@ -67,8 +70,11 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
   const [result, setResult] = useState(null);
   const [limitModal, setLimitModal] = useState(null);
   const [emptyMessage, setEmptyMessage] = useState("");
+  const [shakeBoard, setShakeBoard] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState("");
 
   const completed = Boolean(result?.completed);
+  const remainingLabel = limits?.limit ? `${limits.remaining ?? 0}/${limits.limit} puzzles remaining today` : "Puzzle counter unavailable";
   const progress = useMemo(() => {
     if (!puzzle) return "Move 0/0";
     const current = Math.min(Math.floor((moveIndex + 1) / 2), puzzle.playerMoveCount || 1);
@@ -110,6 +116,7 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
         return;
       }
       setPuzzle(data.puzzle);
+      trackEvent("puzzle_start", { difficulty: nextDifficulty, puzzleId: data.puzzle.puzzleId });
       setGame(makeGame(data.puzzle.fen));
       setMoveIndex(data.puzzle.moveIndex || 1);
       setLastMove(data.puzzle.initialMove ? { from: data.puzzle.initialMove.slice(0, 2), to: data.puzzle.initialMove.slice(2, 4) } : null);
@@ -156,6 +163,8 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
     const legal = legalMoveFromSelection(from, to);
     if (!legal) {
       setFeedback({ type: "error", message: "Illegal move. Try another candidate move." });
+      setShakeBoard(true);
+      window.setTimeout(() => setShakeBoard(false), 360);
       return;
     }
 
@@ -183,9 +192,13 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
         }
       } else {
         setFeedback({ type: "error", message: data.message || "Try again." });
+        setShakeBoard(true);
+        window.setTimeout(() => setShakeBoard(false), 360);
       }
     } catch (error) {
       setFeedback({ type: "error", message: error.message || "Unable to validate that move." });
+      setShakeBoard(true);
+      window.setTimeout(() => setShakeBoard(false), 360);
     } finally {
       setSubmitting(false);
     }
@@ -219,6 +232,7 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
       setHintState({ used: data.hintsUsed || 0, limit: data.hintsLimit || 1, loading: false });
     } catch (error) {
       setFeedback({ type: "error", message: error.message || "No hint is available." });
+      if (error.status === 429) setUpgradeFeature("more puzzle hints");
       setHintState((current) => ({ ...current, loading: false }));
     }
   };
@@ -227,6 +241,7 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
     <div className="min-h-screen bg-[#07100d] text-white">
       <PuzzleLimitModal limit={limitModal} onClose={() => setLimitModal(null)} onUpgrade={() => onNavigate?.("pricing")} />
       <PuzzleResultModal result={result} onClose={() => setResult(null)} onNext={() => loadPuzzle(difficulty, { fresh: true })} />
+      <UpgradeModal open={Boolean(upgradeFeature)} feature={upgradeFeature} onClose={() => setUpgradeFeature("")} onNavigate={onNavigate} />
       <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6 xl:p-8">
         <header className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#132017] via-[#0b1512] to-[#030706] p-5 shadow-2xl shadow-black/30 md:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -250,6 +265,7 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
         </header>
 
         <PuzzleDifficultyTabs value={difficulty} limits={limits} onChange={setDifficulty} />
+        <ErrorBanner message={feedback?.type === "error" && !puzzle ? feedback.message : ""} onRetry={() => loadPuzzle(difficulty, { fresh: true })} />
 
         {loading ? <Skeleton /> : !puzzle ? (
           <EmptyState message={emptyMessage} onRefresh={() => loadPuzzle(difficulty)} />
@@ -268,7 +284,7 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
                   <p className="mt-2 text-sm leading-6 text-slate-400">{progress} · {game.turn() === "w" ? "White" : "Black"} to move</p>
                 </div>
                 <div className="rounded-2xl bg-black/20 px-4 py-3 text-sm font-bold text-slate-300">
-                  {limits?.remaining ?? 0} remaining today
+                  {remainingLabel}
                 </div>
               </div>
 
@@ -277,6 +293,7 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
                 selectedSquare={selectedSquare}
                 lastMove={lastMove}
                 completed={completed || submitting}
+                shake={shakeBoard}
                 onSquareClick={handleSquareClick}
               />
 
@@ -313,7 +330,11 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
                       <option value="endgame">Endgame</option>
                     </select>
                   </label>
-                ) : null}
+                ) : (
+                  <button type="button" onClick={() => setUpgradeFeature("premium puzzle filters")} className="mt-4 w-full rounded-xl border border-amber-200/30 bg-black/20 px-4 py-3 text-sm font-black text-amber-50 transition hover:bg-amber-300/10">
+                    Unlock theme filters
+                  </button>
+                )}
                 <button type="button" onClick={() => onNavigate?.("pricing")} className="mt-4 w-full rounded-xl bg-amber-200 px-4 py-3 text-sm font-black text-[#2a1a00] transition hover:bg-amber-100">View plans</button>
               </div>
 

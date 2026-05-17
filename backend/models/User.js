@@ -70,7 +70,7 @@ const userSchema = new mongoose.Schema({
   // v1.2.1 SaaS / supporter plan fields
   plan: {
     type: String,
-    enum: ["free", "supporter_monthly", "supporter_yearly", "pro"],
+    enum: ["free", "supporter_monthly", "supporter_yearly", "pro", "premium", "lifetime"],
     default: "free",
   },
   planStatus: {
@@ -85,7 +85,7 @@ const userSchema = new mongoose.Schema({
   supporterSince: { type: Date, default: null },
   supporterPlan: {
     type: String,
-    enum: ["none", "supporter_monthly", "supporter_yearly", "pro"],
+    enum: ["none", "supporter_monthly", "supporter_yearly", "pro", "premium", "lifetime"],
     default: "none",
   },
   supporterExpiresAt: { type: Date, default: null },
@@ -106,7 +106,17 @@ const userSchema = new mongoose.Schema({
     unlimitedGameReview: { type: Boolean, default: false },
     tournaments: { type: Boolean, default: false },
     earlyAccess: { type: Boolean, default: false },
+    premiumPuzzleFilters: { type: Boolean, default: false },
+    advancedAnalysis: { type: Boolean, default: false },
   },
+  bonusPuzzleCredits: { type: Number, default: 0, min: 0 },
+  trialDaysAwarded: { type: Number, default: 0, min: 0 },
+  trialUsed: { type: Boolean, default: false, index: true },
+  trialUsedAt: { type: Date, default: null },
+  puzzleXp: { type: Number, default: 0, min: 0 },
+  puzzleStreak: { type: Number, default: 0, min: 0 },
+  puzzleLastSolvedDate: { type: String, trim: true, default: "" },
+  badges: [{ type: String, trim: true }],
   bio: {
     type: String,
     maxlength: 500,

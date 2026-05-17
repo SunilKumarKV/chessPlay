@@ -34,7 +34,18 @@ import TournamentsPage from "../pages/billing/TournamentsPage";
 import CommunityPage from "../pages/CommunityPage";
 import MessagesPage from "../pages/MessagesPage";
 import AutomationPage from "../pages/AutomationPage";
+import FeedbackButton from "../components/feedback/FeedbackButton";
+import RefundPolicyPage from "../pages/legal/RefundPolicyPage";
+import CookiePolicyPage from "../pages/legal/CookiePolicyPage";
+import ContactPage from "../pages/legal/ContactPage";
+import SeoLandingPage from "../pages/seo/SeoLandingPage";
+import CoachingPage from "../pages/growth/CoachingPage";
+import StorePage from "../pages/growth/StorePage";
+import ServicesPage from "../pages/growth/ServicesPage";
+import OpeningExplorerPage from "../pages/growth/OpeningExplorerPage";
+import PaymentStatusPage from "../pages/billing/PaymentStatusPage";
 import { getGuestFeatureMessage, isGuestRestrictedFeature, isGuestUser } from "../utils/guestAccess";
+import { trackEvent } from "../services/analytics";
 
 const routeMap = {
   admin: "/admin",
@@ -54,6 +65,7 @@ const routeMap = {
   billing: "/billing",
   monetization: "/premium",
   referral: "/referral",
+  referrals: "/referrals",
   tournaments: "/tournaments",
   community: "/community",
   messages: "/messages",
@@ -61,16 +73,37 @@ const routeMap = {
   help: "/help",
   puzzles: "/puzzles",
   privacy: "/privacy",
+  "privacy-policy": "/privacy-policy",
   terms: "/terms",
+  "refund-policy": "/refund-policy",
+  "cookie-policy": "/cookie-policy",
+  contact: "/contact",
+  "chess-puzzles": "/chess-puzzles",
+  "play-chess-online": "/play-chess-online",
+  "chess-ai": "/chess-ai",
+  "chess-analysis": "/chess-analysis",
+  coaching: "/coaching",
+  openings: "/openings",
+  "opening-explorer": "/opening-explorer",
+  store: "/store",
+  "hire-me": "/hire-me",
+  services: "/services",
   "delete-account": "/delete-account",
   "forgot-password": "/forgot-password",
   "reset-password": "/reset-password",
   "verify-email": "/verify-email",
+  "payment-success": "/payment/success",
+  "payment-failed": "/payment/failed",
 };
 
 function pageFromPathname(pathname) {
   const normalized = pathname.replace(/\/$/, "") || "/";
   if (normalized === "/") return "dashboard";
+  if (normalized === "/privacy-policy") return "privacy-policy";
+  if (normalized === "/payment/success") return "payment-success";
+  if (normalized === "/payment/failed") return "payment-failed";
+  if (normalized === "/referrals") return "referrals";
+  if (normalized === "/privacy") return "privacy";
   if (normalized === "/admin" || normalized === "/admin/dashboard") return "admin";
   if (normalized.startsWith("/profile/") && normalized.split("/")[2]) return "profile-public";
   if (["/admin/payments", "/admin/supporters"].includes(normalized)) return "admin-supporters";
@@ -239,6 +272,38 @@ export default function App() {
     );
   }
 
+  if (currentPage === "payment-success" || currentPage === "payment-failed") {
+    return (
+      <ErrorBoundary>
+        <PaymentStatusPage status={currentPage === "payment-success" ? "success" : "failed"} onNavigate={guardedNavigate} />
+        <FeedbackButton user={user} />
+      </ErrorBoundary>
+    );
+  }
+
+  if (["privacy", "privacy-policy", "terms", "refund-policy", "cookie-policy", "contact", "chess-puzzles", "play-chess-online", "chess-ai", "chess-analysis", "coaching", "openings", "opening-explorer", "store", "hire-me", "services"].includes(currentPage)) {
+    const page = currentPage === "privacy" || currentPage === "privacy-policy"
+      ? <PrivacyPolicyPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+      : currentPage === "terms"
+        ? <TermsPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+        : currentPage === "refund-policy"
+          ? <RefundPolicyPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+          : currentPage === "cookie-policy"
+            ? <CookiePolicyPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+            : currentPage === "contact"
+              ? <ContactPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+              : currentPage === "coaching"
+                ? <CoachingPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                : currentPage === "openings" || currentPage === "opening-explorer"
+                  ? <OpeningExplorerPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                : currentPage === "store"
+                  ? <StorePage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                  : currentPage === "hire-me" || currentPage === "services"
+                    ? <ServicesPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                    : <SeoLandingPage page={currentPage} onBack={() => navigateToAppPage("dashboard", setCurrentPage)} onNavigate={guardedNavigate} />;
+    return <ErrorBoundary>{page}<FeedbackButton user={user} /></ErrorBoundary>;
+  }
+
   if (!user && currentPage === "local") {
     const selectedTimeControl = localStorage.getItem("selectedTimeControl") || "3+0";
     return (
@@ -308,6 +373,18 @@ export default function App() {
     );
   }
 
+  if (!user && (currentPage === "referral" || currentPage === "referrals")) {
+    return (
+      <ErrorBoundary>
+        <ReferralPage
+          onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
+          onNavigate={guardedNavigate}
+        />
+        <FeedbackButton user={null} />
+      </ErrorBoundary>
+    );
+  }
+
   if (!user && currentPage === "profile-public") {
     return (
       <ErrorBoundary>
@@ -332,6 +409,7 @@ export default function App() {
   const handleStartGame = (gameType, timeControl) => {
     const nextPage = gameType === "multi" ? "multi" : gameType === "local" ? "local" : "ai";
     localStorage.setItem("selectedTimeControl", timeControl);
+    trackEvent(gameType === "multi" ? "multiplayer_start" : "play_ai", { timeControl });
     guardedNavigate(nextPage);
   };
 
@@ -477,6 +555,7 @@ export default function App() {
       case "monetization":
         return <MonetizationPage user={user} onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "referral":
+      case "referrals":
         return <ReferralPage onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "tournaments":
         return <TournamentsPage user={user} onBack={goDashboard} onNavigate={guardedNavigate} />;
@@ -521,6 +600,7 @@ export default function App() {
       >
         {renderContent()}
       </DashboardLayout>
+      <FeedbackButton user={user} />
     </ErrorBoundary>
   );
 }

@@ -20,7 +20,9 @@ const {
   validateStrongPassword,
 } = require("../utils/security");
 const { sendSecurityEmail } = require("../utils/email");
+const logger = require("../utils/safeLogger");
 const auth = require("../middleware/auth");
+const { queueEmailEvent } = require("../services/emailEventService");
 
 const router = express.Router();
 const PUBLIC_USER_FIELDS = "username avatar country title rating gamesPlayed gamesWon privacy friends";
@@ -157,11 +159,14 @@ async function connectReferralForNewUser(user, referralCode) {
   if (user.referredBy) return false;
   user.referredBy = referrer._id;
   await user.save();
-  await Referral.updateOne(
+  const referralResult = await Referral.updateOne(
     { referrer: referrer._id, referred: user._id },
-    { $setOnInsert: { referrer: referrer._id, referred: user._id, code, status: "joined", rewardNote: "Joined through referral. Reward is manually reviewed." } },
+    { $setOnInsert: { referrer: referrer._id, referred: user._id, code, status: "joined", rewardNote: "Joined through referral. Referrer received 3 bonus puzzle credits." } },
     { upsert: true },
   );
+  if (referralResult.upsertedCount > 0) {
+    await User.findByIdAndUpdate(referrer._id, { $inc: { bonusPuzzleCredits: 3 } }).catch(() => {});
+  }
   return true;
 }
 
@@ -299,10 +304,11 @@ router.post("/register", authLimiter, async (req, res) => {
 
     await issueSession(res, user);
     await recordSecurityEvent(req, { type: "register_success", email: user.email, user: user._id });
+    await queueEmailEvent("welcome", { user: user._id, email: user.email, payload: { username: user.username } });
 
     res.status(201).json({ ...buildAuthResponse("Account created successfully", user), referralConnected });
   } catch (error) {
-    console.error("Registration error:", error);
+    logger.error("Registration error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -343,7 +349,7 @@ router.post("/login", authLimiter, async (req, res) => {
 
     res.json(buildAuthResponse("Login successful", user));
   } catch (error) {
-    console.error("Login error:", error);
+    logger.error("Login error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -364,6 +370,7 @@ router.post("/google", authLimiter, async (req, res) => {
     const email = emailValidation.email;
 
     let user = await User.findOne({ email });
+    const isNewUser = !user;
     if (!user) {
       user = new User({
         username: await buildUniqueUsername(profile.name || email.split("@")[0]),
@@ -384,10 +391,11 @@ router.post("/google", authLimiter, async (req, res) => {
     await user.save();
     await issueSession(res, user);
     await recordSecurityEvent(req, { type: user.isAdmin ? "admin_login" : "login_success", email: user.email, user: user._id });
+    if (isNewUser) await queueEmailEvent("welcome", { user: user._id, email: user.email, payload: { username: user.username, provider: "google" } });
 
     res.json(buildAuthResponse("Google login successful", user));
   } catch (error) {
-    console.error("Google login error:", error.message);
+    logger.error("Google login error:", error.message);
     res.status(401).json({ message: error.message || "Google login failed" });
   }
 });
@@ -496,7 +504,7 @@ router.post("/resend-verification", authLimiter, auth, async (req, res) => {
 
     res.json({ message: "Verification email sent" });
   } catch (error) {
-    console.error("Resend verification error:", error);
+    logger.error("Resend verification error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -520,7 +528,7 @@ router.post("/verify-email", authLimiter, async (req, res) => {
 
     res.json({ message: "Email verified successfully" });
   } catch (error) {
-    console.error("Verify email error:", error);
+    logger.error("Verify email error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -547,7 +555,7 @@ router.post("/forgot-password", authLimiter, async (req, res) => {
 
     res.json({ message: "If the account exists, a reset email was sent" });
   } catch (error) {
-    console.error("Forgot password error:", error);
+    logger.error("Forgot password error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -575,7 +583,7 @@ router.post("/reset-password", authLimiter, async (req, res) => {
     clearSessionCookies(res);
     res.json({ message: "Password reset successful. Please log in again." });
   } catch (error) {
-    console.error("Reset password error:", error);
+    logger.error("Reset password error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -599,7 +607,7 @@ router.delete("/account", authLimiter, auth, async (req, res) => {
     clearSessionCookies(res);
     res.json({ message: "Account deleted" });
   } catch (error) {
-    console.error("Delete account error:", error);
+    logger.error("Delete account error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -613,7 +621,7 @@ router.get("/profile", auth, async (req, res) => {
     }
     res.json({ user });
   } catch (error) {
-    console.error("Profile error:", error);
+    logger.error("Profile error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -637,7 +645,7 @@ router.get("/profile/:userId", auth, async (req, res) => {
 
     res.json({ user: publicProfile(user) });
   } catch (error) {
-    console.error("Profile error:", error);
+    logger.error("Profile error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -711,7 +719,7 @@ router.get("/users/search", auth, async (req, res) => {
 
     res.json({ users: usersWithStatus });
   } catch (error) {
-    console.error("User search error:", error);
+    logger.error("User search error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -739,7 +747,7 @@ router.get("/friends", auth, async (req, res) => {
         })),
     });
   } catch (error) {
-    console.error("Friends load error:", error);
+    logger.error("Friends load error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -781,7 +789,7 @@ router.post("/friends/request", auth, async (req, res) => {
 
     res.json({ message: "Friend request sent" });
   } catch (error) {
-    console.error("Friend request error:", error);
+    logger.error("Friend request error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -819,7 +827,7 @@ router.post("/friends/respond", auth, async (req, res) => {
     await user.save();
     res.json({ message: action === "accept" ? "Friend added" : "Request declined" });
   } catch (error) {
-    console.error("Friend response error:", error);
+    logger.error("Friend response error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -847,7 +855,7 @@ router.post("/avatar", auth, async (req, res) => {
       storage: stored.storage,
     });
   } catch (error) {
-    console.error("Avatar upload error:", error);
+    logger.error("Avatar upload error:", error);
     res.status(400).json({ message: error.message || "Avatar upload failed" });
   }
 });
@@ -862,7 +870,7 @@ router.delete("/avatar", auth, async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
     res.json({ message: "Avatar removed", user });
   } catch (error) {
-    console.error("Avatar delete error:", error);
+    logger.error("Avatar delete error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -936,7 +944,7 @@ router.put("/profile", auth, async (req, res) => {
       user
     });
   } catch (error) {
-    console.error("Profile update error:", error);
+    logger.error("Profile update error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -966,7 +974,7 @@ router.put("/password", authLimiter, auth, async (req, res) => {
 
     res.json({ message: "Password updated successfully" });
   } catch (error) {
-    console.error("Password update error:", error);
+    logger.error("Password update error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -983,7 +991,7 @@ router.get("/leaderboard", auth, async (req, res) => {
 
     res.json(users);
   } catch (error) {
-    console.error("Leaderboard error:", error);
+    logger.error("Leaderboard error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });

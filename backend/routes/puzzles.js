@@ -8,7 +8,9 @@ const Puzzle = require("../models/Puzzle");
 const PuzzleAttempt = require("../models/PuzzleAttempt");
 const PuzzleDailyUsage = require("../models/PuzzleDailyUsage");
 const User = require("../models/User");
+const { validateBody } = require("../middleware/validate");
 const { getJwtSecret, getRequestAccessToken } = require("../utils/security");
+const logger = require("../utils/safeLogger");
 
 const router = express.Router();
 const VALID_DIFFICULTIES = new Set(["beginner", "intermediate", "advanced", "master"]);
@@ -26,6 +28,15 @@ const attemptLimiter = rateLimit({
   limit: 60,
   standardHeaders: true,
   legacyHeaders: false,
+});
+
+const validatePuzzleHint = validateBody({
+  moveIndex: { max: 3, pattern: /^\d*$/ },
+});
+
+const validatePuzzleSubmit = validateBody({
+  move: { required: true, max: 5, pattern: /^[a-h][1-8][a-h][1-8][qrbn]?$/i },
+  moveIndex: { required: true, max: 3, pattern: /^\d+$/ },
 });
 
 function normalizeUci(value) {
@@ -51,7 +62,8 @@ function difficultyFromRating(rating) {
 function userPlan(user) {
   if (!user) return "guest";
   if (user.plan === "pro" || user.supporterPlan === "pro") return "premium_pro";
-  if (user.plan === "supporter_yearly" || user.supporterPlan === "supporter_yearly") return "premium_lifetime";
+  if (user.plan === "premium" || user.supporterPlan === "premium") return "premium_pro";
+  if (user.plan === "lifetime" || user.supporterPlan === "lifetime" || user.plan === "supporter_yearly" || user.supporterPlan === "supporter_yearly") return "premium_lifetime";
   if (user.isPremium || user.isSupporter || user.plan === "supporter_monthly" || user.supporterPlan === "supporter_monthly") {
     return "premium_basic";
   }
@@ -183,6 +195,8 @@ function explanationFor(puzzle) {
     pin: "Exploit a piece that cannot move without exposing something more valuable.",
     sacrifice: "Give material only when the forced continuation wins more or ends the game.",
     skewer: "Attack the more valuable piece first so it must move and expose the piece behind it.",
+    endgame: "Reduce the position to king activity, passed pawns, and exact move order.",
+    opening: "Notice the tactical consequence of development, king safety, or an early pawn break.",
   };
   const difficultyOrder = ["beginner", "intermediate", "advanced", "master"];
   const nextDifficulty = difficultyOrder[Math.min(difficultyOrder.indexOf(puzzle.difficulty) + 1, difficultyOrder.length - 1)] || "beginner";
@@ -194,6 +208,21 @@ function explanationFor(puzzle) {
     explanation: themeText[theme] || "This tactic is solved by following the most forcing line and checking each reply.",
     nextRecommendedDifficulty: nextDifficulty,
   };
+}
+
+function dateOffsetKey(daysAgo) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - daysAgo);
+  return date.toISOString().slice(0, 10);
+}
+
+function puzzleBadgesFor(xp, streak, solved) {
+  return [
+    solved >= 1 && "puzzle-learner",
+    streak >= 3 && "puzzle-streak-3",
+    streak >= 7 && "puzzle-streak-7",
+    xp >= 500 && "tactics-500xp",
+  ].filter(Boolean);
 }
 
 function publicPuzzle(puzzle) {
@@ -287,6 +316,7 @@ async function consumeDailyPuzzle(owner, puzzle) {
     {
       $setOnInsert: {
         puzzle: puzzle._id,
+        puzzleId: puzzle.puzzleId,
         ownerType: owner.ownerType,
         user: owner.userId,
         difficulty: puzzle.difficulty,
@@ -350,7 +380,7 @@ router.get("/history/me", async (req, res) => {
     const attempts = await PuzzleAttempt.find({ ownerKey: owner.ownerKey })
       .sort({ updatedAt: -1 })
       .limit(20)
-      .select("puzzleId difficulty status hintsUsed mistakeCount completedAt updatedAt");
+      .select("puzzleId difficulty status hintsUsed mistakeCount movesSubmitted timeSpentMs completedAt updatedAt");
     res.json({ history: attempts });
   } catch {
     res.status(500).json({ message: "Unable to load puzzle history." });
@@ -412,11 +442,12 @@ async function handleNextPuzzle(req, res, requestedDifficulty) {
       limits: limitPayload(owner, consumed.usage),
     });
   } catch (error) {
+    logger.error("Puzzle next failed:", error.message);
     res.status(500).json({ message: "Unable to load the next puzzle." });
   }
 }
 
-router.post("/:id/hint", attemptLimiter, async (req, res) => {
+router.post("/:id/hint", attemptLimiter, validatePuzzleHint, async (req, res) => {
   try {
     const owner = ownerFromRequest(req);
     const puzzle = await findPuzzle(req.params.id);
@@ -427,6 +458,7 @@ router.post("/:id/hint", attemptLimiter, async (req, res) => {
       {
         $setOnInsert: {
           puzzle: puzzle._id,
+          puzzleId: puzzle.puzzleId,
           ownerType: owner.ownerType,
           user: owner.userId,
           difficulty: puzzle.difficulty,
@@ -470,7 +502,7 @@ router.post("/:id/hint", attemptLimiter, async (req, res) => {
   }
 });
 
-router.post("/:id/submit", attemptLimiter, async (req, res) => {
+router.post("/:id/submit", attemptLimiter, validatePuzzleSubmit, async (req, res) => {
   try {
     const move = normalizeUci(req.body?.move);
     const moveIndex = Number.parseInt(req.body?.moveIndex, 10);
@@ -496,6 +528,7 @@ router.post("/:id/submit", attemptLimiter, async (req, res) => {
       {
         $setOnInsert: {
           puzzle: puzzle._id,
+          puzzleId: puzzle.puzzleId,
           ownerType: owner.ownerType,
           user: owner.userId,
           difficulty: puzzle.difficulty,
@@ -537,13 +570,26 @@ router.post("/:id/submit", attemptLimiter, async (req, res) => {
     if (completed) {
       attempt.status = "solved";
       attempt.completedAt = new Date();
+      attempt.timeSpentMs = Math.max(0, attempt.completedAt.getTime() - new Date(attempt.startedAt || attempt.createdAt || Date.now()).getTime());
       puzzle.solves += 1;
       if (owner.userId) {
-        await User.findByIdAndUpdate(owner.userId, {
-          $inc: { puzzlesSolved: 1 },
-          $max: { highestPuzzleRating: puzzle.rating || 1200 },
-          $set: { puzzleRating: puzzle.rating || 1200 },
-        }).catch(() => {});
+        const user = await User.findById(owner.userId).select("puzzlesSolved puzzleXp puzzleStreak puzzleLastSolvedDate badges").catch(() => null);
+        if (user) {
+          const today = dateOffsetKey(0);
+          const yesterday = dateOffsetKey(1);
+          const nextStreak = user.puzzleLastSolvedDate === today ? user.puzzleStreak : user.puzzleLastSolvedDate === yesterday ? user.puzzleStreak + 1 : 1;
+          const xpGain = Math.max(10, Math.round((puzzle.rating || 1000) / 100));
+          const solvedCount = (user.puzzlesSolved || 0) + 1;
+          const nextXp = (user.puzzleXp || 0) + xpGain;
+          user.puzzlesSolved = solvedCount;
+          user.puzzleRating = puzzle.rating || 1200;
+          user.highestPuzzleRating = Math.max(user.highestPuzzleRating || 1200, puzzle.rating || 1200);
+          user.puzzleXp = nextXp;
+          user.puzzleStreak = nextStreak;
+          user.puzzleLastSolvedDate = today;
+          user.badges = Array.from(new Set([...(user.badges || []), ...puzzleBadgesFor(nextXp, nextStreak, solvedCount)]));
+          await user.save().catch(() => {});
+        }
       }
     }
 

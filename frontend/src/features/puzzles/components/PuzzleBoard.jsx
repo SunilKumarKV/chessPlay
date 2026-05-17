@@ -9,10 +9,12 @@ export default function PuzzleBoard({
   selectedSquare,
   lastMove,
   completed,
+  shake,
   onSquareClick,
 }) {
   return (
-    <div className="mx-auto w-full max-w-[min(82vw,620px)]">
+    <div className={`mx-auto w-full max-w-[min(92vw,620px)] ${shake ? "animate-[puzzleShake_0.32s_ease-in-out]" : ""}`}>
+      <style>{`@keyframes puzzleShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}`}</style>
       <Board
         board={game.board()}
         onSquareClick={onSquareClick}
