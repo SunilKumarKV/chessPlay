@@ -36,3 +36,19 @@ pnpm --filter backend start
 - No changes to multiplayer socket handlers.
 - No hardcoded payment secrets.
 - API failures render safe empty/error states.
+
+## Security Checklist
+
+- Invalid login/signup spam is rate-limited with safe messages.
+- Invalid payment verification signatures are rejected.
+- Invalid Razorpay webhook signatures are rejected.
+- Replayed webhook event IDs are ignored after the first processed event.
+- Unauthenticated admin API requests return `401`.
+- Non-admin admin API requests return `403`.
+- Puzzle next/submit/hint limits cannot be bypassed with repeated calls.
+- Invalid puzzle move formats are rejected before chess validation.
+- Referral self-invite attempts are rejected.
+- Duplicate referral reward credits are not issued for the same referrer/referred pair.
+- Missing optional Razorpay and Sentry env vars do not crash local startup.
+- Missing required production env vars produce clear startup errors.
+- Frontend build output contains no backend secrets or non-`VITE_` secret usage.

@@ -4,6 +4,7 @@ const rateLimit = require("express-rate-limit");
 const validator = require("validator");
 const Waitlist = require("../models/Waitlist");
 const { sanitizeText } = require("../utils/security");
+const { validateBody } = require("../middleware/validate");
 
 const router = express.Router();
 
@@ -15,7 +16,13 @@ const waitlistLimiter = rateLimit({
   message: { message: "Too many waitlist attempts. Please try again later." },
 });
 
-router.post("/", waitlistLimiter, async (req, res) => {
+const validateWaitlist = validateBody({
+  email: { required: true, max: 160 },
+  source: { max: 80 },
+  interest: { max: 120 },
+});
+
+router.post("/", waitlistLimiter, validateWaitlist, async (req, res) => {
   try {
     const email = String(req.body.email || "").trim().toLowerCase();
     if (!validator.isEmail(email)) return res.status(400).json({ message: "Enter a valid email address." });

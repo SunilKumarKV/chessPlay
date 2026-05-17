@@ -1,4 +1,6 @@
 require("dotenv").config();
+const logger = require("./utils/safeLogger");
+const { captureException, initMonitoring } = require("./utils/monitoring");
 
 const isProduction = process.env.NODE_ENV === "production";
 const weakJwtSecrets = new Set([
@@ -8,9 +10,11 @@ const weakJwtSecrets = new Set([
 ]);
 
 function fatalConfigError(message) {
-  console.error(`FATAL CONFIG ERROR: ${message}`);
+  logger.error(`FATAL CONFIG ERROR: ${message}`);
   process.exit(1);
 }
+
+initMonitoring();
 
 const accessSecret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
 const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
@@ -29,6 +33,14 @@ if (weakJwtSecrets.has(accessSecret) || weakJwtSecrets.has(refreshSecret)) {
 
 if (isProduction && accessSecret === refreshSecret) {
   fatalConfigError("JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different in production.");
+}
+
+if (isProduction && !process.env.MONGODB_URI) {
+  fatalConfigError("MONGODB_URI is required in production.");
+}
+
+if (isProduction && !(process.env.FRONTEND_URL || process.env.CLIENT_URL || process.env.CORS_ALLOWED_ORIGINS || process.env.FRONTEND_ORIGINS)) {
+  fatalConfigError("FRONTEND_URL, CLIENT_URL, CORS_ALLOWED_ORIGINS, or FRONTEND_ORIGINS is required in production.");
 }
 
 const express = require("express");
@@ -109,7 +121,9 @@ function parseCookies(cookieHeader = "") {
 
 // Configure CORS for the frontend
 const configuredOrigins = Array.from(new Set([
+  ...parseCsvEnv(process.env.CORS_ALLOWED_ORIGINS),
   ...parseCsvEnv(process.env.FRONTEND_ORIGINS),
+  ...parseCsvEnv(process.env.CLIENT_URL),
   ...parseCsvEnv(process.env.FRONTEND_URL),
   "https://getchessplay.com",
   "https://www.getchessplay.com",
@@ -153,7 +167,7 @@ function corsOriginForRequest(req, origin, callback) {
     return callback(null, true);
   }
 
-  console.warn("Blocked by CORS:", origin);
+  logger.warn("Blocked by CORS", { origin });
   return callback(null, false);
 }
 
@@ -303,7 +317,7 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         connectSrc: [...cspConnectSources, "https://accounts.google.com", "https://oauth2.googleapis.com"],
-        scriptSrc: ["'self'", "https://accounts.google.com"],
+        scriptSrc: ["'self'", "'wasm-unsafe-eval'", "https://accounts.google.com"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com"],
         imgSrc: ["'self'", "data:", "https:", "blob:"],
         fontSrc: ["'self'", "data:"],
@@ -315,7 +329,7 @@ app.use(
 app.use(express.json({
   limit: "20kb",
   verify: (req, _res, buffer) => {
-    if (req.originalUrl === "/api/payments/webhook") req.rawBody = buffer.toString("utf8");
+    if (req.originalUrl.startsWith("/api/payments/webhook")) req.rawBody = buffer.toString("utf8");
   },
 }));
 app.use(mongoSanitize());
@@ -331,7 +345,7 @@ const mongoUri =
     : "mongodb://127.0.0.1:27017/chessplay");
 
 if (!process.env.MONGODB_URI && process.env.NODE_ENV !== "production") {
-  console.warn(
+  logger.warn(
     "Warning: MONGODB_URI is not set. Using local development MongoDB URI.",
   );
 }
@@ -339,8 +353,11 @@ if (!process.env.MONGODB_URI && process.env.NODE_ENV !== "production") {
 // Connect to MongoDB
 mongoose
   .connect(mongoUri, { serverSelectionTimeoutMS: 5000 })
-  .then(() => console.log("Connected to MongoDB"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+  .then(() => logger.info("Connected to MongoDB"))
+  .catch((err) => {
+    captureException(err, { area: "mongodb" });
+    logger.error("MongoDB connection error", err);
+  });
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -464,6 +481,16 @@ function stripHtmlTags(text) {
 
 function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeRoomCode(value) {
+  const roomId = String(value || "").trim().toUpperCase();
+  return /^[A-Z0-9]{6}$/.test(roomId) ? roomId : "";
+}
+
+function safePlayerName(value, fallback = "Player") {
+  const name = stripHtmlTags(String(value || fallback)).replace(/[^\w .-]/g, "").trim().slice(0, 30);
+  return name || fallback;
 }
 
 function censorBlockedWords(text) {
@@ -655,7 +682,8 @@ io.on("connection", (socket) => {
         return;
       }
       Promise.resolve(handler(...args)).catch((error) => {
-        console.error(`${eventName} handler error:`, error);
+        captureException(error, { socketEvent: eventName });
+        logger.error(`${eventName} handler error`, error);
         socket.emit("serverError", { message: "An unexpected server error occurred" });
       });
     });
@@ -670,7 +698,7 @@ io.on("connection", (socket) => {
       const queueEntry = {
         socketId: socket.id,
         userId: socket.user._id,
-        playerName: data.playerName || socket.user.username,
+        playerName: safePlayerName(data.playerName, socket.user.username),
         rating,
         mode: ["casual", "ranked", "blitz", "rapid", "beginner", "intermediate", "advanced"].includes(data.mode) ? data.mode : "casual",
         timeControlIndex: Number.isInteger(data.timeControlIndex) ? data.timeControlIndex : null,
@@ -708,7 +736,7 @@ io.on("connection", (socket) => {
     try {
       removeFromQueue(socket.id);
       cleanupSpectator(socket.id, true);
-      const { playerName } = data;
+      const playerName = safePlayerName(data?.playerName, socket.user.username);
       const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
 
       const gameState = createInitialGameState();
@@ -750,9 +778,10 @@ io.on("connection", (socket) => {
     try {
       removeFromQueue(socket.id);
       cleanupSpectator(socket.id, true);
-      const { roomId, playerName } = data;
-      const normalizedRoomId = String(roomId || "").trim().toUpperCase();
-      if (!/^[A-Z0-9]{6}$/.test(normalizedRoomId)) {
+      const { roomId } = data;
+      const playerName = safePlayerName(data?.playerName, socket.user.username);
+      const normalizedRoomId = normalizeRoomCode(roomId);
+      if (!normalizedRoomId) {
         socket.emit("serverError", { message: "Invalid room code" });
         return;
       }
@@ -824,7 +853,7 @@ io.on("connection", (socket) => {
   onSafe("spectateRoom", (data = {}) => {
     try {
       removeFromQueue(socket.id);
-      const { roomId } = data;
+      const roomId = normalizeRoomCode(data.roomId);
       if (!roomId) {
         socket.emit("serverError", { message: "Room ID is required" });
         return;
@@ -870,7 +899,7 @@ io.on("connection", (socket) => {
     try {
       removeFromQueue(socket.id);
       cleanupSpectator(socket.id, true);
-      const { roomId } = data;
+      const roomId = normalizeRoomCode(data.roomId);
       if (!roomId) {
         socket.emit("serverError", { message: "Room is required" });
         return;
@@ -940,6 +969,14 @@ io.on("connection", (socket) => {
   onSafe("makeMove", async (data) => {
     try {
       const { fromRow, fromCol, toRow, toCol, promotion } = data;
+      if (![fromRow, fromCol, toRow, toCol].every((value) => Number.isInteger(value) && value >= 0 && value <= 7)) {
+        socket.emit("serverError", { message: "Invalid move coordinates" });
+        return;
+      }
+      if (promotion && !["q", "r", "b", "n"].includes(String(promotion).toLowerCase())) {
+        socket.emit("serverError", { message: "Invalid promotion piece" });
+        return;
+      }
       const player = players.get(socket.id);
 
       if (!player) {
@@ -1416,9 +1453,10 @@ app.use((err, req, res, next) => {
   const status = Number(err.status || err.statusCode || 500);
   const safeStatus = status >= 400 && status < 600 ? status : 500;
   if (safeStatus >= 500) {
-    console.error("Unhandled express error:", err);
+    captureException(err, { path: req.originalUrl, method: req.method });
+    logger.error("Unhandled express error", err);
   } else {
-    console.warn("Handled express error:", err.message);
+    logger.warn("Handled express error", { message: err.message, path: req.originalUrl });
   }
   if (res.headersSent) {
     return next(err);
@@ -1430,13 +1468,14 @@ app.use((err, req, res, next) => {
 
 server.on("error", (error) => {
   if (error.code === "EADDRINUSE") {
-    console.error(`Port ${PORT} is already in use. Stop the existing server or change PORT.`);
+    logger.error(`Port ${PORT} is already in use. Stop the existing server or change PORT.`);
     return;
   }
-  console.error("HTTP server error:", error);
+  captureException(error, { area: "http_server" });
+  logger.error("HTTP server error", error);
 });
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Chess server running on port ${PORT}`);
-  console.log(`Local network access: http://0.0.0.0:${PORT}`);
+  logger.info(`Chess server running on port ${PORT}`);
+  logger.info(`Local network access: http://0.0.0.0:${PORT}`);
 });

@@ -111,6 +111,8 @@ const userSchema = new mongoose.Schema({
   },
   bonusPuzzleCredits: { type: Number, default: 0, min: 0 },
   trialDaysAwarded: { type: Number, default: 0, min: 0 },
+  trialUsed: { type: Boolean, default: false, index: true },
+  trialUsedAt: { type: Date, default: null },
   puzzleXp: { type: Number, default: 0, min: 0 },
   puzzleStreak: { type: Number, default: 0, min: 0 },
   puzzleLastSolvedDate: { type: String, trim: true, default: "" },

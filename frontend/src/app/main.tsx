@@ -6,6 +6,9 @@ import "../styles/index.css";
 import App from "./App";
 import { ThemeProvider } from "../context/ThemeContext";
 import { I18nProvider } from "../i18n/I18nContext";
+import { initMonitoring } from "../services/monitoring";
+
+initMonitoring();
 
 const root = document.getElementById("root");
 

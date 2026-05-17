@@ -15,6 +15,7 @@
 - Added SEO and growth placeholder pages for puzzles, online chess, AI chess, analysis, coaching, openings, store, and services.
 - Added environment-driven analytics abstraction and feedback modal.
 - Added admin revenue, premium, payment, puzzle usage, feedback, and conversion summary fields.
+- Hardened production safety with Helmet/CSP, env allowlisted CORS, rate limits, schema validation, webhook replay protection, referral/trial abuse guards, safe logging, and optional Sentry monitoring.
 
 ## v1.3.0
 

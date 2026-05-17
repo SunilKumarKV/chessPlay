@@ -6,6 +6,7 @@ const User = require("../models/User");
 const Referral = require("../models/Referral");
 const AdminAuditLog = require("../models/AdminAuditLog");
 const { sanitizeText } = require("../utils/security");
+const { validateBody } = require("../middleware/validate");
 
 const router = express.Router();
 
@@ -15,6 +16,11 @@ const referralLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many referral requests. Please try again later." },
+});
+
+const validateReferralClaim = validateBody({
+  code: { max: 24, pattern: /^[A-Za-z0-9]*$/ },
+  referralCode: { max: 24, pattern: /^[A-Za-z0-9]*$/ },
 });
 
 function normalizeReferralCode(code) {
@@ -116,12 +122,12 @@ async function applyReferralForUser(req, res, rawCode) {
   if (user.referredBy) return res.status(409).json({ message: "Referral already connected to this account." });
   user.referredBy = referrer._id;
   await user.save();
-  await Referral.updateOne(
+  const result = await Referral.updateOne(
     { referrer: referrer._id, referred: user._id },
     { $setOnInsert: { referrer: referrer._id, referred: user._id, code, status: "joined", rewardNote: "Joined through referral. Referrer received 3 bonus puzzle credits." } },
     { upsert: true },
   );
-  await User.findByIdAndUpdate(referrer._id, { $inc: { bonusPuzzleCredits: 3 } }).catch(() => {});
+  if (result.upsertedCount > 0) await User.findByIdAndUpdate(referrer._id, { $inc: { bonusPuzzleCredits: 3 } }).catch(() => {});
   await writeAudit(req, "referral_created", "Referral", user._id, { referrer: String(referrer._id) });
   return res.json({ message: "Referral connected successfully. Rewards are reviewed manually." });
 }
@@ -132,6 +138,6 @@ router.get("/me", auth, referralLimiter, async (req, res) => {
   res.json(dashboard);
 });
 
-router.post("/claim", auth, referralLimiter, async (req, res) => applyReferralForUser(req, res, req.body.code || req.body.referralCode));
+router.post("/claim", auth, referralLimiter, validateReferralClaim, async (req, res) => applyReferralForUser(req, res, req.body.code || req.body.referralCode));
 
 module.exports = router;

@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const Feedback = require("../models/Feedback");
 const User = require("../models/User");
 const { getJwtSecret, getRequestAccessToken, sanitizeText } = require("../utils/security");
+const { validateBody } = require("../middleware/validate");
 
 const router = express.Router();
 const VALID_CATEGORIES = new Set(["bug", "feature", "payment", "general"]);
@@ -15,6 +16,13 @@ const feedbackLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many feedback submissions. Please try again later." },
+});
+
+const validateFeedback = validateBody({
+  category: { max: 40, pattern: /^[a-z_]*$/ },
+  message: { required: true, max: 2000 },
+  email: { max: 160 },
+  page: { max: 200 },
 });
 
 async function optionalAuth(req, _res, next) {
@@ -29,7 +37,7 @@ async function optionalAuth(req, _res, next) {
   return next();
 }
 
-router.post("/", feedbackLimiter, optionalAuth, async (req, res) => {
+router.post("/", feedbackLimiter, optionalAuth, validateFeedback, async (req, res) => {
   try {
     const category = VALID_CATEGORIES.has(req.body.category) ? req.body.category : "general";
     const message = sanitizeText(req.body.message, 2000);

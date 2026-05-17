@@ -8,7 +8,9 @@ const Puzzle = require("../models/Puzzle");
 const PuzzleAttempt = require("../models/PuzzleAttempt");
 const PuzzleDailyUsage = require("../models/PuzzleDailyUsage");
 const User = require("../models/User");
+const { validateBody } = require("../middleware/validate");
 const { getJwtSecret, getRequestAccessToken } = require("../utils/security");
+const logger = require("../utils/safeLogger");
 
 const router = express.Router();
 const VALID_DIFFICULTIES = new Set(["beginner", "intermediate", "advanced", "master"]);
@@ -26,6 +28,15 @@ const attemptLimiter = rateLimit({
   limit: 60,
   standardHeaders: true,
   legacyHeaders: false,
+});
+
+const validatePuzzleHint = validateBody({
+  moveIndex: { max: 3, pattern: /^\d*$/ },
+});
+
+const validatePuzzleSubmit = validateBody({
+  move: { required: true, max: 5, pattern: /^[a-h][1-8][a-h][1-8][qrbn]?$/i },
+  moveIndex: { required: true, max: 3, pattern: /^\d+$/ },
 });
 
 function normalizeUci(value) {
@@ -431,12 +442,12 @@ async function handleNextPuzzle(req, res, requestedDifficulty) {
       limits: limitPayload(owner, consumed.usage),
     });
   } catch (error) {
-    console.error("Puzzle next failed:", error.message);
+    logger.error("Puzzle next failed:", error.message);
     res.status(500).json({ message: "Unable to load the next puzzle." });
   }
 }
 
-router.post("/:id/hint", attemptLimiter, async (req, res) => {
+router.post("/:id/hint", attemptLimiter, validatePuzzleHint, async (req, res) => {
   try {
     const owner = ownerFromRequest(req);
     const puzzle = await findPuzzle(req.params.id);
@@ -491,7 +502,7 @@ router.post("/:id/hint", attemptLimiter, async (req, res) => {
   }
 });
 
-router.post("/:id/submit", attemptLimiter, async (req, res) => {
+router.post("/:id/submit", attemptLimiter, validatePuzzleSubmit, async (req, res) => {
   try {
     const move = normalizeUci(req.body?.move);
     const moveIndex = Number.parseInt(req.body?.moveIndex, 10);

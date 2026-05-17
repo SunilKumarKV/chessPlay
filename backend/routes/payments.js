@@ -9,6 +9,8 @@ const WebhookEvent = require("../models/WebhookEvent");
 const { PLANS, normalizePlan, planConfig } = require("../config/plans");
 const razorpay = require("../services/razorpayService");
 const { queueEmailEvent } = require("../services/emailEventService");
+const { validateBody } = require("../middleware/validate");
+const logger = require("../utils/safeLogger");
 
 const router = express.Router();
 
@@ -18,6 +20,28 @@ const paymentLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many payment attempts. Please slow down." },
+});
+
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many webhook attempts." },
+});
+
+const validateCreateOrder = validateBody({
+  plan: { required: true, max: 40, pattern: /^[a-z_]+$/ },
+  coupon: { max: 32, pattern: /^[A-Za-z0-9_-]*$/ },
+});
+
+const validateVerifyPayment = validateBody({
+  razorpay_order_id: { max: 80, pattern: /^[A-Za-z0-9_:-]*$/ },
+  orderId: { max: 80, pattern: /^[A-Za-z0-9_:-]*$/ },
+  razorpay_payment_id: { max: 80, pattern: /^[A-Za-z0-9_:-]*$/ },
+  paymentId: { max: 80, pattern: /^[A-Za-z0-9_:-]*$/ },
+  razorpay_signature: { max: 128, pattern: /^[a-fA-F0-9]*$/ },
+  signature: { max: 128, pattern: /^[a-fA-F0-9]*$/ },
 });
 
 function normalizeCoupon(code) {
@@ -40,7 +64,7 @@ function discountedAmount(baseAmount, coupon = {}) {
   return Math.max(1, Math.round(afterPercent - (coupon.discountAmount || 0)));
 }
 
-router.post("/create-order", auth, paymentLimiter, async (req, res) => {
+router.post("/create-order", auth, paymentLimiter, validateCreateOrder, async (req, res) => {
   try {
     const plan = normalizePlan(req.body.plan);
     if (plan === "free") return res.status(400).json({ message: "Choose a paid plan." });
@@ -72,7 +96,7 @@ router.post("/create-order", auth, paymentLimiter, async (req, res) => {
   }
 });
 
-router.post("/verify", auth, paymentLimiter, async (req, res) => {
+router.post("/verify", auth, paymentLimiter, validateVerifyPayment, async (req, res) => {
   try {
     const orderId = String(req.body.razorpay_order_id || req.body.orderId || "");
     const paymentId = String(req.body.razorpay_payment_id || req.body.paymentId || "");
@@ -126,7 +150,7 @@ router.get("/history", auth, async (req, res) => {
   res.json({ payments, subscriptions });
 });
 
-router.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+router.post("/webhook", webhookLimiter, express.raw({ type: "application/json" }), async (req, res) => {
   try {
     const signature = req.headers["x-razorpay-signature"];
     const rawBody = req.rawBody || (Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body || {}));
@@ -137,10 +161,16 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
     try {
       await WebhookEvent.create({ provider: "razorpay", eventId: webhookEventId, eventType: String(event?.event || ""), raw: event, status: "processed" });
     } catch (error) {
-      if (error?.code === 11000) return res.json({ received: true, duplicate: true });
+      if (error?.code === 11000) {
+        logger.warn("Duplicate Razorpay webhook ignored", { webhookEventId });
+        return res.json({ received: true, duplicate: true });
+      }
       throw error;
     }
-    if (await Payment.exists({ webhookEventId })) return res.json({ received: true, duplicate: true });
+    if (await Payment.exists({ webhookEventId })) {
+      logger.warn("Duplicate Razorpay payment webhook ignored", { webhookEventId });
+      return res.json({ received: true, duplicate: true });
+    }
     await Payment.create({
       provider: "razorpay",
       providerPaymentId: String(event?.payload?.payment?.entity?.id || ""),
@@ -155,13 +185,17 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
 });
 
 router.post("/trial/start", auth, paymentLimiter, async (req, res) => {
-  const existingTrial = await Subscription.exists({ user: req.user.userId, status: "trialing" });
-  if (existingTrial) return res.status(409).json({ message: "Trial already used." });
+  const userDoc = await User.findById(req.user.userId).select("email trialUsed trialUsedAt");
+  if (!userDoc) return res.status(404).json({ message: "User not found." });
+  const existingTrial = await Subscription.exists({ user: req.user.userId, status: { $in: ["trialing", "active", "expired", "cancelled"] }, trialEndsAt: { $ne: null } });
+  if (userDoc.trialUsed || existingTrial) return res.status(409).json({ message: "Trial already used." });
   const now = new Date();
   const trialEndsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const subscription = await Subscription.create({ user: req.user.userId, plan: "pro", status: "trialing", provider: "manual", trialEndsAt, currentPeriodStart: now, currentPeriodEnd: trialEndsAt });
-  const user = await User.findById(req.user.userId).select("email").lean().catch(() => null);
-  await queueEmailEvent("trial_expiring", { user: req.user.userId, email: user?.email || "", scheduledFor: new Date(trialEndsAt.getTime() - 24 * 60 * 60 * 1000), payload: { plan: "pro", trialEndsAt } });
+  userDoc.trialUsed = true;
+  userDoc.trialUsedAt = now;
+  await userDoc.save();
+  await queueEmailEvent("trial_expiring", { user: req.user.userId, email: userDoc.email || "", scheduledFor: new Date(trialEndsAt.getTime() - 24 * 60 * 60 * 1000), payload: { plan: "pro", trialEndsAt } });
   res.status(201).json({ message: "7-day Pro trial started.", subscription });
 });
 
