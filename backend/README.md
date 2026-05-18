@@ -68,7 +68,7 @@ The server will run on `http://localhost:3001`
 
 ## Game State Structure
 
-```javascript
+```JavaScript
 {
   board: Array[8][8], // Chess board with piece notation (e.g., 'wP', 'bK')
   turn: 'w' | 'b',    // Current player's turn
