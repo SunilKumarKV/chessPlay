@@ -1,6 +1,6 @@
 {
-  "installCommand": "corepack enable && corepack prepare pnpm@10.15.0 --activate && pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm --filter frontend build",
+  "installCommand": "npm i -g pnpm@10.15.0 && pnpm install --frozen-lockfile",
+  "buildCommand": "cd frontend && pnpm build",
   "outputDirectory": "frontend/dist",
   "framework": "vite",
   "headers": [
