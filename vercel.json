@@ -1,6 +1,6 @@
 {
   "installCommand": "npm i -g pnpm@10.15.0 && pnpm install --frozen-lockfile",
-  "buildCommand": "cd frontend && pnpm build",
+  "buildCommand": "pnpm build",
   "outputDirectory": "dist",
   "framework": "vite",
   "headers": [
