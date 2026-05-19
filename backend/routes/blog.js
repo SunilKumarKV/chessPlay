@@ -1,5 +1,5 @@
 const express = require("express");
-const mongoose = require("mongoose");
+const { isValidId } = require("../utils/id");
 const auth = require("../middleware/auth");
 const BlogPost = require("../models/BlogPost");
 const User = require("../models/User");
@@ -16,7 +16,7 @@ function slugify(value) {
 }
 
 function isValidObjectId(id) {
-  return mongoose.Types.ObjectId.isValid(String(id || ""));
+  return isValidId(String(id || ""));
 }
 
 async function requireAdmin(req, res, next) {

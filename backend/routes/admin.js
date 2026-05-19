@@ -1,5 +1,5 @@
 const express = require("express");
-const mongoose = require("mongoose");
+const { isValidId } = require("../utils/id");
 const User = require("../models/User");
 const Game = require("../models/Game");
 const SupporterRequest = require("../models/SupporterRequest");
@@ -36,7 +36,7 @@ function asBoolean(value) {
 }
 
 function isValidObjectId(id) {
-  return mongoose.Types.ObjectId.isValid(String(id || ""));
+  return isValidId(String(id || ""));
 }
 
 function escapeRegex(value) {

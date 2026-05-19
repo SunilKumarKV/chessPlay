@@ -1,5 +1,5 @@
 const express = require("express");
-const mongoose = require("mongoose");
+const { isValidId } = require("../utils/id");
 const auth = require("../middleware/auth");
 const MistakeReview = require("../models/MistakeReview");
 const { sanitizeText } = require("../utils/security");
@@ -7,7 +7,7 @@ const { sanitizeText } = require("../utils/security");
 const router = express.Router();
 
 function isValidObjectId(id) {
-  return mongoose.Types.ObjectId.isValid(String(id || ""));
+  return isValidId(String(id || ""));
 }
 
 router.get("/", auth, async (req, res) => {

@@ -2,9 +2,8 @@ require("dotenv").config();
 
 const fs = require("fs");
 const readline = require("readline");
-const mongoose = require("mongoose");
 const Puzzle = require("../models/Puzzle");
-const { connectMongo, normalizePuzzleRecord } = require("./puzzleUtils");
+const { connectDatabase, normalizePuzzleRecord } = require("./puzzleUtils");
 
 const CSV_HEADERS = [
   "PuzzleId",
@@ -65,7 +64,7 @@ async function main() {
   }
   if (!fs.existsSync(file)) throw new Error(`CSV file not found: ${file}`);
 
-  await connectMongo();
+  await connectDatabase();
 
   const input = fs.createReadStream(file);
   const lines = readline.createInterface({ input, crlfDelay: Infinity });
@@ -110,11 +109,9 @@ async function main() {
   upserted += result.upserted;
   modified += result.modified;
   console.log(`Done. Processed ${imported} puzzles. Upserted ${upserted}, modified ${modified}.`);
-  await mongoose.disconnect();
-}
+  }
 
 main().catch(async (error) => {
   console.error(error.message);
-  await mongoose.disconnect().catch(() => {});
-  process.exit(1);
+    process.exit(1);
 });

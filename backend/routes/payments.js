@@ -89,7 +89,7 @@ router.post("/create-order", auth, paymentLimiter, validateCreateOrder, async (r
       order,
       keyId: razorpay.publicKey(),
       configured: razorpay.isConfigured(),
-      message: razorpay.isConfigured() ? "Razorpay order created." : "Razorpay keys are not configured. Safe local order placeholder created.",
+      message: razorpay.isConfigured() ? "Razorpay order created." : "Razorpay keys are not configured. Created a local pending order for development only.",
     });
   } catch (error) {
     res.status(500).json({ message: error.message || "Unable to create payment order." });

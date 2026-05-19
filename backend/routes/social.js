@@ -1,5 +1,5 @@
 const express = require('express');
-const mongoose = require('mongoose');
+const { isValidId } = require("../utils/id");
 const auth = require('../middleware/auth');
 const User = require('../models/User');
 const CommunityPost = require('../models/CommunityPost');
@@ -29,7 +29,7 @@ function optionalAuth(req, _res, next) {
   next();
 }
 
-function validObjectId(id) { return mongoose.Types.ObjectId.isValid(id); }
+function validObjectId(id) { return isValidId(id); }
 
 
 async function getCurrentUser(req) {
@@ -211,7 +211,7 @@ async function getOrCreatePublicRoom(key) {
 }
 
 async function getOrCreatePrivateConversation(user, friendId) {
-  if (!mongoose.Types.ObjectId.isValid(friendId)) {
+  if (!isValidId(friendId)) {
     const error = new Error('Invalid friend id');
     error.status = 400;
     throw error;

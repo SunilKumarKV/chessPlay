@@ -1,51 +1,61 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { notifyUserChanged } from "../hooks/useCurrentUser";
 import { apiClient } from "../services/apiClient";
-import Chess from "../features/chess/pages/ChessPage";
-import LocalChessPage from "../features/chess/pages/LocalChessPage";
-import MultiplayerChess from "../features/chess/components/MultiplayerChess";
-import Leaderboard from "../pages/LeaderboardPage";
-import GameHistory from "../pages/GameHistoryPage";
+const Chess = lazy(() => import("../features/chess/pages/ChessPage"));
+const LocalChessPage = lazy(() => import("../features/chess/pages/LocalChessPage"));
+const MultiplayerChess = lazy(() => import("../features/chess/components/MultiplayerChess"));
+const Leaderboard = lazy(() => import("../pages/LeaderboardPage"));
+const GameHistory = lazy(() => import("../pages/GameHistoryPage"));
 import LandingPage from "../pages/LandingPage";
 import Dashboard from "../pages/DashboardPage";
-import Settings from "../pages/SettingsPage";
-import Profile from "../pages/ProfilePage";
+const Settings = lazy(() => import("../pages/SettingsPage"));
+const Profile = lazy(() => import("../pages/ProfilePage"));
 import ComingSoonPage from "../pages/ComingSoonPage";
-import AnalysisPage from "../pages/AnalysisPage";
-import LanPlayPage from "../pages/LanPlayPage";
-import PuzzlesPage from "../pages/PuzzlesPage";
+const AnalysisPage = lazy(() => import("../pages/AnalysisPage"));
+const LanPlayPage = lazy(() => import("../pages/LanPlayPage"));
+const PuzzlesPage = lazy(() => import("../pages/PuzzlesPage"));
 import AppSplash from "../components/AppSplash";
 import DashboardLayout from "../layouts/DashboardLayout";
 import ErrorBoundary from "../components/ErrorBoundary";
-import PrivacyPolicyPage from "../pages/legal/PrivacyPolicyPage";
-import TermsPage from "../pages/legal/TermsPage";
-import DeleteAccountPage from "../pages/legal/DeleteAccountPage";
-import ForgotPasswordPage from "../pages/ForgotPasswordPage";
-import ResetPasswordPage from "../pages/ResetPasswordPage";
-import VerifyEmailPage from "../pages/VerifyEmailPage";
-import PricingPage from "../pages/billing/PricingPage";
-import BillingPage from "../pages/billing/BillingPage";
-import AdminSupportersPage from "../pages/billing/AdminSupportersPage";
-import AdminPanelPage from "../pages/admin/AdminPanelPage";
-import HelpCenterPage from "../pages/HelpCenterPage";
-import MonetizationPage from "../pages/billing/MonetizationPage";
-import ReferralPage from "../pages/billing/ReferralPage";
-import TournamentsPage from "../pages/billing/TournamentsPage";
-import CommunityPage from "../pages/CommunityPage";
-import MessagesPage from "../pages/MessagesPage";
-import AutomationPage from "../pages/AutomationPage";
+const PrivacyPolicyPage = lazy(() => import("../pages/legal/PrivacyPolicyPage"));
+const TermsPage = lazy(() => import("../pages/legal/TermsPage"));
+const DeleteAccountPage = lazy(() => import("../pages/legal/DeleteAccountPage"));
+const ForgotPasswordPage = lazy(() => import("../pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("../pages/ResetPasswordPage"));
+const VerifyEmailPage = lazy(() => import("../pages/VerifyEmailPage"));
+const PricingPage = lazy(() => import("../pages/billing/PricingPage"));
+const BillingPage = lazy(() => import("../pages/billing/BillingPage"));
+const AdminSupportersPage = lazy(() => import("../pages/billing/AdminSupportersPage"));
+const AdminPanelPage = lazy(() => import("../pages/admin/AdminPanelPage"));
+const HelpCenterPage = lazy(() => import("../pages/HelpCenterPage"));
+const MonetizationPage = lazy(() => import("../pages/billing/MonetizationPage"));
+const ReferralPage = lazy(() => import("../pages/billing/ReferralPage"));
+const TournamentsPage = lazy(() => import("../pages/billing/TournamentsPage"));
+const CommunityPage = lazy(() => import("../pages/CommunityPage"));
+const MessagesPage = lazy(() => import("../pages/MessagesPage"));
+const AutomationPage = lazy(() => import("../pages/AutomationPage"));
 import FeedbackButton from "../components/feedback/FeedbackButton";
-import RefundPolicyPage from "../pages/legal/RefundPolicyPage";
-import CookiePolicyPage from "../pages/legal/CookiePolicyPage";
-import ContactPage from "../pages/legal/ContactPage";
-import SeoLandingPage from "../pages/seo/SeoLandingPage";
-import CoachingPage from "../pages/growth/CoachingPage";
-import StorePage from "../pages/growth/StorePage";
-import ServicesPage from "../pages/growth/ServicesPage";
-import OpeningExplorerPage from "../pages/growth/OpeningExplorerPage";
-import PaymentStatusPage from "../pages/billing/PaymentStatusPage";
+const RefundPolicyPage = lazy(() => import("../pages/legal/RefundPolicyPage"));
+const CookiePolicyPage = lazy(() => import("../pages/legal/CookiePolicyPage"));
+const ContactPage = lazy(() => import("../pages/legal/ContactPage"));
+const SeoLandingPage = lazy(() => import("../pages/seo/SeoLandingPage"));
+const CoachingPage = lazy(() => import("../pages/growth/CoachingPage"));
+const StorePage = lazy(() => import("../pages/growth/StorePage"));
+const ServicesPage = lazy(() => import("../pages/growth/ServicesPage"));
+const OpeningExplorerPage = lazy(() => import("../pages/growth/OpeningExplorerPage"));
+const PaymentStatusPage = lazy(() => import("../pages/billing/PaymentStatusPage"));
 import { getGuestFeatureMessage, isGuestRestrictedFeature, isGuestUser } from "../utils/guestAccess";
 import { trackEvent } from "../services/analytics";
+
+function RouteFrame({ children }) {
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<AppSplash />}>
+        {children}
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
 
 const routeMap = {
   admin: "/admin",
@@ -250,34 +260,34 @@ export default function App() {
 
   if (currentPage === "forgot-password") {
     return (
-      <ErrorBoundary>
+      <RouteFrame>
         <ForgotPasswordPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-      </ErrorBoundary>
+      </RouteFrame>
     );
   }
 
   if (currentPage === "reset-password") {
     return (
-      <ErrorBoundary>
+      <RouteFrame>
         <ResetPasswordPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-      </ErrorBoundary>
+      </RouteFrame>
     );
   }
 
   if (currentPage === "verify-email") {
     return (
-      <ErrorBoundary>
+      <RouteFrame>
         <VerifyEmailPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-      </ErrorBoundary>
+      </RouteFrame>
     );
   }
 
   if (currentPage === "payment-success" || currentPage === "payment-failed") {
     return (
-      <ErrorBoundary>
+      <RouteFrame>
         <PaymentStatusPage status={currentPage === "payment-success" ? "success" : "failed"} onNavigate={guardedNavigate} />
         <FeedbackButton user={user} />
-      </ErrorBoundary>
+      </RouteFrame>
     );
   }
 
@@ -301,37 +311,37 @@ export default function App() {
                   : currentPage === "hire-me" || currentPage === "services"
                     ? <ServicesPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
                     : <SeoLandingPage page={currentPage} onBack={() => navigateToAppPage("dashboard", setCurrentPage)} onNavigate={guardedNavigate} />;
-    return <ErrorBoundary>{page}<FeedbackButton user={user} /></ErrorBoundary>;
+    return <RouteFrame>{page}<FeedbackButton user={user} /></RouteFrame>;
   }
 
   if (!user && currentPage === "local") {
     const selectedTimeControl = localStorage.getItem("selectedTimeControl") || "3+0";
     return (
-      <ErrorBoundary>
+      <RouteFrame>
         <LocalChessPage
           timeControl={selectedTimeControl}
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
           onNavigate={guardedNavigate}
         />
-      </ErrorBoundary>
+      </RouteFrame>
     );
   }
 
   if (!user && currentPage === "analysis") {
     return (
-      <ErrorBoundary>
+      <RouteFrame>
         <AnalysisPage
           user={null}
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
           onNavigate={guardedNavigate}
         />
-      </ErrorBoundary>
+      </RouteFrame>
     );
   }
 
   if (!user && (currentPage === "pricing" || currentPage === "support" || currentPage === "monetization")) {
     return (
-      <ErrorBoundary>
+      <RouteFrame>
         {currentPage === "monetization" ? (
           <MonetizationPage
             user={null}
@@ -345,64 +355,64 @@ export default function App() {
           onNavigate={guardedNavigate}
         />
         )}
-      </ErrorBoundary>
+      </RouteFrame>
     );
   }
 
   if (!user && currentPage === "leaderboard") {
     return (
-      <ErrorBoundary>
+      <RouteFrame>
         <Leaderboard
           user={null}
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
           onNavigate={guardedNavigate}
         />
-      </ErrorBoundary>
+      </RouteFrame>
     );
   }
 
   if (!user && currentPage === "puzzles") {
     return (
-      <ErrorBoundary>
+      <RouteFrame>
         <PuzzlesPage
           user={null}
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
           onNavigate={guardedNavigate}
         />
-      </ErrorBoundary>
+      </RouteFrame>
     );
   }
 
   if (!user && (currentPage === "referral" || currentPage === "referrals")) {
     return (
-      <ErrorBoundary>
+      <RouteFrame>
         <ReferralPage
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
           onNavigate={guardedNavigate}
         />
         <FeedbackButton user={null} />
-      </ErrorBoundary>
+      </RouteFrame>
     );
   }
 
   if (!user && currentPage === "profile-public") {
     return (
-      <ErrorBoundary>
+      <RouteFrame>
         <Profile
           user={null}
           username={profileUsernameFromPathname(window.location.pathname)}
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
           onNavigate={guardedNavigate}
         />
-      </ErrorBoundary>
+      </RouteFrame>
     );
   }
 
   if (!user) {
     return (
-      <ErrorBoundary>
+      <RouteFrame>
         <LandingPage onLogin={handleLogin} onGuestPlay={handleGuestPlay} onNavigatePath={(path) => { window.history.pushState({}, "", path); setCurrentPage(pageFromPathname(path)); }} />
-      </ErrorBoundary>
+      </RouteFrame>
     );
   }
 
@@ -592,7 +602,7 @@ export default function App() {
   };
 
   return (
-    <ErrorBoundary>
+    <RouteFrame>
       <DashboardLayout
         activePage={authTimedOut ? "offline" : currentPage}
         onNavigate={guardedNavigate}
@@ -601,6 +611,6 @@ export default function App() {
         {renderContent()}
       </DashboardLayout>
       <FeedbackButton user={user} />
-    </ErrorBoundary>
+    </RouteFrame>
   );
 }

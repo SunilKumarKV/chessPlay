@@ -20,16 +20,14 @@ const SUPPORTER_FEATURES = [
   { label: "Supporter badge", status: "Available now" },
   { label: "No promotional ads where ads are enabled", status: "Available now" },
   { label: "Priority feature feedback", status: "Available now" },
-  { label: "Early access to UI/theme experiments", status: "Supporter preview" },
-  { label: "Future board themes", status: "Coming soon" },
-  { label: "Advanced analysis reports", status: "Coming soon" },
+  { label: "Early access to UI/theme experiments", status: "Optional preview" },
 ];
 
 const ROADMAP = [
   "No ads and supporter badge",
-  "Board themes and cosmetic profile highlights",
-  "Advanced analysis reports",
-  "Extra puzzle packs and training paths",
+  "Board themes and cosmetic profile highlights, not sold until released",
+  "Advanced analysis reports, not sold until released",
+  "Extra puzzle packs and training paths, not sold until released",
   "Supporter feature voting",
 ];
 

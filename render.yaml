@@ -2,17 +2,19 @@ services:
   - type: web
     name: chessplay-backend
     env: node
-    rootDir: backend
+    rootDir: .
     plan: free
-    buildCommand: corepack enable && corepack prepare pnpm@10.15.0 --activate && pnpm install --frozen-lockfile && pnpm build
-    startCommand: pnpm start
+    buildCommand: corepack enable && corepack prepare pnpm@10.15.0 --activate && pnpm install --frozen-lockfile && pnpm --filter backend prisma:generate && pnpm --filter backend prisma:migrate && pnpm --filter backend build
+    startCommand: pnpm --filter backend start
     healthCheckPath: /healthz
     envVars:
       - key: NODE_VERSION
         value: 20.20.2
       - key: NODE_ENV
         value: production
-      - key: MONGODB_URI
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
         sync: false
       - key: JWT_ACCESS_SECRET
         sync: false
@@ -21,4 +23,6 @@ services:
       - key: FRONTEND_ORIGINS
         sync: false
       - key: FRONTEND_URL
+        sync: false
+      - key: CLIENT_URL
         sync: false

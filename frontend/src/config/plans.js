@@ -13,7 +13,7 @@ export const PLANS = {
     priceInr: 99,
     priceUsd: 3,
     copy: "For regular training and cleaner gameplay.",
-    features: ["25 puzzles/day", "No ads", "Premium sounds", "Early features"],
+    features: ["25 puzzles/day", "No ads", "Premium sounds", "Priority feedback"],
   },
   premium: {
     id: "premium",
@@ -21,7 +21,7 @@ export const PLANS = {
     priceInr: 299,
     priceUsd: 8,
     copy: "For serious improvement and deeper practice.",
-    features: ["100 puzzles/day", "Advanced puzzle filters", "Advanced analysis placeholders", "Priority feedback"],
+    features: ["100 puzzles/day", "Advanced puzzle filters", "Priority feedback"],
   },
   lifetime: {
     id: "lifetime",
@@ -29,7 +29,7 @@ export const PLANS = {
     priceInr: 2999,
     priceUsd: 79,
     copy: "One-time supporter access for long-term users.",
-    features: ["200 puzzles/day", "Lifetime badge", "All premium placeholders", "Priority roadmap voting"],
+    features: ["200 puzzles/day", "Lifetime badge", "Priority roadmap voting"],
   },
 };
 

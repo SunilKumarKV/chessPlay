@@ -19,35 +19,35 @@ const FALLBACK_PLANS = {
     amount: 99,
     usdAmount: 3,
     days: 30,
-    benefits: ["25 puzzles/day", "No ads", "Premium sounds", "Early feature access"],
+    benefits: ["25 puzzles/day", "No ads", "Premium sounds", "Priority feedback"],
   },
   premium: {
     label: "Premium",
     amount: 299,
     usdAmount: 8,
     days: 30,
-    benefits: ["100 puzzles/day", "Advanced filters", "Analysis placeholders", "Priority feedback"],
+    benefits: ["100 puzzles/day", "Advanced filters", "Priority feedback"],
   },
   lifetime: {
     label: "Lifetime",
     amount: 2999,
     usdAmount: 79,
     days: 36500,
-    benefits: ["200 puzzles/day", "Lifetime badge", "All premium placeholders", "Roadmap voting"],
+    benefits: ["200 puzzles/day", "Lifetime badge", "Priority roadmap voting"],
   },
   supporter_monthly: {
     label: "Supporter Monthly",
     amount: 49,
     usdAmount: 2,
     days: 30,
-    benefits: ["Supporter badge", "No ads", "Early feature access", "Priority feedback", "Custom themes later", "Support development"],
+    benefits: ["Supporter badge", "No ads", "Priority feedback", "Support development"],
   },
   supporter_yearly: {
     label: "Supporter Yearly",
     amount: 499,
     usdAmount: 12,
     days: 365,
-    benefits: ["Supporter badge", "No ads", "Early feature access", "Priority feedback", "Custom themes later", "Support development"],
+    benefits: ["Supporter badge", "No ads", "Priority feedback", "Support development"],
   },
 };
 
@@ -61,10 +61,10 @@ const CORE_PLANS = ["free", "pro", "premium", "lifetime"];
 const COMPARISON = [
   ["Daily puzzles", "5", "25", "100", "200"],
   ["Hints per puzzle", "1", "1", "3", "3"],
-  ["AI Coach", "Locked", "Coming soon", "Included soon", "Included soon"],
-  ["Analysis reports", "Basic", "Basic", "Premium soon", "Premium soon"],
+  ["AI Coach", "Not sold", "Not sold", "Not sold", "Not sold"],
+  ["Analysis reports", "Basic", "Basic", "Basic", "Basic"],
   ["Premium themes", "Locked", "Included", "Included", "Included"],
-  ["Opening explorer", "Preview", "Preview", "Premium filters soon", "Premium filters soon"],
+  ["Opening explorer", "Preview", "Preview", "Preview", "Preview"],
 ];
 
 const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || "devwithsunilyt@gmail.com";
@@ -246,7 +246,7 @@ export default function PricingPage({ user, onBack, onNavigate }) {
     ["How is supporter verified?", "You send payment by PayPal, UPI, or bank transfer, then submit the reference ID. Admin verifies it manually."],
     ["How long approval takes?", "Manual approval depends on admin availability. Your request status will show as pending until reviewed."],
     ["Can I request support?", `Yes. Contact ${SUPPORT_EMAIL} for payment or account questions.`],
-    ["What benefits are included?", "Supporters get a badge, no ads, early feature access, priority feedback, and future cosmetic themes."],
+    ["What benefits are included?", "Supporters get released benefits such as a badge, no ads where ads are enabled, premium sounds, puzzle limits, and priority feedback."],
   ];
 
   return (
@@ -442,7 +442,7 @@ export default function PricingPage({ user, onBack, onNavigate }) {
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
           <h2 className="text-xl font-black">Supporter roadmap</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {["No ads", "Themes", "Advanced analysis", "Puzzle packs", "Early feature access", "Priority feedback"].map((item) => <div key={item} className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">{item}</div>)}
+            {["No ads", "Released themes", "Puzzle limits", "Premium sounds", "Priority feedback"].map((item) => <div key={item} className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">{item}</div>)}
           </div>
           <p className="mt-4 text-sm text-slate-500">No fake supporter counts, fake revenue, or fake limited offers are shown. Benefits are enabled after manual admin approval.</p>
         </section>

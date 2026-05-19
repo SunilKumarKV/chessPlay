@@ -1,6 +1,6 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
 const User = require('../models/User');
+const { checkDatabase } = require('../lib/prisma');
 
 async function main() {
   const email = String(process.argv[2] || process.env.ADMIN_EMAIL || '').toLowerCase().trim();
@@ -8,14 +8,14 @@ async function main() {
     console.error('Usage: node backend/scripts/make-admin.js yourmail@gmail.com');
     process.exit(1);
   }
-  if (!process.env.MONGODB_URI) {
-    console.error('MONGODB_URI missing');
+  const database = await checkDatabase();
+  if (!database.ok) {
+    console.error(`DATABASE_URL unavailable: ${database.message}`);
     process.exit(1);
   }
-  await mongoose.connect(process.env.MONGODB_URI);
   const user = await User.findOneAndUpdate(
     { email },
-    { isAdmin: true },
+    { $set: { isAdmin: true } },
     { new: true },
   ).select('email username isAdmin');
   if (!user) {
@@ -24,11 +24,9 @@ async function main() {
   } else {
     console.log(`Admin enabled for ${user.email} (${user.username}).`);
   }
-  await mongoose.disconnect();
 }
 
-main().catch(async (error) => {
+main().catch((error) => {
   console.error(error);
-  try { await mongoose.disconnect(); } catch {}
   process.exit(1);
 });

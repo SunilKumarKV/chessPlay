@@ -1,6 +1,6 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
-const mongoose = require("mongoose");
+const { isValidId } = require("../utils/id");
 const { Chess } = require("chess.js");
 const auth = require("../middleware/auth");
 const AnalysisNote = require("../models/AnalysisNote");
@@ -78,14 +78,14 @@ router.post("/notes", auth, noteLimiter, async (req, res) => {
 router.get("/reports/:gameId", auth, async (req, res) => {
   try {
     const gameId = safeString(req.params.gameId, 120);
-    if (!mongoose.Types.ObjectId.isValid(gameId)) {
-      return res.json({ report: null, placeholder: true, message: "Premium analysis reports are planned for saved games." });
+    if (!isValidId(String(gameId || ""))) {
+      return res.json({ report: null, available: false, message: "Premium analysis reports are coming soon for saved games." });
     }
     const report = await GameAnalysis.findOne({ user: req.user.userId, game: gameId }).lean();
     res.json({
       report,
-      placeholder: !report,
-      message: report ? "Analysis report loaded." : "Premium analysis reports are planned. Heavy server-side engine analysis is not enabled yet.",
+      available: Boolean(report),
+      message: report ? "Analysis report loaded." : "Premium analysis reports are coming soon. Heavy server-side engine analysis is not enabled yet.",
     });
   } catch {
     res.status(500).json({ message: "Unable to load analysis report." });
@@ -98,16 +98,16 @@ router.post("/reports", auth, noteLimiter, async (req, res) => {
     const report = await GameAnalysis.findOneAndUpdate(
       {
         user: req.user.userId,
-        game: mongoose.Types.ObjectId.isValid(gameId) ? gameId : null,
+        game: isValidId(String(gameId || "")) ? gameId : null,
       },
       {
         user: req.user.userId,
-        game: mongoose.Types.ObjectId.isValid(gameId) ? gameId : null,
+        game: isValidId(String(gameId || "")) ? gameId : null,
         accuracy: Math.min(100, Math.max(0, Number(req.body.accuracy || 0))),
         mistakes: Math.max(0, Number(req.body.mistakes || 0)),
         blunders: Math.max(0, Number(req.body.blunders || 0)),
         bestMoves: Array.isArray(req.body.bestMoves) ? req.body.bestMoves.map((move) => safeString(move, 12)).filter(Boolean).slice(0, 80) : [],
-        status: ["placeholder", "queued", "complete", "failed"].includes(req.body.status) ? req.body.status : "placeholder",
+        status: ["queued", "complete", "failed", "coming_soon"].includes(req.body.status) ? req.body.status : "coming_soon",
         summary: safeString(req.body.summary || "Analysis report saved for future premium review.", 1000),
       },
       { upsert: true, new: true, setDefaultsOnInsert: true },

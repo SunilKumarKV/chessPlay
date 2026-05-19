@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const mongoose = require("mongoose");
+const { isValidId } = require("../utils/id");
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const validator = require("validator");
@@ -30,7 +30,7 @@ const PLAN_CONFIG = {
     amount: 49,
     usdAmount: 2,
     days: 30,
-    benefits: ["No ads", "Premium sounds", "Premium badge", "Advanced analysis credits"],
+    benefits: ["No ads", "Premium sounds", "Premium badge", "Priority feedback"],
     entitlements: { noAds: true, premiumSounds: true, premiumThemes: true, earlyAccess: true },
   },
   supporter_yearly: {
@@ -46,7 +46,7 @@ const PLAN_CONFIG = {
     amount: 99,
     usdAmount: 3,
     days: 30,
-    benefits: ["No ads", "25 puzzles/day", "Premium sounds", "Early feature access"],
+    benefits: ["No ads", "25 puzzles/day", "Premium sounds", "Priority feedback"],
     entitlements: { noAds: true, premiumSounds: true, premiumThemes: true, earlyAccess: true },
   },
   premium: {
@@ -54,7 +54,7 @@ const PLAN_CONFIG = {
     amount: 299,
     usdAmount: 8,
     days: 30,
-    benefits: ["No ads", "100 puzzles/day", "Premium filters", "Advanced analysis placeholders", "Priority feedback"],
+    benefits: ["No ads", "100 puzzles/day", "Premium filters", "Priority feedback"],
     entitlements: { noAds: true, premiumSounds: true, unlimitedAnalysis: true, advancedEngineDepth: true, customBoards: true, premiumThemes: true, advancedStats: true, unlimitedGameReview: true, earlyAccess: true },
   },
   lifetime: {
@@ -62,7 +62,7 @@ const PLAN_CONFIG = {
     amount: 2999,
     usdAmount: 79,
     days: 36500,
-    benefits: ["No ads", "200 puzzles/day", "Lifetime badge", "All premium placeholders", "Priority roadmap voting"],
+    benefits: ["No ads", "200 puzzles/day", "Lifetime badge", "Priority roadmap voting"],
     entitlements: { noAds: true, premiumSounds: true, unlimitedAnalysis: true, advancedEngineDepth: true, customBoards: true, premiumThemes: true, advancedStats: true, unlimitedGameReview: true, tournaments: true, earlyAccess: true },
   },
 };
@@ -89,7 +89,7 @@ async function requireAdmin(req, res, next) {
 }
 
 function isValidObjectId(id) {
-  return mongoose.Types.ObjectId.isValid(String(id || ""));
+  return isValidId(String(id || ""));
 }
 
 function billingMessageFor(status) {

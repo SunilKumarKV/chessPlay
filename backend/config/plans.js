@@ -26,7 +26,7 @@ const PLANS = {
     amountUsd: 8,
     durationDays: 30,
     puzzleLimit: 100,
-    features: ["no_ads", "premium_sounds", "premium_puzzles", "advanced_analysis", "coach_placeholder"],
+    features: ["no_ads", "premium_sounds", "premium_puzzles", "priority_feedback"],
     entitlements: {
       noAds: true,
       premiumSounds: true,
