@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Modal } from "../components/ui";
-import Auth from "../features/auth/components/Auth";
 import LegalFooter from "../components/common/LegalFooter";
+
+const Auth = lazy(() => import("../features/auth/components/Auth"));
 
 const BOARD = [
   ["r", "n", "b", "q", "k", "b", "n", "r"],
@@ -354,7 +355,9 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
       </Modal>
 
       <Modal isOpen={showAuth} onClose={() => setShowAuth(false)} title={isLogin ? "Sign in to ChessPlay" : "Create your ChessPlay account"} className="max-w-md">
-        <Auth onLogin={handleAuthSuccess} isModal initialIsLogin={isLogin} onToggleMode={() => setIsLogin(!isLogin)} onNavigatePath={onNavigatePath} />
+        <Suspense fallback={<div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-sm font-bold text-slate-200">Loading secure sign in...</div>}>
+          <Auth onLogin={handleAuthSuccess} isModal initialIsLogin={isLogin} onToggleMode={() => setIsLogin(!isLogin)} onNavigatePath={onNavigatePath} />
+        </Suspense>
       </Modal>
     </div>
   );

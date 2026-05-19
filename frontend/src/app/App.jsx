@@ -7,15 +7,15 @@ const MultiplayerChess = lazy(() => import("../features/chess/components/Multipl
 const Leaderboard = lazy(() => import("../pages/LeaderboardPage"));
 const GameHistory = lazy(() => import("../pages/GameHistoryPage"));
 import LandingPage from "../pages/LandingPage";
-import Dashboard from "../pages/DashboardPage";
+const Dashboard = lazy(() => import("../pages/DashboardPage"));
 const Settings = lazy(() => import("../pages/SettingsPage"));
 const Profile = lazy(() => import("../pages/ProfilePage"));
-import ComingSoonPage from "../pages/ComingSoonPage";
+const ComingSoonPage = lazy(() => import("../pages/ComingSoonPage"));
 const AnalysisPage = lazy(() => import("../pages/AnalysisPage"));
 const LanPlayPage = lazy(() => import("../pages/LanPlayPage"));
 const PuzzlesPage = lazy(() => import("../pages/PuzzlesPage"));
 import AppSplash from "../components/AppSplash";
-import DashboardLayout from "../layouts/DashboardLayout";
+const DashboardLayout = lazy(() => import("../layouts/DashboardLayout"));
 import ErrorBoundary from "../components/ErrorBoundary";
 const PrivacyPolicyPage = lazy(() => import("../pages/legal/PrivacyPolicyPage"));
 const TermsPage = lazy(() => import("../pages/legal/TermsPage"));
@@ -34,7 +34,8 @@ const TournamentsPage = lazy(() => import("../pages/billing/TournamentsPage"));
 const CommunityPage = lazy(() => import("../pages/CommunityPage"));
 const MessagesPage = lazy(() => import("../pages/MessagesPage"));
 const AutomationPage = lazy(() => import("../pages/AutomationPage"));
-import FeedbackButton from "../components/feedback/FeedbackButton";
+const FeedbackButton = lazy(() => import("../components/feedback/FeedbackButton"));
+const ReduxProvider = lazy(() => import("../store/ReduxProvider"));
 const RefundPolicyPage = lazy(() => import("../pages/legal/RefundPolicyPage"));
 const CookiePolicyPage = lazy(() => import("../pages/legal/CookiePolicyPage"));
 const ContactPage = lazy(() => import("../pages/legal/ContactPage"));
@@ -47,6 +48,32 @@ const PaymentStatusPage = lazy(() => import("../pages/billing/PaymentStatusPage"
 import { getGuestFeatureMessage, isGuestRestrictedFeature, isGuestUser } from "../utils/guestAccess";
 import { trackEvent } from "../services/analytics";
 
+const REDUX_PAGES = new Set(["ai", "local", "settings"]);
+
+function getStoredUser() {
+  const storedUser = localStorage.getItem("user");
+  if (!storedUser) return null;
+  try {
+    return JSON.parse(storedUser);
+  } catch {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    return null;
+  }
+}
+
+function runWhenIdle(callback) {
+  if ("requestIdleCallback" in window) {
+    return window.requestIdleCallback(callback, { timeout: 1800 });
+  }
+  return window.setTimeout(callback, 350);
+}
+
+function cancelIdleRun(id) {
+  if ("cancelIdleCallback" in window) window.cancelIdleCallback(id);
+  else window.clearTimeout(id);
+}
+
 function RouteFrame({ children }) {
   return (
     <ErrorBoundary>
@@ -55,6 +82,22 @@ function RouteFrame({ children }) {
       </Suspense>
     </ErrorBoundary>
   );
+}
+
+function RouteProviders({ page, children }) {
+  if (!REDUX_PAGES.has(page)) return children;
+  return <ReduxProvider>{children}</ReduxProvider>;
+}
+
+function DeferredFeedbackButton({ user }) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const idleId = runWhenIdle(() => setVisible(true));
+    return () => cancelIdleRun(idleId);
+  }, []);
+
+  return visible ? <FeedbackButton user={user} /> : null;
 }
 
 const routeMap = {
@@ -140,20 +183,8 @@ function navigateToAppPage(page, setCurrentPage, replace = false) {
 }
 
 export default function App() {
-  const [user, setUser] = useState(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        return JSON.parse(storedUser);
-      } catch {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        return null;
-      }
-    }
-    return null;
-  });
-  const [authChecked, setAuthChecked] = useState(false);
+  const [user, setUser] = useState(getStoredUser);
+  const [authChecked, setAuthChecked] = useState(() => !getStoredUser());
   const [authTimedOut, setAuthTimedOut] = useState(false);
   const [currentPage, setCurrentPage] = useState(() =>
     pageFromPathname(window.location.pathname),
@@ -199,11 +230,13 @@ export default function App() {
       }
     }
 
-    restoreSession();
+    const restoreTimer = user ? window.setTimeout(restoreSession, 0) : runWhenIdle(restoreSession);
     return () => {
       cancelled = true;
       window.removeEventListener("popstate", syncPageFromUrl);
       window.clearTimeout(fallbackTimer);
+      if (user) window.clearTimeout(restoreTimer);
+      else cancelIdleRun(restoreTimer);
     };
   }, []);
 
@@ -286,7 +319,7 @@ export default function App() {
     return (
       <RouteFrame>
         <PaymentStatusPage status={currentPage === "payment-success" ? "success" : "failed"} onNavigate={guardedNavigate} />
-        <FeedbackButton user={user} />
+        <DeferredFeedbackButton user={user} />
       </RouteFrame>
     );
   }
@@ -311,18 +344,20 @@ export default function App() {
                   : currentPage === "hire-me" || currentPage === "services"
                     ? <ServicesPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
                     : <SeoLandingPage page={currentPage} onBack={() => navigateToAppPage("dashboard", setCurrentPage)} onNavigate={guardedNavigate} />;
-    return <RouteFrame>{page}<FeedbackButton user={user} /></RouteFrame>;
+    return <RouteFrame>{page}<DeferredFeedbackButton user={user} /></RouteFrame>;
   }
 
   if (!user && currentPage === "local") {
     const selectedTimeControl = localStorage.getItem("selectedTimeControl") || "3+0";
     return (
       <RouteFrame>
-        <LocalChessPage
-          timeControl={selectedTimeControl}
-          onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
-          onNavigate={guardedNavigate}
-        />
+        <RouteProviders page={currentPage}>
+          <LocalChessPage
+            timeControl={selectedTimeControl}
+            onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
+            onNavigate={guardedNavigate}
+          />
+        </RouteProviders>
       </RouteFrame>
     );
   }
@@ -390,7 +425,7 @@ export default function App() {
           onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
           onNavigate={guardedNavigate}
         />
-        <FeedbackButton user={null} />
+        <DeferredFeedbackButton user={null} />
       </RouteFrame>
     );
   }
@@ -608,9 +643,9 @@ export default function App() {
         onNavigate={guardedNavigate}
         onLogout={handleLogout}
       >
-        {renderContent()}
+        <RouteProviders page={currentPage}>{renderContent()}</RouteProviders>
       </DashboardLayout>
-      <FeedbackButton user={user} />
+      <DeferredFeedbackButton user={user} />
     </RouteFrame>
   );
 }

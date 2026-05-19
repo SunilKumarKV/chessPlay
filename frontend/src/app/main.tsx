@@ -1,7 +1,5 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { Provider } from "react-redux";
-import { store } from "../store";
 import "../styles/index.css";
 import App from "./App";
 import { ThemeProvider } from "../context/ThemeContext";
@@ -18,12 +16,10 @@ if (!root) {
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <Provider store={store}>
-      <ThemeProvider>
-        <I18nProvider>
-          <App />
-        </I18nProvider>
-      </ThemeProvider>
-    </Provider>
+    <ThemeProvider>
+      <I18nProvider>
+        <App />
+      </I18nProvider>
+    </ThemeProvider>
   </React.StrictMode>,
 );
