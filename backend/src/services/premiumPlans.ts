@@ -1,4 +1,4 @@
-import type { PremiumPlan } from "../../generated/prisma/client";
+import type { PremiumPlan } from "@prisma/client";
 import type { BillingPlan, BillingPlanConfig } from "../types/billing.js";
 import { logger } from "../utils/logger.js";
 

@@ -150,7 +150,7 @@ export default function CommunityPage({ user, onBack, onNavigate }) {
         {['Announcements', 'Feedback & Ideas', 'Bug Reports', 'Guidelines'].map((item) => (
           <div key={item} className="rounded-2xl border border-white/10 bg-white/10 p-4 shadow-xl shadow-black/10">
             <div className="text-sm font-black text-white">{item}</div>
-            <p className="mt-2 text-sm text-slate-400">{item === 'Guidelines' ? 'Be respectful, helpful, and avoid sharing private details.' : 'Real community content only. No fake stats or placeholder posts.'}</p>
+            <p className="mt-2 text-sm text-slate-400">{item === 'Guidelines' ? 'Be respectful, helpful, and avoid sharing private details.' : 'Real community content only. No fake stats or seeded posts.'}</p>
           </div>
         ))}
       </section>

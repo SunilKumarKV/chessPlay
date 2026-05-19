@@ -22,7 +22,7 @@ export default function PlanBadge({ user, compact = false }) {
       .then((data) => active && setRemotePlan(data.plan || "free"))
       .catch(() => active && setRemotePlan(""));
     return () => { active = false; };
-  }, [user?.id, user?._id, user?.isGuest]);
+  }, [user, user?.id, user?._id, user?.isGuest]);
 
   const plan = remotePlan || user?.plan || user?.supporterPlan || "free";
   const label = labelFor(plan);

@@ -3,8 +3,7 @@ import { useEffect } from "react";
 const BENEFITS = [
   ["More puzzles", "Pro starts at 25 puzzles/day; Premium raises that to 100/day"],
   ["Extra hints", "Premium training gets more guided hints per puzzle"],
-  ["AI Coach", "Premium coaching foundation with safe placeholders while engine coaching matures"],
-  ["Analysis", "Premium analysis reports and mistake review foundations"],
+  ["Analysis", "Current free analysis tools remain available; deeper reports are not sold until released"],
   ["Themes", "Premium board/theme unlock logic without changing the default board"],
 ];
 
@@ -46,7 +45,7 @@ export default function UpgradeModal({ open, onClose, onNavigate, feature = "pre
             Unlock a cleaner, faster and more premium chess experience.
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
-            Continue free anytime, or upgrade when you want {feature}, richer puzzle limits, AI Coach foundations, analysis reports and premium themes.
+            Continue free anytime, or upgrade when you want {feature}, richer puzzle limits, and released supporter benefits.
           </p>
 
           <div className="mt-6 grid gap-3 md:grid-cols-5">

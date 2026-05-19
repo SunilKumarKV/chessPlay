@@ -111,7 +111,7 @@ async function sendEmailAlert({ title, message, payload = {} }) {
 }
 
 async function sendWhatsappPlaceholder() {
-  // WhatsApp will be added later. This placeholder keeps the API stable without failing production.
+  // WhatsApp will be added later. Keep the API stable without failing production.
   return { skipped: true, reason: "whatsapp_later" };
 }
 

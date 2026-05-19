@@ -1,5 +1,5 @@
 const express = require('express');
-const mongoose = require('mongoose');
+const { isValidId } = require("../utils/id");
 const auth = require('../middleware/auth');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
@@ -17,7 +17,7 @@ function userIdFromReq(req) {
 }
 
 function isObjectId(value) {
-  return mongoose.Types.ObjectId.isValid(String(value || ''));
+  return isValidId(String(value || ''));
 }
 
 function cleanText(value, max = MESSAGE_MAX_LENGTH) {

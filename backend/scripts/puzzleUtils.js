@@ -1,5 +1,3 @@
-const mongoose = require("mongoose");
-
 const PREMIUM_THEME_HINTS = new Set([
   "advancedPawn",
   "attraction",
@@ -57,13 +55,16 @@ function normalizePuzzleRecord(record) {
   };
 }
 
-async function connectMongo() {
-  const uri = process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb://127.0.0.1:27017/chessplay";
-  await mongoose.connect(uri);
+async function connectDatabase() {
+  const { checkDatabase } = require("../lib/prisma");
+  const status = await checkDatabase();
+  if (!status.ok && process.env.NODE_ENV === "production") {
+    throw new Error(`Database unavailable: ${status.message}`);
+  }
 }
 
 module.exports = {
-  connectMongo,
+  connectDatabase,
   difficultyFromRating,
   isPremiumPuzzle,
   normalizePuzzleRecord,

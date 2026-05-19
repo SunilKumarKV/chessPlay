@@ -1,8 +1,11 @@
-const DEFAULT_PRODUCTION_BACKEND_URL = "https://chessplay-b5ve.onrender.com";
+const configuredApiUrl =
+  import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL;
 
-export const BACKEND_URL =
-  import.meta.env.VITE_BACKEND_URL ||
-  (import.meta.env.PROD ? DEFAULT_PRODUCTION_BACKEND_URL : "http://localhost:3001");
+if (import.meta.env.PROD && !configuredApiUrl) {
+  throw new Error("VITE_BACKEND_URL is required for production builds.");
+}
+
+export const BACKEND_URL = configuredApiUrl || "http://localhost:3001";
 
 export const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL || BACKEND_URL;

@@ -7,7 +7,7 @@ export default function RefundPolicyPage({ onBack }) {
       <h2>Manual Payments</h2>
       <p>If a payment was made by mistake or cannot be verified, contact support with the payment reference. Refund eligibility depends on provider rules, payment status, and whether premium benefits were already used.</p>
       <h2>Digital Benefits</h2>
-      <p>Because premium benefits are digital, refunds may be limited once access is activated. This page is a product placeholder and should be reviewed before live paid launch.</p>
+      <p>Because premium benefits are digital, refunds may be limited once access is activated. This policy should be reviewed for the jurisdiction and provider used before a full public paid launch.</p>
       <h2>Contact</h2>
       <p>Use the contact page or support email configured for this deployment.</p>
     </LegalShell>

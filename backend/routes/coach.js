@@ -9,7 +9,7 @@ router.post("/session", auth, requireFeature("advancedAnalysis"), async (req, re
   const fen = sanitizeText(req.body.fen || "", 120);
   const goal = sanitizeText(req.body.goal || "Improve my position", 300);
   res.json({
-    mode: "premium_coach_placeholder",
+    mode: "premium_coach_coming_soon",
     engineAvailable: false,
     message: "AI Coach foundation is ready. Server-side engine coaching is not enabled on this deployment.",
     coaching: {

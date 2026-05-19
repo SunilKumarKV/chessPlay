@@ -1,6 +1,6 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
-const mongoose = require("mongoose");
+const { isValidId } = require("../utils/id");
 const jwt = require("jsonwebtoken");
 const auth = require("../middleware/auth");
 const Tournament = require("../models/Tournament");
@@ -19,7 +19,7 @@ const tournamentActionLimiter = rateLimit({
 });
 
 function isValidObjectId(id) {
-  return mongoose.Types.ObjectId.isValid(String(id || ""));
+  return isValidId(String(id || ""));
 }
 
 async function optionalAuth(req, _res, next) {

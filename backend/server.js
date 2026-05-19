@@ -35,8 +35,8 @@ if (isProduction && accessSecret === refreshSecret) {
   fatalConfigError("JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different in production.");
 }
 
-if (isProduction && !process.env.MONGODB_URI) {
-  fatalConfigError("MONGODB_URI is required in production.");
+if (isProduction && !process.env.DATABASE_URL) {
+  fatalConfigError("DATABASE_URL is required in production.");
 }
 
 if (isProduction && !(process.env.FRONTEND_URL || process.env.CLIENT_URL || process.env.CORS_ALLOWED_ORIGINS || process.env.FRONTEND_ORIGINS)) {
@@ -51,10 +51,9 @@ const morgan = require("morgan");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const rateLimit = require("express-rate-limit");
-const mongoSanitize = require("express-mongo-sanitize");
 const hpp = require("hpp");
-const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
+const { checkDatabase } = require("./lib/prisma");
 const { getJwtSecret } = require("./utils/security");
 const {
   isValidMove: validateMove,
@@ -92,6 +91,29 @@ const profileRoutes = require("./routes/profile");
 const User = require("./models/User");
 const Game = require("./models/Game");
 const { updatePlayerStats } = require("./utils/elo");
+
+function sanitizeRequestObject(value) {
+  if (!value || typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    value.forEach(sanitizeRequestObject);
+    return value;
+  }
+  for (const key of Object.keys(value)) {
+    if (key.startsWith("$") || key.includes(".")) {
+      delete value[key];
+      continue;
+    }
+    sanitizeRequestObject(value[key]);
+  }
+  return value;
+}
+
+function requestKeySanitizer(req, _res, next) {
+  sanitizeRequestObject(req.body);
+  sanitizeRequestObject(req.params);
+  sanitizeRequestObject(req.query);
+  next();
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -332,31 +354,26 @@ app.use(express.json({
     if (req.originalUrl.startsWith("/api/payments/webhook")) req.rawBody = buffer.toString("utf8");
   },
 }));
-app.use(mongoSanitize());
+app.use(requestKeySanitizer);
 app.use(hpp());
 if (process.env.NODE_ENV === "production") {
   app.use(morgan("combined"));
 }
 
-const mongoUri =
-  process.env.MONGODB_URI ||
-  (process.env.NODE_ENV === "production"
-    ? undefined
-    : "mongodb://127.0.0.1:27017/chessplay");
-
-if (!process.env.MONGODB_URI && process.env.NODE_ENV !== "production") {
-  logger.warn(
-    "Warning: MONGODB_URI is not set. Using local development MongoDB URI.",
-  );
-}
-
-// Connect to MongoDB
-mongoose
-  .connect(mongoUri, { serverSelectionTimeoutMS: 5000 })
-  .then(() => logger.info("Connected to MongoDB"))
+checkDatabase()
+  .then((status) => {
+    if (status.ok) {
+      logger.info("Connected to PostgreSQL with Prisma");
+      return;
+    }
+    const message = `PostgreSQL connection unavailable: ${status.message}`;
+    if (process.env.NODE_ENV === "production") fatalConfigError(message);
+    logger.warn(message);
+  })
   .catch((err) => {
-    captureException(err, { area: "mongodb" });
-    logger.error("MongoDB connection error", err);
+    captureException(err, { area: "postgres" });
+    if (process.env.NODE_ENV === "production") fatalConfigError("PostgreSQL connection failed.");
+    logger.error("PostgreSQL connection error", err);
   });
 
 // Routes

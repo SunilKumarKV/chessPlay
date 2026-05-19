@@ -247,8 +247,8 @@ export default function AnalysisPage({ user = null, onBack, onNavigate }) {
               )}
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
-              <h2 className="font-['Montserrat'] text-lg font-black">Supporter preview</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-300">Coming soon: deeper review reports, saved analysis collections, custom board themes, and no-ads experience for supporters.</p>
+              <h2 className="font-['Montserrat'] text-lg font-black">Supporter status</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-300">Supporter payments unlock only released benefits. Deeper review reports and extra themes are roadmap items and are not sold as active features.</p>
               <button type="button" onClick={() => onNavigate?.("pricing")} className="mt-4 w-full rounded-xl bg-[#81b64c] px-4 py-3 text-sm font-black text-[#07100a] hover:bg-[#93c85f]">Support ChessPlay</button>
               <p className="mt-3 text-xs text-slate-400">PayPal, UPI, and bank payments are manually verified by admin.</p>
             </div>

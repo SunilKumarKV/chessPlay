@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const jwt = require("jsonwebtoken");
-const mongoose = require("mongoose");
+const { isValidId } = require("../utils/id");
 const { Chess } = require("chess.js");
 const Puzzle = require("../models/Puzzle");
 const PuzzleAttempt = require("../models/PuzzleAttempt");
@@ -616,7 +616,7 @@ router.post("/:id/submit", attemptLimiter, validatePuzzleSubmit, async (req, res
 });
 
 async function findPuzzle(id) {
-  const query = mongoose.Types.ObjectId.isValid(id)
+  const query = isValidId(id)
     ? { $or: [{ _id: id }, { puzzleId: id }], isActive: true }
     : { puzzleId: id, isActive: true };
   return Puzzle.findOne(query);

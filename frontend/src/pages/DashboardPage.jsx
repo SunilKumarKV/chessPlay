@@ -257,7 +257,19 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
     { label: "Win Rate", value: `${winRate}%`, accent: "#22c55e" },
   ];
   const trialEndsAt = entitlements?.planStatus === "trialing" ? entitlements.planExpiresAt : null;
-  const trialDaysLeft = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000)) : 0;
+const [now, setNow] = useState(() => Date.now());
+
+useEffect(() => {
+  const timer = setInterval(() => {
+    setNow(Date.now());
+  }, 60 * 1000);
+
+  return () => clearInterval(timer);
+}, []);
+
+const trialDaysLeft = trialEndsAt
+  ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - now) / 86400000))
+  : 0;
 
   const setTimeControl = (value) => {
     setSelectedTimeControl(value);
