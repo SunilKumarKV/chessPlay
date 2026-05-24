@@ -7,6 +7,10 @@ const { updatePlayerStats } = require('../utils/elo');
 const { isValidMove: validateMove, applyMove, opponent } = require('../chessUtils');
 const { isPlayableStatus, toGameResult } = require('../gameState');
 
+function emitServerError(socket: Socket, message: string): void {
+  socket.emit('serverError', { message });
+}
+
 export async function updateDrawStats(whiteUserId?: string, blackUserId?: string): Promise<void> {
   const updates = [];
   if (whiteUserId) updates.push(recordUserDraw(String(whiteUserId)));
@@ -16,16 +20,37 @@ export async function updateDrawStats(whiteUserId?: string, blackUserId?: string
 
 export async function handleMove(io: SocketIOServer, socket: Socket, state: SocketState, data: any): Promise<void> {
   const { fromRow, fromCol, toRow, toCol, promotion } = data || {};
-  if (![fromRow, fromCol, toRow, toCol].every((value) => Number.isInteger(value) && value >= 0 && value <= 7)) return socket.emit('serverError', { message: 'Invalid move coordinates' });
-  if (promotion && !['q', 'r', 'b', 'n'].includes(String(promotion).toLowerCase())) return socket.emit('serverError', { message: 'Invalid promotion piece' });
+  if (![fromRow, fromCol, toRow, toCol].every((value) => Number.isInteger(value) && value >= 0 && value <= 7)) {
+    emitServerError(socket, 'Invalid move coordinates');
+    return;
+  }
+  if (promotion && !['q', 'r', 'b', 'n'].includes(String(promotion).toLowerCase())) {
+    emitServerError(socket, 'Invalid promotion piece');
+    return;
+  }
 
   const player = state.players.get(socket.id);
-  if (!player) return socket.emit('serverError', { message: 'Not in a room' });
+  if (!player) {
+    emitServerError(socket, 'Not in a room');
+    return;
+  }
   const roomData = state.rooms.get(player.roomId);
-  if (!roomData) return socket.emit('serverError', { message: 'Room not found' });
-  if (!isPlayableStatus(roomData.status)) return socket.emit('serverError', { message: 'Game is over' });
-  if (roomData.turn !== player.color) return socket.emit('serverError', { message: 'Not your turn' });
-  if (!validateMove(roomData, fromRow, fromCol, toRow, toCol)) return socket.emit('serverError', { message: 'Invalid move' });
+  if (!roomData) {
+    emitServerError(socket, 'Room not found');
+    return;
+  }
+  if (!isPlayableStatus(roomData.status)) {
+    emitServerError(socket, 'Game is over');
+    return;
+  }
+  if (roomData.turn !== player.color) {
+    emitServerError(socket, 'Not your turn');
+    return;
+  }
+  if (!validateMove(roomData, fromRow, fromCol, toRow, toCol)) {
+    emitServerError(socket, 'Invalid move');
+    return;
+  }
 
   const color = player.color;
   applyMove(roomData, fromRow, fromCol, toRow, toCol, promotion);
@@ -37,9 +62,7 @@ export async function handleMove(io: SocketIOServer, socket: Socket, state: Sock
   };
 
   const existingMoves = Array.isArray(roomData.moves) ? roomData.moves : [];
-  const updatePayload: any = {
-    moves: [...existingMoves, moveRecord],
-  };
+  const updatePayload: any = { moves: [...existingMoves, moveRecord] };
 
   if (roomData.status === 'checkmate') {
     const winnerColor = color;
@@ -64,9 +87,15 @@ export async function handleMove(io: SocketIOServer, socket: Socket, state: Sock
 
 export async function acceptDraw(io: SocketIOServer, socket: Socket, state: SocketState): Promise<void> {
   const player = state.players.get(socket.id);
-  if (!player) return socket.emit('serverError', { message: 'Not in a room' });
+  if (!player) {
+    emitServerError(socket, 'Not in a room');
+    return;
+  }
   const roomData = state.rooms.get(player.roomId);
-  if (!roomData) return socket.emit('serverError', { message: 'Room not found' });
+  if (!roomData) {
+    emitServerError(socket, 'Room not found');
+    return;
+  }
   roomData.status = 'draw';
   await updateGame(roomData.gameId, { result: 'draw', winner: null, endTime: new Date() });
   await updateDrawStats(roomData.players.w.userId, roomData.players.b.userId);
@@ -75,7 +104,10 @@ export async function acceptDraw(io: SocketIOServer, socket: Socket, state: Sock
 
 export async function resignGame(io: SocketIOServer, socket: Socket, state: SocketState): Promise<void> {
   const player = state.players.get(socket.id);
-  if (!player) return socket.emit('serverError', { message: 'Not in a room' });
+  if (!player) {
+    emitServerError(socket, 'Not in a room');
+    return;
+  }
   const roomData = state.rooms.get(player.roomId);
   if (!roomData || !isPlayableStatus(roomData.status)) return;
   const winnerColor = opponent(player.color);
