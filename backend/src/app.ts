@@ -12,6 +12,7 @@ const authCoreRoutes = require('../routes/authCore');
 const authRoutes = require('../routes/auth');
 const gameRoutes = require('../routes/games');
 const billingRoutes = require('../routes/billing');
+const socialCoreRoutes = require('../routes/socialCore');
 const socialRoutes = require('../routes/social');
 const automationRoutes = require('../routes/automation');
 const adminRoutes = require('../routes/admin');
@@ -118,6 +119,7 @@ function registerRoutes(app: express.Express): void {
   app.use('/api/auth', authRoutes);
   app.use('/api/games', gameRoutes);
   app.use('/api/billing', billingRoutes);
+  app.use('/api/social', socialCoreRoutes);
   app.use('/api/social', socialRoutes);
   app.use('/api/automation', automationRoutes);
   app.use('/api/admin', adminRoutes);
