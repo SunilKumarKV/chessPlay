@@ -11,6 +11,7 @@ import { env, isProduction } from './config/env';
 const authCoreRoutes = require('../routes/authCore');
 const authRoutes = require('../routes/auth');
 const gameRoutes = require('../routes/games');
+const billingCoreRoutes = require('../routes/billingCore');
 const billingRoutes = require('../routes/billing');
 const socialCoreRoutes = require('../routes/socialCore');
 const socialRoutes = require('../routes/social');
@@ -31,7 +32,9 @@ const blogRoutes = require('../routes/blog');
 const shareRoutes = require('../routes/share');
 const supportRoutes = require('../routes/support');
 const messageRoutes = require('../routes/messages');
+const settingsCoreRoutes = require('../routes/settingsCore');
 const settingsRoutes = require('../routes/settings');
+const profileCoreRoutes = require('../routes/profileCore');
 const profileRoutes = require('../routes/profile');
 
 type HealthState = {
@@ -118,6 +121,7 @@ function registerRoutes(app: express.Express): void {
   app.use('/api/auth', authCoreRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/games', gameRoutes);
+  app.use('/api/billing', billingCoreRoutes);
   app.use('/api/billing', billingRoutes);
   app.use('/api/social', socialCoreRoutes);
   app.use('/api/social', socialRoutes);
@@ -138,7 +142,9 @@ function registerRoutes(app: express.Express): void {
   app.use('/api/share', shareRoutes);
   app.use('/api/support', supportRoutes);
   app.use('/api/messages', messageRoutes);
+  app.use('/api/settings', settingsCoreRoutes);
   app.use('/api/settings', settingsRoutes);
+  app.use('/api/profile', profileCoreRoutes);
   app.use('/api/profile', profileRoutes);
 }
 
