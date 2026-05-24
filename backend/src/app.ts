@@ -8,9 +8,7 @@ import morgan from 'morgan';
 
 import { env, isProduction } from './config/env';
 
-// Existing CommonJS routes stay in place during the safe TypeScript migration.
-// They will be migrated route-by-route after the app/socket split is stable.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+const authCoreRoutes = require('../routes/authCore');
 const authRoutes = require('../routes/auth');
 const gameRoutes = require('../routes/games');
 const billingRoutes = require('../routes/billing');
@@ -46,7 +44,6 @@ function sanitizeRequestObject(value: unknown): unknown {
     value.forEach(sanitizeRequestObject);
     return value;
   }
-
   const target = value as Record<string, unknown>;
   for (const key of Object.keys(target)) {
     if (key.startsWith('$') || key.includes('.')) {
@@ -72,21 +69,17 @@ function configuredOrigins(): Array<string | RegExp> {
     'https://www.getchessplay.com',
     'https://getchessplay.vercel.app',
   ].filter(Boolean)));
-
   const developmentOrigins: Array<string | RegExp> = isProduction ? [] : [
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:5174',
-    /^http:\/\/192\.168\.\d+\.\d+:5173$/,
-    /^http:\/\/192\.168\.\d+\.\d+:5174$/,
-    /^http:\/\/10\.\d+\.\d+\.\d+:5173$/,
-    /^http:\/\/10\.\d+\.\d+\.\d+:5174$/,
-    /^http:\/\/172\.\d+\.\d+\.\d+:5173$/,
-    /^http:\/\/172\.\d+\.\d+\.\d+:5174$/,
+    'http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174',
+    /^http:\/\/192\.168\.\d+\.\d+:5173$/, /^http:\/\/192\.168\.\d+\.\d+:5174$/,
+    /^http:\/\/10\.\d+\.\d+\.\d+:5173$/, /^http:\/\/10\.\d+\.\d+\.\d+:5174$/,
+    /^http:\/\/172\.\d+\.\d+\.\d+:5173$/, /^http:\/\/172\.\d+\.\d+\.\d+:5174$/,
   ];
-
   return [...productionOrigins, ...developmentOrigins];
+}
+
+export function getAllowedOrigins(): Array<string | RegExp> {
+  return configuredOrigins();
 }
 
 export function isAllowedOrigin(origin: string, allowedOrigins = configuredOrigins()): boolean {
@@ -121,6 +114,7 @@ function enforceProductionOrigin(req: Request, res: Response, next: NextFunction
 }
 
 function registerRoutes(app: express.Express): void {
+  app.use('/api/auth', authCoreRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/games', gameRoutes);
   app.use('/api/billing', billingRoutes);
@@ -149,24 +143,12 @@ function registerRoutes(app: express.Express): void {
 export function createApp(healthState: HealthState = {}): express.Express {
   const app = express();
   app.set('trust proxy', 1);
-
   const cspOrigins = configuredOrigins().filter((origin): origin is string => typeof origin === 'string');
-  const cspConnectSources = [
-    "'self'",
-    ...cspOrigins,
-    ...cspOrigins.map((origin) => origin.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')),
-  ];
-
+  const cspConnectSources = ["'self'", ...cspOrigins, ...cspOrigins.map((origin) => origin.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:'))];
   app.use((req, res, next) => cors(createCorsOptions(req))(req, res, next));
   app.use(enforceProductionOrigin);
   app.use(cookieParser());
-  app.use(rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: isProduction ? 300 : 2000,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { message: 'Too many requests. Please slow down.' },
-  }));
+  app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: isProduction ? 300 : 2000, standardHeaders: true, legacyHeaders: false, message: { message: 'Too many requests. Please slow down.' } }));
   app.use(helmet({
     crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
     crossOriginEmbedderPolicy: false,
@@ -182,33 +164,16 @@ export function createApp(healthState: HealthState = {}): express.Express {
       },
     },
   }));
-  app.use(express.json({
-    limit: '20kb',
-    verify: (req: Request & { rawBody?: string }, _res, buffer) => {
-      if (req.originalUrl.startsWith('/api/payments/webhook')) req.rawBody = buffer.toString('utf8');
-    },
-  }));
+  app.use(express.json({ limit: '20kb', verify: (req: Request & { rawBody?: string }, _res, buffer) => { if (req.originalUrl.startsWith('/api/payments/webhook')) req.rawBody = buffer.toString('utf8'); } }));
   app.use(requestKeySanitizer);
   app.use(hpp());
   if (isProduction) app.use(morgan('combined'));
-
   registerRoutes(app);
-
   app.get('/health', (req, res) => {
     const secret = req.headers['x-health-secret'];
-    if (process.env.HEALTH_SECRET && secret !== process.env.HEALTH_SECRET) {
-      return res.status(401).json({ status: 'unauthorized' });
-    }
-    return res.json({
-      status: 'ok',
-      rooms: healthState.rooms?.() ?? 0,
-      players: healthState.players?.() ?? 0,
-    });
+    if (process.env.HEALTH_SECRET && secret !== process.env.HEALTH_SECRET) return res.status(401).json({ status: 'unauthorized' });
+    return res.json({ status: 'ok', rooms: healthState.rooms?.() ?? 0, players: healthState.players?.() ?? 0 });
   });
-
-  app.get('/healthz', (_req, res) => {
-    res.json({ status: 'ok', service: 'chessplay-backend' });
-  });
-
+  app.get('/healthz', (_req, res) => res.json({ status: 'ok', service: 'chessplay-backend' }));
   return app;
 }
