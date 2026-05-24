@@ -235,17 +235,17 @@ model Payment {
 }
 
 model Subscription {
-  id          String             @id @default(cuid())
-  userId      String
-  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  planId      String?
-  status      SubscriptionStatus @default(ACTIVE)
-  startedAt   DateTime           @default(now())
-  expiresAt   DateTime?
-  canceledAt  DateTime?
-  metadata    Json?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  id         String             @id @default(cuid())
+  userId     String
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId     String?
+  status     SubscriptionStatus @default(ACTIVE)
+  startedAt  DateTime           @default(now())
+  expiresAt  DateTime?
+  canceledAt DateTime?
+  metadata   Json?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
 
   @@index([userId])
   @@index([status])
