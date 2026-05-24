@@ -1,7 +1,7 @@
 import type { Server as SocketIOServer } from 'socket.io';
 import type { MatchmakingEntry, SocketState } from './socketTypes';
+import { createGame } from './repositories/gameRepository';
 
-const Game = require('../models/Game');
 const { createInitialGameState } = require('../gameState');
 
 export function getRatingRange(rating: number) {
@@ -47,15 +47,18 @@ export async function createMatchRoom(io: SocketIOServer, state: SocketState, pl
   gameState.players.b.userId = blackPlayer.userId;
   gameState.players.b.disconnected = false;
 
-  const game = new Game({ whitePlayer: whitePlayer.userId, blackPlayer: blackPlayer.userId, roomId });
-  await game.save();
+  const game = await createGame({
+    whitePlayerId: whitePlayer.userId,
+    blackPlayerId: blackPlayer.userId,
+    status: 'ACTIVE',
+  });
 
   gameState.matchmaking = {
     mode: whitePlayer.mode || blackPlayer.mode || 'casual',
     timeControlIndex: Number.isInteger(whitePlayer.timeControlIndex) ? whitePlayer.timeControlIndex : blackPlayer.timeControlIndex,
   };
 
-  state.rooms.set(roomId, { ...gameState, gameId: game._id });
+  state.rooms.set(roomId, { ...gameState, gameId: game.id });
   state.players.set(whiteSocket.id, { roomId, color: 'w', playerName: whitePlayer.playerName, userId: whitePlayer.userId });
   state.players.set(blackSocket.id, { roomId, color: 'b', playerName: blackPlayer.playerName, userId: blackPlayer.userId });
 
