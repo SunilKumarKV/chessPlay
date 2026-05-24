@@ -23,14 +23,15 @@ export async function findUserByUsername(username: string) {
 }
 
 export async function findUserByEmailOrUsername(email: string, username: string) {
-  return prisma.user.findFirst({
-    where: {
-      OR: [
-        { email: email.toLowerCase() },
-        { username },
-      ],
-    },
-  });
+  return prisma.user.findFirst({ where: { OR: [{ email: email.toLowerCase() }, { username }] } });
+}
+
+export async function findUserByEmailVerificationHash(tokenHash: string, now = new Date()) {
+  return prisma.user.findFirst({ where: { emailVerificationTokenHash: tokenHash, emailVerificationExpires: { gt: now } } });
+}
+
+export async function findUserByPasswordResetHash(tokenHash: string, now = new Date()) {
+  return prisma.user.findFirst({ where: { passwordResetTokenHash: tokenHash, passwordResetExpires: { gt: now } } });
 }
 
 export async function createUser(input: CreateUserInput) {
@@ -70,6 +71,18 @@ export async function clearUserRefreshToken(userId: string) {
   return prisma.user.update({ where: { id: userId }, data: { refreshTokenHash: null } });
 }
 
+export async function setEmailVerificationToken(userId: string, tokenHash: string, expiresAt: Date) {
+  return prisma.user.update({ where: { id: userId }, data: { emailVerificationTokenHash: tokenHash, emailVerificationExpires: expiresAt } });
+}
+
+export async function markEmailVerified(userId: string) {
+  return prisma.user.update({ where: { id: userId }, data: { emailVerified: true, emailVerificationTokenHash: null, emailVerificationExpires: null } });
+}
+
+export async function setPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date) {
+  return prisma.user.update({ where: { id: userId }, data: { passwordResetTokenHash: tokenHash, passwordResetExpires: expiresAt } });
+}
+
 export async function recordUserDraw(userId: string) {
   const current = await prisma.stats.findUnique({ where: { userId } });
   const data = {
@@ -77,9 +90,5 @@ export async function recordUserDraw(userId: string) {
     gamesPlayed: Number((current?.data as any)?.gamesPlayed || 0) + 1,
     gamesDrawn: Number((current?.data as any)?.gamesDrawn || 0) + 1,
   };
-  return prisma.stats.upsert({
-    where: { userId },
-    create: { userId, data },
-    update: { data },
-  });
+  return prisma.stats.upsert({ where: { userId }, create: { userId, data }, update: { data } });
 }
