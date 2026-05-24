@@ -75,17 +75,26 @@ enum TournamentStatus {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  mongoUserId  String?  @unique
-  email        String   @unique
-  username     String   @unique
-  displayName  String?
-  passwordHash String?
-  role         UserRole @default(USER)
-  rating       Int      @default(1200)
-  isPremium    Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                         String    @id @default(cuid())
+  mongoUserId                String?   @unique
+  email                      String    @unique
+  username                   String    @unique
+  displayName                String?
+  passwordHash               String?
+  role                       UserRole  @default(USER)
+  rating                     Int       @default(1200)
+  isPremium                  Boolean   @default(false)
+  emailVerified              Boolean   @default(false)
+  refreshTokenHash           String?
+  tokenVersion               Int       @default(0)
+  emailVerificationTokenHash String?
+  emailVerificationExpires   DateTime?
+  passwordResetTokenHash     String?
+  passwordResetExpires       DateTime?
+  deletedAt                  DateTime?
+  lastLogin                  DateTime?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
 
   gamesAsWhite  Game[]         @relation("WhitePlayer")
   gamesAsBlack  Game[]         @relation("BlackPlayer")
@@ -97,6 +106,7 @@ model User {
 
   @@index([email])
   @@index([username])
+  @@index([deletedAt])
 }
 
 model Game {
@@ -138,492 +148,111 @@ model PremiumPlan {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
-  payments      Payment[]
-  subscriptions Subscription[]
 }
 
 model Payment {
-  id                String          @id @default(cuid())
-  mongoPaymentId    String?         @unique
-  userId            String
-  planId            String?
-  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan              PremiumPlan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
-  provider          PaymentProvider @default(MANUAL)
-  status            PaymentStatus   @default(PENDING)
-  amountCents       Int
-  currency          String          @default("USD")
-  providerReference String?
-  metadata          Json?
-  submittedAt       DateTime?
-  approvedAt        DateTime?
-  rejectedAt        DateTime?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  id             String          @id @default(cuid())
+  userId         String?
+  user           User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  status         PaymentStatus   @default(PENDING)
+  provider       PaymentProvider @default(MANUAL)
+  amountCents    Int
+  currency       String          @default("USD")
+  transactionRef String?
+  proofUrl       String?
+  notes          String?
+  metadata       Json?
+  reviewedAt     DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@index([userId])
-  @@index([planId])
   @@index([status])
-  @@index([provider])
 }
 
 model Subscription {
-  id                  String             @id @default(cuid())
-  mongoSubscriptionId String?            @unique
-  userId              String
-  planId              String
-  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan                PremiumPlan        @relation(fields: [planId], references: [id], onDelete: Restrict)
-  status              SubscriptionStatus @default(ACTIVE)
-  currentPeriodStart  DateTime?
-  currentPeriodEnd    DateTime?
-  canceledAt          DateTime?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  id          String             @id @default(cuid())
+  userId      String
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId      String?
+  status      SubscriptionStatus @default(ACTIVE)
+  startedAt   DateTime           @default(now())
+  expiresAt   DateTime?
+  canceledAt  DateTime?
+  metadata    Json?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   @@index([userId])
-  @@index([planId])
   @@index([status])
 }
 
 model Referral {
-  id              String         @id @default(cuid())
-  mongoReferralId String?        @unique
-  code            String         @unique
-  referrerId      String
-  referredUserId  String?
-  referrer        User           @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
-  referredUser    User?          @relation("ReferredUser", fields: [referredUserId], references: [id], onDelete: SetNull)
-  status          ReferralStatus @default(PENDING)
-  rewardGranted   Boolean        @default(false)
-  createdAt       DateTime       @default(now())
-  qualifiedAt     DateTime?
-  rewardedAt      DateTime?
+  id             String         @id @default(cuid())
+  code           String
+  referrerId     String
+  referrer       User           @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUserId String?
+  referredUser   User?          @relation("ReferredUser", fields: [referredUserId], references: [id], onDelete: SetNull)
+  status         ReferralStatus @default(PENDING)
+  rewardNote     String?
+  metadata       Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  @@index([referrerId])
-  @@index([referredUserId])
-  @@index([status])
+  @@unique([referrerId, referredUserId])
+  @@index([code])
 }
 
 model Tournament {
-  id                String           @id @default(cuid())
-  mongoTournamentId String?          @unique
-  name              String
-  description       String?
-  creatorId         String?
-  creator           User?            @relation("TournamentCreator", fields: [creatorId], references: [id], onDelete: SetNull)
-  status            TournamentStatus @default(DRAFT)
-  startsAt          DateTime?
-  endsAt            DateTime?
-  rules             Json?
-  maxPlayers        Int?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  id          String           @id @default(cuid())
+  creatorId   String?
+  creator     User?            @relation("TournamentCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  name        String
+  status      TournamentStatus @default(DRAFT)
+  description String?
+  startsAt    DateTime?
+  endsAt      DateTime?
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   @@index([creatorId])
   @@index([status])
-  @@index([startsAt])
 }
 
-model Account {
-  id        String   @id @default(cuid())
-  userId    String
-  provider  String
-  subject   String
-  data      Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([provider, subject])
-  @@index([userId])
-}
-
-model Session {
-  id        String   @id @default(cuid())
-  userId    String
-  tokenHash String   @unique
-  expiresAt DateTime
-  revokedAt DateTime?
-  data      Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-}
-
-model RefreshToken {
-  id        String   @id @default(cuid())
-  userId    String
-  tokenHash String   @unique
-  expiresAt DateTime
-  revokedAt DateTime?
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-}
-
-
-model GameMove {
+model Puzzle {
   id         String   @id @default(cuid())
-  gameId     String
-  moveNumber Int
-  data       Json
+  externalId String?  @unique
+  fen        String
+  moves      String[]
+  rating     Int?
+  themes     String[]
+  source     String?
+  metadata   Json?
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  @@index([gameId])
+  attempts PuzzleAttempt[]
 }
 
-model Leaderboard {
+model PuzzleAttempt {
   id        String   @id @default(cuid())
-  userId    String
-  scope     String
-  rating    Int      @default(1200)
-  data      Json?
-  updatedAt DateTime @updatedAt
+  puzzleId  String
+  puzzle    Puzzle   @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
+  userId    String?
+  success   Boolean
+  metadata  Json?
+  createdAt DateTime @default(now())
 
-  @@unique([userId, scope])
+  @@index([puzzleId])
+  @@index([userId])
 }
 
 model Stats {
   id        String   @id @default(cuid())
   userId    String   @unique
   data      Json
-  updatedAt DateTime @updatedAt
-}
-
-model Friend {
-  id        String   @id @default(cuid())
-  userId    String
-  friendId  String
-  status    String   @default("pending")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@unique([userId, friendId])
-}
-
-model CommunityPost {
-  id        String   @id @default(cuid())
-  authorId  String?
-  type      String   @default("discussion")
-  status    String   @default("open")
-  title     String?
-  body      String?
-  data      Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([authorId])
-  @@index([status])
-  @@index([type])
-}
-
-model Conversation {
-  id            String   @id @default(cuid())
-  type          String   @default("direct")
-  participantIds Json?
-  lastMessageAt DateTime?
-  data          Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([lastMessageAt])
-}
-
-model Message {
-  id             String   @id @default(cuid())
-  conversationId String
-  senderId       String
-  body           String
-  data           Json?
-  createdAt      DateTime @default(now())
-
-  @@index([conversationId])
-}
-
-model Notification {
-  id        String   @id @default(cuid())
-  userId    String
-  type      String
-  title     String?
-  body      String?
-  readAt    DateTime?
-  data      Json?
-  createdAt DateTime @default(now())
-
-  @@index([userId, readAt])
-}
-
-model Feedback {
-  id        String   @id @default(cuid())
-  userId    String?
-  type      String?
-  status    String   @default("open")
-  data      Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([status])
-}
-
-model SupportTicket {
-  id        String   @id @default(cuid())
-  userId    String?
-  email     String?
-  subject   String?
-  status    String   @default("open")
-  data      Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@index([status])
-}
-
-model SupporterRequest {
-  id        String   @id @default(cuid())
-  userId    String?
-  plan      String?
-  status    String   @default("pending")
-  amount    Int?
-  data      Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@index([status])
-}
-
-model AdminAuditLog {
-  id        String   @id @default(cuid())
-  actorId   String?
-  action    String
-  targetId  String?
-  data      Json?
-  createdAt DateTime @default(now())
-
-  @@index([actorId])
-  @@index([action])
-}
-
-model AppSetting {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  value     Json?
-  updatedBy String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model SecurityEvent {
-  id        String   @id @default(cuid())
-  userId    String?
-  type      String
-  ip        String?
-  data      Json?
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([type])
-  @@index([createdAt])
-}
-
-model AnalysisNote {
-  id        String   @id @default(cuid())
-  userId    String?
-  gameId    String?
-  fen       String?
-  note      String?
-  data      Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@index([gameId])
-}
-
-model PaymentIntent {
-  id                String   @id @default(cuid())
-  userId            String?
-  provider          String   @default("manual")
-  providerReference String?
-  status            String   @default("pending")
-  amountCents       Int      @default(0)
-  currency          String   @default("USD")
-  data              Json?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  @@index([userId])
-  @@index([status])
-  @@index([provider])
-}
-
-model AutomationEvent {
-  id          String    @id @default(cuid())
-  userId      String?
-  type        String
-  status      String    @default("queued")
-  scheduledFor DateTime?
-  data        Json?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([userId])
-  @@index([type])
-  @@index([status])
-}
-
-model EmailEvent {
-  id           String    @id @default(cuid())
-  userId       String?
-  email        String?
-  type         String
-  status       String    @default("queued")
-  scheduledFor DateTime?
-  data         Json?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  @@index([userId])
-  @@index([email])
-  @@index([status])
-}
-
-model FeatureEntitlement {
-  id        String   @id @default(cuid())
-  userId    String
-  feature   String
-  source    String?
-  active    Boolean  @default(true)
-  expiresAt DateTime?
-  data      Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, feature])
-  @@index([active])
-}
-
-
-model Waitlist {
-  id String @id @default(cuid())
-  email String @unique
-  source String?
-  data Json?
-  createdAt DateTime @default(now())
-}
-model Coupon {
-  id String @id @default(cuid())
-  code String @unique
-  active Boolean @default(true)
-  data Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-model Puzzle {
-  id String @id @default(cuid())
-  puzzleId String? @unique
-  fen String?
-  moves Json?
-  rating Int @default(1200)
-  difficulty String?
-  data Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-model PuzzleAttempt {
-  id String @id @default(cuid())
-  puzzleId String
-  userId String?
-  ownerKey String
-  status String
-  data Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-model PuzzleDailyUsage {
-  id String @id @default(cuid())
-  ownerKey String
-  dateKey String
-  attempts Int @default(0)
-  hints Int @default(0)
-  data Json?
-  updatedAt DateTime @updatedAt
-}
-model Achievement {
-  id String @id @default(cuid())
-  userId String
-  code String
-  data Json?
-  earnedAt DateTime @default(now())
-}
-model GameAnalysis {
-  id String @id @default(cuid())
-  gameId String?
-  userId String?
-  data Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-model Opening {
-  id String @id @default(cuid())
-  eco String?
-  name String
-  pgn String?
-  data Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-model MistakeReview {
-  id String @id @default(cuid())
-  userId String
-  gameId String?
-  status String @default("open")
-  data Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-model TournamentPlayer {
-  id String @id @default(cuid())
-  tournamentId String
-  userId String
-  status String @default("joined")
-  data Json?
-  createdAt DateTime @default(now())
-}
-model BlogPost {
-  id String @id @default(cuid())
-  slug String @unique
-  title String
-  status String @default("draft")
-  data Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-model SupportPayment {
-  id String @id @default(cuid())
-  userId String?
-  provider String
-  status String @default("pending")
-  amountCents Int @default(0)
-  currency String @default("USD")
-  data Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-model WebhookEvent {
-  id String @id @default(cuid())
-  provider String
-  eventId String
-  data Json
-  createdAt DateTime @default(now())
-}
-model AuditLog {
-  id String @id @default(cuid())
-  actorId String?
-  action String
-  data Json?
-  createdAt DateTime @default(now())
 }
