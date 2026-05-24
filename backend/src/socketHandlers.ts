@@ -12,12 +12,17 @@ function activeRoomIdFor(socket: Socket, state: SocketState): string | null {
   return player?.roomId || state.spectatorRooms.get(socket.id) || null;
 }
 
+function socketUserId(user: any): string {
+  return String(user?.id || user?._id || '');
+}
+
 function sanitizeChatText(value: unknown): string {
   return String(value || '').replace(/<[^>]*>/g, '').trim().slice(0, 200);
 }
 
 export function registerSocketHandlers(io: SocketIOServer, socket: Socket, state: SocketState, onSafe: SafeRegistrar): void {
   const user = socket.data.user;
+  const userId = socketUserId(user);
 
   onSafe('joinQueue', async (data = {}) => {
     removeFromQueue(state, socket.id);
@@ -28,7 +33,7 @@ export function registerSocketHandlers(io: SocketIOServer, socket: Socket, state
     const mode = ['casual', 'ranked', 'blitz', 'rapid', 'beginner', 'intermediate', 'advanced'].includes(payload.mode) ? payload.mode : 'casual';
     const entry: MatchmakingEntry = {
       socketId: socket.id,
-      userId: String(user._id),
+      userId,
       playerName: String(payload.playerName || user.username || 'Player').replace(/[^\w .-]/g, '').trim().slice(0, 30) || 'Player',
       rating,
       mode,
@@ -106,7 +111,7 @@ export function registerSocketHandlers(io: SocketIOServer, socket: Socket, state
     if (!roomData) return socket.emit('serverError', { message: 'Room not found' });
     const text = sanitizeChatText((data as any)?.text || (data as any)?.message);
     if (!text) return;
-    const chatMessage = { userId: user._id, username: user.username, text, timestamp: new Date().toISOString() };
+    const chatMessage = { userId, username: user.username, text, timestamp: new Date().toISOString() };
     roomData.chatHistory = roomData.chatHistory || [];
     roomData.chatHistory.push(chatMessage);
     if (roomData.chatHistory.length > 50) roomData.chatHistory.shift();
