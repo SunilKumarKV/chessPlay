@@ -74,6 +74,26 @@ enum TournamentStatus {
   CANCELED
 }
 
+enum CommunityPostType {
+  ANNOUNCEMENT
+  FEEDBACK
+  BUG
+  FEATURE
+  DISCUSSION
+}
+
+enum CommunityPostStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  CLOSED
+}
+
+enum ConversationType {
+  PUBLIC
+  PRIVATE
+}
+
 model User {
   id                         String    @id @default(cuid())
   mongoUserId                String?   @unique
@@ -130,6 +150,50 @@ model Game {
   @@index([whitePlayerId])
   @@index([blackPlayerId])
   @@index([status])
+}
+
+model CommunityPost {
+  id              String              @id @default(cuid())
+  authorId        String?
+  authorName      String
+  authorSupporter Boolean             @default(false)
+  type            CommunityPostType   @default(DISCUSSION)
+  status          CommunityPostStatus @default(OPEN)
+  title           String
+  body            String
+  isPublic        Boolean             @default(true)
+  isHidden        Boolean             @default(false)
+  isPinned        Boolean             @default(false)
+  likes           String[]            @default([])
+  comments        Json                @default("[]")
+  metadata        Json?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([authorId])
+  @@index([type])
+  @@index([status])
+  @@index([isPublic, isHidden])
+  @@index([isPinned, createdAt])
+}
+
+model Conversation {
+  id            String           @id @default(cuid())
+  type          ConversationType @default(PRIVATE)
+  roomKey       String?
+  title         String?
+  participants  String[]         @default([])
+  messages      Json             @default("[]")
+  mutedBy       String[]         @default([])
+  blockedBy     String[]         @default([])
+  reports       Json             @default("[]")
+  lastMessageAt DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([type, roomKey])
+  @@index([type])
+  @@index([lastMessageAt])
 }
 
 model PremiumPlan {
