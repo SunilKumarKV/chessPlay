@@ -119,6 +119,16 @@ function createRateLimiter({ windowMs, max, message }) {
 
 const authLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, message: "Too many requests from this IP, please try again after 15 minutes" });
 
+router.get('/profile', auth, async (req, res) => {
+  try {
+    const user = await findUserById(req.user.userId);
+    if (!user || user.deletedAt) return res.status(404).json({ message: 'User not found' });
+    return res.json(prismaUserPayload(user));
+  } catch {
+    return res.status(500).json({ message: 'Unable to load profile' });
+  }
+});
+
 router.post("/register", authLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
