@@ -12,6 +12,7 @@ const authCoreRoutes = require('../routes/authCore');
 const authRoutes = require('../routes/auth');
 const gameRoutes = require('../routes/games');
 const billingCoreRoutes = require('../routes/billingCore');
+const billingPaymentsCoreRoutes = require('../routes/billingPaymentsCore');
 const billingRoutes = require('../routes/billing');
 const socialCoreRoutes = require('../routes/socialCore');
 const socialRoutes = require('../routes/social');
@@ -123,6 +124,7 @@ function registerRoutes(app: express.Express): void {
   app.use('/api/auth', authRoutes);
   app.use('/api/games', gameRoutes);
   app.use('/api/billing', billingCoreRoutes);
+  app.use('/api/billing', billingPaymentsCoreRoutes);
   app.use('/api/billing', billingRoutes);
   app.use('/api/social', socialCoreRoutes);
   app.use('/api/social', socialRoutes);
