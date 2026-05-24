@@ -27,6 +27,16 @@ function authUserId(req) {
   return String(req.user?.userId || req.user?.id || '');
 }
 
+function cleanText(value, max = 1500) {
+  return String(value || '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/[<>]/g, '')
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max);
+}
+
 function toPostType(value) {
   const type = String(value || '').toLowerCase();
   if (!POST_TYPES.has(type)) return null;
@@ -108,13 +118,80 @@ router.get('/community/posts', optionalAuth, async (req, res, next) => {
   }
 });
 
+router.post('/community/posts', auth, async (req, res, next) => {
+  try {
+    const userId = authUserId(req);
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.deletedAt) return res.status(401).json({ message: 'Please sign in to continue.' });
+    const type = toPostType(req.body?.type) || 'FEEDBACK';
+    const title = cleanText(req.body?.title, 120);
+    const body = cleanText(req.body?.body || req.body?.content, 1500);
+    if (title.length < 4) return res.status(400).json({ message: 'Title must be at least 4 characters.' });
+    if (body.length < 10) return res.status(400).json({ message: 'Message must be at least 10 characters.' });
+    const post = await prisma.communityPost.create({
+      data: {
+        authorId: user.id,
+        authorName: user.username || 'ChessPlay Player',
+        authorSupporter: Boolean(user.isPremium),
+        type,
+        status: 'OPEN',
+        title,
+        body,
+        isPublic: true,
+        isHidden: false,
+        likes: [],
+        comments: [],
+      },
+    });
+    return res.status(201).json({ post: safePost(post, user.id) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/community/posts/:id/like', auth, async (req, res, next) => {
+  try {
+    const userId = authUserId(req);
+    const post = await prisma.communityPost.findUnique({ where: { id: req.params.id } });
+    if (!post || post.isHidden) return res.status(404).json({ message: 'Post not found.' });
+    const likes = safeJsonArray(post.likes).map(String);
+    const nextLikes = likes.includes(userId) ? likes.filter((id) => id !== userId) : [...likes, userId];
+    const updated = await prisma.communityPost.update({ where: { id: post.id }, data: { likes: nextLikes } });
+    return res.json({ post: safePost(updated, userId) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/community/posts/:id/comments', auth, async (req, res, next) => {
+  try {
+    const userId = authUserId(req);
+    const [user, post] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId } }),
+      prisma.communityPost.findUnique({ where: { id: req.params.id } }),
+    ]);
+    if (!user || user.deletedAt) return res.status(401).json({ message: 'Please sign in to continue.' });
+    if (!post || post.isHidden) return res.status(404).json({ message: 'Post not found.' });
+    const text = cleanText(req.body?.text || req.body?.body, 500);
+    if (text.length < 2) return res.status(400).json({ message: 'Comment must be at least 2 characters.' });
+    const comments = safeJsonArray(post.comments);
+    const nextComments = [
+      ...comments,
+      { _id: `${Date.now()}-${user.id}`, userId: user.id, username: user.username, text, createdAt: new Date().toISOString() },
+    ].slice(-50);
+    const updated = await prisma.communityPost.update({ where: { id: post.id }, data: { comments: nextComments } });
+    return res.status(201).json({ post: safePost(updated, user.id) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get('/messaging/bootstrap', auth, async (req, res, next) => {
   try {
     const userId = authUserId(req);
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.deletedAt) return res.status(404).json({ message: 'User not found' });
 
-    // Friend relationships are still on legacy fallback until the friendship schema is migrated.
     return res.json({ publicRooms: PUBLIC_ROOMS, friends: [] });
   } catch (error) {
     return next(error);
