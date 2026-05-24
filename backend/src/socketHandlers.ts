@@ -16,6 +16,10 @@ function socketUserId(user: any): string {
   return String(user?.id || user?._id || '');
 }
 
+function emitServerError(socket: Socket, message: string): void {
+  socket.emit('serverError', { message });
+}
+
 function sanitizeChatText(value: unknown): string {
   return String(value || '').replace(/<[^>]*>/g, '').trim().slice(0, 200);
 }
@@ -87,11 +91,16 @@ export function registerSocketHandlers(io: SocketIOServer, socket: Socket, state
     rejoinRoom(io, socket, state, data);
   });
 
-  onSafe('makeMove', async (data) => handleMove(io, socket, state, data));
+  onSafe('makeMove', async (data) => {
+    await handleMove(io, socket, state, data);
+  });
 
   onSafe('drawOffer', () => {
     const player = state.players.get(socket.id);
-    if (!player) return socket.emit('serverError', { message: 'Not in a room' });
+    if (!player) {
+      emitServerError(socket, 'Not in a room');
+      return;
+    }
     socket.to(player.roomId).emit('drawOffer', { fromColor: player.color, fromName: player.playerName });
   });
 
@@ -100,15 +109,27 @@ export function registerSocketHandlers(io: SocketIOServer, socket: Socket, state
     if (player) socket.to(player.roomId).emit('drawDeclined');
   });
 
-  onSafe('drawAccepted', async () => acceptDraw(io, socket, state));
-  onSafe('resign', async () => resignGame(io, socket, state));
-  onSafe('leaveRoom', async () => leaveRoom(io, socket, state));
+  onSafe('drawAccepted', async () => {
+    await acceptDraw(io, socket, state);
+  });
+  onSafe('resign', async () => {
+    await resignGame(io, socket, state);
+  });
+  onSafe('leaveRoom', async () => {
+    await leaveRoom(io, socket, state);
+  });
 
   onSafe('sendMessage', (data) => {
     const roomId = activeRoomIdFor(socket, state);
-    if (!roomId) return socket.emit('serverError', { message: 'Not in a room' });
+    if (!roomId) {
+      emitServerError(socket, 'Not in a room');
+      return;
+    }
     const roomData = state.rooms.get(roomId);
-    if (!roomData) return socket.emit('serverError', { message: 'Room not found' });
+    if (!roomData) {
+      emitServerError(socket, 'Room not found');
+      return;
+    }
     const text = sanitizeChatText((data as any)?.text || (data as any)?.message);
     if (!text) return;
     const chatMessage = { userId, username: user.username, text, timestamp: new Date().toISOString() };
