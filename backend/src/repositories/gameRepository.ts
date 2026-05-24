@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client';
+
 import { prisma } from '../config/prisma';
 
 export async function createGame(input: {
@@ -5,7 +7,7 @@ export async function createGame(input: {
   blackPlayerId?: string | null;
   status?: 'WAITING' | 'ACTIVE' | 'COMPLETED' | 'ABANDONED';
   fen?: string | null;
-  moves?: unknown;
+  moves?: Prisma.InputJsonValue | null;
   timeControl?: string | null;
 }) {
   return prisma.game.create({
@@ -14,7 +16,7 @@ export async function createGame(input: {
       blackPlayerId: input.blackPlayerId ?? null,
       status: input.status ?? 'WAITING',
       fen: input.fen ?? null,
-      moves: input.moves ?? null,
+      moves: input.moves ?? Prisma.JsonNull,
       timeControl: input.timeControl ?? null,
     },
   });
