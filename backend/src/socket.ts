@@ -4,17 +4,11 @@ import { Server as SocketIOServer, type Socket } from 'socket.io';
 
 import { getAllowedOrigins, isAllowedOrigin } from './app';
 import { isProduction } from './config/env';
+import { registerSocketHandlers } from './socketHandlers';
+import type { SocketState } from './socketTypes';
 
 const User = require('../models/User');
 const { getJwtSecret } = require('../utils/security');
-
-const CHAT_MAX_LENGTH = 200;
-const CHAT_RATE_LIMIT_COUNT = 5;
-const CHAT_RATE_LIMIT_WINDOW_MS = 5000;
-const BLOCKED_WORDS = String(process.env.BLOCKED_WORDS || '')
-  .split(',')
-  .map((word) => word.trim().toLowerCase())
-  .filter(Boolean);
 
 const SOCKET_EVENT_LIMITS: Record<string, { count: number; windowMs: number }> = {
   makeMove: { count: 12, windowMs: 5000 },
@@ -23,16 +17,6 @@ const SOCKET_EVENT_LIMITS: Record<string, { count: number; windowMs: number }> =
   joinQueue: { count: 12, windowMs: 60_000 },
   sendMessage: { count: 5, windowMs: 5000 },
   default: { count: 40, windowMs: 10_000 },
-};
-
-type SocketState = {
-  rooms: Map<string, unknown>;
-  players: Map<string, unknown>;
-  spectators: Map<string, Set<string>>;
-  spectatorRooms: Map<string, string>;
-  matchmakingQueue: Array<Record<string, unknown>>;
-  chatRateLimits: Map<string, { count: number; resetAt: number }>;
-  socketEventRateLimits: Map<string, { count: number; resetAt: number }>;
 };
 
 export function createSocketState(): SocketState {
@@ -73,56 +57,12 @@ function exceedsSocketEventRateLimit(state: SocketState, socketId: string, event
   return bucket.count > rule.count;
 }
 
-function exceedsChatRateLimit(state: SocketState, socketId: string): boolean {
-  const now = Date.now();
-  const tracker = state.chatRateLimits.get(socketId);
-  if (!tracker || now >= tracker.resetAt) {
-    state.chatRateLimits.set(socketId, { count: 1, resetAt: now + CHAT_RATE_LIMIT_WINDOW_MS });
-    return false;
-  }
-  if (tracker.count >= CHAT_RATE_LIMIT_COUNT) return true;
-  tracker.count += 1;
-  return false;
-}
-
 function isSafeSocketPayload(args: unknown[]): boolean {
   try {
     return Buffer.byteLength(JSON.stringify(args), 'utf8') <= 20_000;
   } catch {
     return false;
   }
-}
-
-function stripHtmlTags(text: string): string {
-  return text.replace(/<[^>]*>/g, '');
-}
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function normalizeRoomCode(value: unknown): string {
-  const roomId = String(value || '').trim().toUpperCase();
-  return /^[A-Z0-9]{6}$/.test(roomId) ? roomId : '';
-}
-
-function safePlayerName(value: unknown, fallback = 'Player'): string {
-  const name = stripHtmlTags(String(value || fallback)).replace(/[^\w .-]/g, '').trim().slice(0, 30);
-  return name || fallback;
-}
-
-function censorBlockedWords(text: string): string {
-  if (BLOCKED_WORDS.length === 0) return text;
-  let sanitized = text;
-  for (const blockedWord of BLOCKED_WORDS) {
-    const pattern = new RegExp(`\\b${escapeRegex(blockedWord)}\\b`, 'gi');
-    sanitized = sanitized.replace(pattern, (match) => '*'.repeat(match.length));
-  }
-  return sanitized;
-}
-
-function sanitizeChatMessage(value: unknown): string {
-  return censorBlockedWords(stripHtmlTags(String(value || '')).trim().slice(0, CHAT_MAX_LENGTH));
 }
 
 function onSafe(socket: Socket, state: SocketState, eventName: string, handler: (...args: unknown[]) => Promise<void> | void): void {
@@ -187,19 +127,7 @@ export function registerSockets(server: HttpServer, state = createSocketState())
       socket.broadcast.emit('socialUserStatus', { userId: user._id, status: 'online' });
     }
 
-    onSafe(socket, state, 'sendMessage', (data) => {
-      if (exceedsChatRateLimit(state, socket.id)) {
-        socket.emit('serverError', { message: 'You are sending messages too fast.' });
-        return;
-      }
-      const body = sanitizeChatMessage((data as { message?: unknown })?.message);
-      if (!body) return;
-      socket.emit('messageSanitized', { message: body });
-    });
-
-    socket.on('disconnect', () => {
-      if (user?._id) socket.broadcast.emit('socialUserStatus', { userId: user._id, status: 'offline' });
-    });
+    registerSocketHandlers(io, socket, state, (eventName, handler) => onSafe(socket, state, eventName, handler));
   });
 
   return io;
@@ -211,9 +139,3 @@ export function socketHealthState(state: SocketState) {
     players: () => state.players.size,
   };
 }
-
-export const socketTestHelpers = {
-  normalizeRoomCode,
-  safePlayerName,
-  sanitizeChatMessage,
-};
