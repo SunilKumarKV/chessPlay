@@ -4,6 +4,10 @@ import { createGame, updateGame } from './repositories/gameRepository';
 
 const { createInitialGameState } = require('../gameState');
 
+function emitServerError(socket: Socket, message: string): void {
+  socket.emit('serverError', { message });
+}
+
 export function getSpectatorCount(state: SocketState, roomId: string): number {
   return state.spectators.get(roomId)?.size || 0;
 }
@@ -44,19 +48,16 @@ export async function createRoom(socket: Socket, state: SocketState, data: any):
   const playerName = safePlayerName(data?.playerName, user?.username);
   const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
   const gameState = createInitialGameState();
+  const userId = String(user.id || user._id);
 
   gameState.players.w.id = socket.id;
   gameState.players.w.name = playerName;
-  gameState.players.w.userId = user.id || user._id;
+  gameState.players.w.userId = userId;
   gameState.players.w.disconnected = false;
 
-  const game = await createGame({
-    whitePlayerId: String(user.id || user._id),
-    status: 'WAITING',
-  });
-
+  const game = await createGame({ whitePlayerId: userId, status: 'WAITING' });
   state.rooms.set(roomId, { ...gameState, gameId: game.id });
-  state.players.set(socket.id, { roomId, color: 'w', playerName, userId: user.id || user._id });
+  state.players.set(socket.id, { roomId, color: 'w', playerName, userId });
   socket.join(roomId);
   socket.emit('roomCreated', { roomId, gameState, chatHistory: gameState.chatHistory });
 }
@@ -65,17 +66,25 @@ export async function joinRoom(io: SocketIOServer, socket: Socket, state: Socket
   const user = socket.data.user;
   const userId = String(user.id || user._id);
   const normalizedRoomId = normalizeRoomCode(data?.roomId);
-  if (!normalizedRoomId) return socket.emit('serverError', { message: 'Invalid room code' });
+  if (!normalizedRoomId) {
+    emitServerError(socket, 'Invalid room code');
+    return;
+  }
 
   const roomData = state.rooms.get(normalizedRoomId);
-  if (!roomData) return socket.emit('serverError', { message: 'Room not found' });
+  if (!roomData) {
+    emitServerError(socket, 'Room not found');
+    return;
+  }
 
   const gameState = roomData;
   if (['w', 'b'].some((color) => String(gameState.players[color].userId) === userId)) {
-    return socket.emit('serverError', { message: 'You are already in this room' });
+    emitServerError(socket, 'You are already in this room');
+    return;
   }
   if (gameState.players.w.userId && gameState.players.b.userId) {
-    return socket.emit('serverError', { message: 'Room is full' });
+    emitServerError(socket, 'Room is full');
+    return;
   }
 
   const color = !gameState.players.w.userId ? 'w' : 'b';
@@ -94,10 +103,19 @@ export async function joinRoom(io: SocketIOServer, socket: Socket, state: Socket
 
 export function spectateRoom(io: SocketIOServer, socket: Socket, state: SocketState, data: any): void {
   const roomId = normalizeRoomCode(data?.roomId);
-  if (!roomId) return socket.emit('serverError', { message: 'Room ID is required' });
-  if (state.players.has(socket.id)) return socket.emit('serverError', { message: 'Players cannot spectate a room' });
+  if (!roomId) {
+    emitServerError(socket, 'Room ID is required');
+    return;
+  }
+  if (state.players.has(socket.id)) {
+    emitServerError(socket, 'Players cannot spectate a room');
+    return;
+  }
   const roomData = state.rooms.get(roomId);
-  if (!roomData) return socket.emit('serverError', { message: 'Room not found' });
+  if (!roomData) {
+    emitServerError(socket, 'Room not found');
+    return;
+  }
   const currentSpectatorRoom = state.spectatorRooms.get(socket.id);
   if (currentSpectatorRoom && currentSpectatorRoom !== roomId) cleanupSpectator(io, state, socket.id, true);
   socket.join(roomId);
@@ -112,11 +130,20 @@ export function rejoinRoom(io: SocketIOServer, socket: Socket, state: SocketStat
   const user = socket.data.user;
   const userId = String(user.id || user._id);
   const roomId = normalizeRoomCode(data?.roomId);
-  if (!roomId) return socket.emit('serverError', { message: 'Room is required' });
+  if (!roomId) {
+    emitServerError(socket, 'Room is required');
+    return;
+  }
   const roomData = state.rooms.get(roomId);
-  if (!roomData) return socket.emit('serverError', { message: 'Room not found' });
+  if (!roomData) {
+    emitServerError(socket, 'Room not found');
+    return;
+  }
   const color = ['w', 'b'].find((candidate) => String(roomData.players[candidate].userId) === userId);
-  if (!color) return socket.emit('serverError', { message: 'Player is not in this room' });
+  if (!color) {
+    emitServerError(socket, 'Player is not in this room');
+    return;
+  }
   const playerSlot = roomData.players[color];
   if (playerSlot.id && playerSlot.id !== socket.id) state.players.delete(playerSlot.id);
   playerSlot.id = socket.id;
