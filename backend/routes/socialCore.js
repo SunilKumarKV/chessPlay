@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const auth = require('../middleware/auth');
 const { getRequestAccessToken, getJwtSecret } = require('../utils/security');
 const { prisma } = require('../src/config/prisma');
 
@@ -7,6 +8,12 @@ const router = express.Router();
 
 const POST_TYPES = new Set(['announcement', 'feedback', 'bug', 'feature', 'discussion']);
 const POST_STATUSES = new Set(['open', 'reviewing', 'resolved', 'closed']);
+const PUBLIC_ROOMS = [
+  { key: 'general', title: 'General Chess Chat', description: 'Public lounge for ChessPlay users.' },
+  { key: 'puzzles', title: 'Puzzle Room', description: 'Discuss tactics and daily puzzle ideas.' },
+  { key: 'tournaments', title: 'Tournament Room', description: 'Find players and discuss events.' },
+  { key: 'beginners', title: 'Beginner Help', description: 'Friendly room for new players.' },
+];
 
 function optionalAuth(req, _res, next) {
   try {
@@ -14,6 +21,10 @@ function optionalAuth(req, _res, next) {
     if (token) req.user = jwt.verify(token, getJwtSecret('access'));
   } catch {}
   next();
+}
+
+function authUserId(req) {
+  return String(req.user?.userId || req.user?.id || '');
 }
 
 function toPostType(value) {
@@ -55,6 +66,24 @@ function safePost(post, userId) {
   };
 }
 
+function safeConversation(conversation) {
+  return {
+    _id: conversation.id,
+    id: conversation.id,
+    type: String(conversation.type || 'PRIVATE').toLowerCase(),
+    roomKey: conversation.roomKey,
+    title: conversation.title,
+    participants: conversation.participants || [],
+    messages: safeJsonArray(conversation.messages),
+    mutedBy: conversation.mutedBy || [],
+    blockedBy: conversation.blockedBy || [],
+    reports: safeJsonArray(conversation.reports),
+    lastMessageAt: conversation.lastMessageAt,
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.updatedAt,
+  };
+}
+
 router.get('/community/posts', optionalAuth, async (req, res, next) => {
   try {
     const userId = req.user?.userId || req.user?.id || null;
@@ -74,6 +103,42 @@ router.get('/community/posts', optionalAuth, async (req, res, next) => {
     });
 
     return res.json({ posts: posts.map((post) => safePost(post, userId)) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/messaging/bootstrap', auth, async (req, res, next) => {
+  try {
+    const userId = authUserId(req);
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.deletedAt) return res.status(404).json({ message: 'User not found' });
+
+    // Friend relationships are still on legacy fallback until the friendship schema is migrated.
+    return res.json({ publicRooms: PUBLIC_ROOMS, friends: [] });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/messaging/conversations', auth, async (req, res, next) => {
+  try {
+    const userId = authUserId(req);
+    const conversations = await prisma.conversation.findMany({
+      where: {
+        OR: [
+          { type: 'PUBLIC' },
+          { participants: { has: userId } },
+        ],
+      },
+      orderBy: [
+        { lastMessageAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take: 40,
+    });
+
+    return res.json({ conversations: conversations.map(safeConversation) });
   } catch (error) {
     return next(error);
   }
