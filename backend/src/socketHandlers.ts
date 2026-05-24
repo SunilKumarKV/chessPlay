@@ -22,7 +22,6 @@ export function registerSocketHandlers(io: SocketIOServer, socket: Socket, state
   onSafe('joinQueue', async (data = {}) => {
     removeFromQueue(state, socket.id);
     cleanupSpectator(io, state, socket.id, true);
-
     const payload = data as any;
     const rating = Number(user?.rating || 1200);
     const mode = ['casual', 'ranked', 'blitz', 'rapid', 'beginner', 'intermediate', 'advanced'].includes(payload.mode) ? payload.mode : 'casual';
@@ -35,7 +34,6 @@ export function registerSocketHandlers(io: SocketIOServer, socket: Socket, state
       timeControlIndex: Number.isInteger(payload.timeControlIndex) ? payload.timeControlIndex : null,
       ratingRange: payload.ratingRange || getRatingRange(rating),
     };
-
     const opponent = findQueuedOpponent(state, entry);
     if (!opponent) {
       state.matchmakingQueue.push(entry);
@@ -43,7 +41,6 @@ export function registerSocketHandlers(io: SocketIOServer, socket: Socket, state
       broadcastQueueUpdate(io, state);
       return;
     }
-
     removeFromQueue(state, opponent.socketId);
     const roomId = await createMatchRoom(io, state, entry, opponent);
     if (!roomId) {
@@ -82,11 +79,16 @@ export function registerSocketHandlers(io: SocketIOServer, socket: Socket, state
     rejoinRoom(io, socket, state, data);
   });
 
-  onSafe('makeMove', async (data) => handleMove(io, socket, state, data));
+  onSafe('makeMove', async (data) => {
+    await handleMove(io, socket, state, data);
+  });
 
   onSafe('drawOffer', () => {
     const player = state.players.get(socket.id);
-    if (!player) return socket.emit('serverError', { message: 'Not in a room' });
+    if (!player) {
+      socket.emit('serverError', { message: 'Not in a room' });
+      return;
+    }
     socket.to(player.roomId).emit('drawOffer', { fromColor: player.color, fromName: player.playerName });
   });
 
@@ -95,15 +97,29 @@ export function registerSocketHandlers(io: SocketIOServer, socket: Socket, state
     if (player) socket.to(player.roomId).emit('drawDeclined');
   });
 
-  onSafe('drawAccepted', async () => acceptDraw(io, socket, state));
-  onSafe('resign', async () => resignGame(io, socket, state));
-  onSafe('leaveRoom', async () => leaveRoom(io, socket, state));
+  onSafe('drawAccepted', async () => {
+    await acceptDraw(io, socket, state);
+  });
+
+  onSafe('resign', async () => {
+    await resignGame(io, socket, state);
+  });
+
+  onSafe('leaveRoom', async () => {
+    await leaveRoom(io, socket, state);
+  });
 
   onSafe('sendMessage', (data) => {
     const roomId = activeRoomIdFor(socket, state);
-    if (!roomId) return socket.emit('serverError', { message: 'Not in a room' });
+    if (!roomId) {
+      socket.emit('serverError', { message: 'Not in a room' });
+      return;
+    }
     const roomData = state.rooms.get(roomId);
-    if (!roomData) return socket.emit('serverError', { message: 'Room not found' });
+    if (!roomData) {
+      socket.emit('serverError', { message: 'Room not found' });
+      return;
+    }
     const text = sanitizeChatText((data as any)?.text || (data as any)?.message);
     if (!text) return;
     const chatMessage = { userId: user._id, username: user.username, text, timestamp: new Date().toISOString() };
