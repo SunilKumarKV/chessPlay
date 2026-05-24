@@ -41,3 +41,17 @@ export async function updateUserRating(userId: string, rating: number) {
 export async function setUserPremium(userId: string, isPremium: boolean) {
   return prisma.user.update({ where: { id: userId }, data: { isPremium } });
 }
+
+export async function recordUserDraw(userId: string) {
+  const current = await prisma.stats.findUnique({ where: { userId } });
+  const data = {
+    ...((current?.data as Record<string, unknown>) || {}),
+    gamesPlayed: Number((current?.data as any)?.gamesPlayed || 0) + 1,
+    gamesDrawn: Number((current?.data as any)?.gamesDrawn || 0) + 1,
+  };
+  return prisma.stats.upsert({
+    where: { userId },
+    create: { userId, data },
+    update: { data },
+  });
+}
