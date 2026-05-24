@@ -31,6 +31,7 @@ const mistakeRoutes = require('../routes/mistakes');
 const blogRoutes = require('../routes/blog');
 const shareRoutes = require('../routes/share');
 const supportRoutes = require('../routes/support');
+const messagesCoreRoutes = require('../routes/messagesCore');
 const messageRoutes = require('../routes/messages');
 const settingsCoreRoutes = require('../routes/settingsCore');
 const settingsRoutes = require('../routes/settings');
@@ -141,6 +142,7 @@ function registerRoutes(app: express.Express): void {
   app.use('/api/blog', blogRoutes);
   app.use('/api/share', shareRoutes);
   app.use('/api/support', supportRoutes);
+  app.use('/api/messages', messagesCoreRoutes);
   app.use('/api/messages', messageRoutes);
   app.use('/api/settings', settingsCoreRoutes);
   app.use('/api/settings', settingsRoutes);
