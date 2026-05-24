@@ -89,6 +89,10 @@ function configuredOrigins(): Array<string | RegExp> {
   return [...productionOrigins, ...developmentOrigins];
 }
 
+export function getAllowedOrigins(): Array<string | RegExp> {
+  return configuredOrigins();
+}
+
 export function isAllowedOrigin(origin: string, allowedOrigins = configuredOrigins()): boolean {
   return allowedOrigins.some((pattern) => typeof pattern === 'string' ? pattern === origin : pattern.test(origin));
 }
