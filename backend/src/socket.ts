@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { Server as SocketIOServer, type Socket } from 'socket.io';
 
 import { getAllowedOrigins, isAllowedOrigin } from './app';
+import { setActiveSocketState } from './activeRooms';
 import { isProduction } from './config/env';
 import { findUserById } from './repositories/userRepository';
 import { registerSocketHandlers } from './socketHandlers';
@@ -82,6 +83,8 @@ function onSafe(socket: Socket, state: SocketState, eventName: string, handler: 
 }
 
 export function registerSockets(server: HttpServer, state = createSocketState()): SocketIOServer {
+  setActiveSocketState(state);
+
   const allowedOrigins = getAllowedOrigins();
   const io = new SocketIOServer(server, {
     cors: {
