@@ -11,6 +11,7 @@ import { env, isProduction } from './config/env';
 const authCoreRoutes = require('../routes/authCore');
 const authRoutes = require('../routes/auth');
 const gameRoutes = require('../routes/games');
+const aiRoutes = require('../routes/ai');
 const billingCoreRoutes = require('../routes/billingCore');
 const billingPaymentsCoreRoutes = require('../routes/billingPaymentsCore');
 const billingRoutes = require('../routes/billing');
@@ -124,6 +125,7 @@ function registerRoutes(app: express.Express): void {
   app.use('/api/auth', authCoreRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/games', gameRoutes);
+  app.use('/api/ai', aiRoutes);
   app.use('/api/billing', billingCoreRoutes);
   app.use('/api/billing', billingPaymentsCoreRoutes);
   app.use('/api/billing', billingRoutes);

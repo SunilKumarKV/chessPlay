@@ -67,6 +67,7 @@ const {
 } = require("./gameState");
 const authRoutes = require("./routes/auth");
 const gameRoutes = require("./routes/games");
+const aiRoutes = require("./routes/ai");
 const billingRoutes = require("./routes/billing");
 const socialRoutes = require("./routes/social");
 const automationRoutes = require("./routes/automation");
@@ -379,6 +380,7 @@ checkDatabase()
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/games", gameRoutes);
+app.use("/api/ai", aiRoutes);
 app.use("/api/billing", billingRoutes);
 app.use("/api/social", socialRoutes);
 app.use("/api/automation", automationRoutes);
