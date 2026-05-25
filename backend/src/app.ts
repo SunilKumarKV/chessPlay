@@ -38,6 +38,7 @@ const settingsCoreRoutes = require('../routes/settingsCore');
 const settingsRoutes = require('../routes/settings');
 const profileCoreRoutes = require('../routes/profileCore');
 const profileRoutes = require('../routes/profile');
+const billingPaymentsCoreRoutes = require('../routes/billingPaymentsCore');
 
 type HealthState = {
   rooms?: () => number;
@@ -150,6 +151,7 @@ function registerRoutes(app: express.Express): void {
   app.use('/api/settings', settingsRoutes);
   app.use('/api/profile', profileCoreRoutes);
   app.use('/api/profile', profileRoutes);
+  app.use('/api/billing', billingPaymentsCoreRoutes);
 }
 
 export function createApp(healthState: HealthState = {}): express.Express {
