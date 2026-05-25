@@ -31,6 +31,7 @@ const {
 
 const router = express.Router();
 const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const MOBILE_ACCESS_EXPIRES_IN_SECONDS = 15 * 60;
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
@@ -81,6 +82,14 @@ function signRefreshToken(user, tokenVersion = 0) {
   return jwt.sign({ userId: String(user.id), tokenVersion, type: "refresh" }, getJwtSecret("refresh"), { expiresIn: process.env.REFRESH_TOKEN_EXPIRES || "7d" });
 }
 
+function signMobileAccessToken(user) {
+  return jwt.sign(
+    { userId: String(user.id), username: user.username, tokenVersion: user.tokenVersion || 0, type: "access" },
+    getJwtSecret("access"),
+    { expiresIn: `${MOBILE_ACCESS_EXPIRES_IN_SECONDS}s` },
+  );
+}
+
 async function issuePrismaSession(res, user) {
   const accessToken = signAccessToken(userForJwt(user));
   const refreshToken = signRefreshToken(user, user.tokenVersion || 0);
@@ -93,6 +102,80 @@ async function issuePrismaSession(res, user) {
 
 function buildAuthResponse(message, user) {
   return { message, user: prismaUserPayload(user), socketToken: signAccessToken(userForJwt(user)) };
+}
+
+async function issueMobileTokenSet(user) {
+  const accessToken = signMobileAccessToken(user);
+  const refreshToken = signRefreshToken(user, user.tokenVersion || 0);
+  await updateUserAuthSession(user.id, { refreshTokenHash: hashToken(refreshToken), lastLogin: new Date() });
+  return {
+    accessToken,
+    refreshToken,
+    socketToken: signMobileAccessToken(user),
+    expiresIn: MOBILE_ACCESS_EXPIRES_IN_SECONDS,
+  };
+}
+
+function buildMobileAuthResponse(user, tokens, extra = {}) {
+  return { user: prismaUserPayload(user), ...tokens, ...extra };
+}
+
+async function userFromMobileAccessToken(token) {
+  const decoded = jwt.verify(token, getJwtSecret("access"));
+  if (decoded.type && decoded.type !== "access") {
+    const error = new Error("Invalid token type");
+    error.statusCode = 401;
+    throw error;
+  }
+  if (!decoded.userId) {
+    const error = new Error("Invalid token payload");
+    error.statusCode = 401;
+    throw error;
+  }
+  const user = await findUserById(decoded.userId);
+  if (!user || user.deletedAt) {
+    const error = new Error("Invalid session");
+    error.statusCode = 401;
+    throw error;
+  }
+  if (typeof decoded.tokenVersion === "number" && decoded.tokenVersion !== (user.tokenVersion || 0)) {
+    const error = new Error("Session has expired");
+    error.statusCode = 401;
+    throw error;
+  }
+  return { user, decoded };
+}
+
+async function userFromMobileRefreshToken(refreshToken) {
+  const decoded = jwt.verify(refreshToken, getJwtSecret("refresh"));
+  if (decoded.type && decoded.type !== "refresh") {
+    const error = new Error("Invalid token type");
+    error.statusCode = 401;
+    throw error;
+  }
+  if (!decoded.userId) {
+    const error = new Error("Invalid token payload");
+    error.statusCode = 401;
+    throw error;
+  }
+  const user = await findUserById(decoded.userId);
+  if (!user || user.deletedAt) {
+    const error = new Error("Invalid refresh session");
+    error.statusCode = 401;
+    throw error;
+  }
+  if (decoded.tokenVersion !== (user.tokenVersion || 0)) {
+    const error = new Error("Refresh session has expired");
+    error.statusCode = 401;
+    throw error;
+  }
+  if (!user.refreshTokenHash || user.refreshTokenHash !== hashToken(refreshToken)) {
+    await updateUserAuthSession(user.id, { refreshTokenHash: null, tokenVersion: (user.tokenVersion || 0) + 1 });
+    const error = new Error("Refresh session was revoked");
+    error.statusCode = 401;
+    throw error;
+  }
+  return { user, decoded };
 }
 
 function createRateLimiter({ windowMs, max, message }) {
@@ -164,6 +247,97 @@ router.post("/login", authLimiter, async (req, res) => {
   } catch (error) {
     logger.error("Prisma login error:", error);
     return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/mobile/register", authLimiter, async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const emailValidation = validateProductionEmail(req.body.email);
+    if (!emailValidation.ok) return res.status(400).json({ message: emailValidation.message });
+    const email = emailValidation.email;
+    const passwordError = validateStrongPassword(password);
+    if (passwordError) return res.status(400).json({ message: passwordError });
+    if (!username || !/^[a-zA-Z0-9]+$/.test(username)) return res.status(400).json({ message: "Username must be alphanumeric only" });
+    const existingUser = await findUserByEmailOrUsername(email, username);
+    if (existingUser) return res.status(400).json({ message: existingUser.email === email ? "Email already exists" : "Username already exists" });
+    const passwordHash = await bcrypt.hash(String(password), 12);
+    const user = await createUser({ username, email, passwordHash });
+    const tokens = await issueMobileTokenSet(user);
+    await queueEmailEvent("welcome", { user: user.id, email: user.email, payload: { username: user.username } }).catch(() => {});
+    return res.status(201).json(buildMobileAuthResponse(user, tokens, { referralConnected: false }));
+  } catch (error) {
+    logger.error("Prisma mobile registration error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/mobile/login", authLimiter, async (req, res) => {
+  try {
+    const { password } = req.body;
+    const email = normalizeEmail(req.body.email);
+    const user = await findUserByEmail(email);
+    if (!user || user.deletedAt || !user.passwordHash) return res.status(400).json({ message: "Invalid credentials" });
+    const isMatch = await bcrypt.compare(String(password || ""), user.passwordHash);
+    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+    const tokens = await issueMobileTokenSet(user);
+    return res.json(buildMobileAuthResponse(user, tokens, { referralConnected: false }));
+  } catch (error) {
+    logger.error("Prisma mobile login error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/mobile/refresh", authLimiter, async (req, res) => {
+  try {
+    const refreshToken = String(req.body.refreshToken || "").trim();
+    if (!refreshToken) return res.status(400).json({ message: "Refresh token is required" });
+    const { user } = await userFromMobileRefreshToken(refreshToken);
+    const tokens = await issueMobileTokenSet(user);
+    return res.json(buildMobileAuthResponse(user, tokens));
+  } catch (error) {
+    return res.status(error.statusCode || 401).json({ message: error.message || "Invalid or expired refresh token" });
+  }
+});
+
+router.post("/mobile/logout", async (req, res) => {
+  try {
+    const refreshToken = String(req.body.refreshToken || "").trim();
+    const bearerToken = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i)?.[1]?.trim() || "";
+    let user = null;
+    if (bearerToken) {
+      ({ user } = await userFromMobileAccessToken(bearerToken));
+    } else if (refreshToken) {
+      ({ user } = await userFromMobileRefreshToken(refreshToken));
+    } else {
+      return res.status(400).json({ message: "Access token or refresh token is required" });
+    }
+    await updateUserAuthSession(user.id, { refreshTokenHash: null, tokenVersion: (user.tokenVersion || 0) + 1 });
+    return res.json({ message: "Logged out" });
+  } catch (error) {
+    return res.status(error.statusCode || 401).json({ message: error.message || "Invalid session" });
+  }
+});
+
+router.get("/mobile/session", async (req, res) => {
+  try {
+    const bearerToken = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i)?.[1]?.trim() || "";
+    if (!bearerToken) return res.status(401).json({ message: "No token provided" });
+    const { user } = await userFromMobileAccessToken(bearerToken);
+    return res.json({ user: prismaUserPayload(user) });
+  } catch (error) {
+    return res.status(error.statusCode || 401).json({ message: error.message || "Invalid or expired token" });
+  }
+});
+
+router.get("/mobile/socket-token", async (req, res) => {
+  try {
+    const bearerToken = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i)?.[1]?.trim() || "";
+    if (!bearerToken) return res.status(401).json({ message: "No token provided" });
+    const { user } = await userFromMobileAccessToken(bearerToken);
+    return res.json({ socketToken: signMobileAccessToken(user) });
+  } catch (error) {
+    return res.status(error.statusCode || 401).json({ message: error.message || "Unable to create socket token" });
   }
 });
 

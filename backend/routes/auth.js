@@ -522,7 +522,7 @@ router.post("/mobile/login", authLimiter, async (req, res) => {
     const referralCode = req.body.referralCode || req.body.ref || "";
     const email = normalizeEmail(req.body.email);
 
-    const user = await User.findOne({ email }).select("+refreshTokenHash");
+    const user = await User.findOne({ email });
     if (!user) {
       await recordSecurityEvent(req, { type: "mobile_login_failed", email, reason: "user_not_found" });
       return res.status(400).json({ message: "Invalid credentials" });
