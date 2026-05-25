@@ -2,6 +2,7 @@ import type { Server as SocketIOServer, Socket } from 'socket.io';
 import type { SocketState } from './socketTypes';
 import { updateGame } from './repositories/gameRepository';
 import { recordUserDraw } from './repositories/userRepository';
+import { advanceClockAfterMove, emitClockSnapshot, stopRoomClock } from './socketClock';
 
 const { updatePlayerStats } = require('../utils/elo');
 const { isValidMove: validateMove, applyMove, opponent } = require('../chessUtils');
@@ -53,6 +54,9 @@ export async function handleMove(io: SocketIOServer, socket: Socket, state: Sock
   }
 
   const color = player.color;
+  const stillOnTime = await advanceClockAfterMove(io, state, player.roomId, color);
+  if (!stillOnTime) return;
+
   applyMove(roomData, fromRow, fromCol, toRow, toCol, promotion);
 
   const moveRecord = {
@@ -79,10 +83,14 @@ export async function handleMove(io: SocketIOServer, socket: Socket, state: Sock
     updatePayload.endTime = new Date();
     await updateDrawStats(roomData.players.w.userId, roomData.players.b.userId);
   }
+  if (!isPlayableStatus(roomData.status)) {
+    stopRoomClock(player.roomId, roomData, 'ended');
+  }
 
   roomData.moves = updatePayload.moves;
   await updateGame(roomData.gameId, updatePayload);
   io.to(player.roomId).emit('moveMade', { gameState: roomData, move: { fromRow, fromCol, toRow, toCol } });
+  emitClockSnapshot(io, player.roomId, roomData);
 }
 
 export async function acceptDraw(io: SocketIOServer, socket: Socket, state: SocketState): Promise<void> {
@@ -97,9 +105,11 @@ export async function acceptDraw(io: SocketIOServer, socket: Socket, state: Sock
     return;
   }
   roomData.status = 'draw';
+  stopRoomClock(player.roomId, roomData, 'ended');
   await updateGame(roomData.gameId, { result: 'draw', winner: null, endTime: new Date() });
   await updateDrawStats(roomData.players.w.userId, roomData.players.b.userId);
   io.to(player.roomId).emit('drawAccepted', { gameState: roomData });
+  emitClockSnapshot(io, player.roomId, roomData);
 }
 
 export async function resignGame(io: SocketIOServer, socket: Socket, state: SocketState): Promise<void> {
@@ -113,9 +123,11 @@ export async function resignGame(io: SocketIOServer, socket: Socket, state: Sock
   const winnerColor = opponent(player.color);
   const winnerSlot = roomData.players[winnerColor];
   roomData.status = 'resigned';
+  stopRoomClock(player.roomId, roomData, 'ended');
   await updateGame(roomData.gameId, { result: winnerColor === 'w' ? 'white' : 'black', winner: winnerSlot?.userId || null, endTime: new Date() });
   if (winnerSlot?.userId) await updatePlayerStats(winnerSlot.userId, player.userId);
   io.to(player.roomId).emit('playerResigned', { color: player.color, winnerColor, gameState: roomData });
+  emitClockSnapshot(io, player.roomId, roomData);
 }
 
 export async function closeRoomIfEmpty(io: SocketIOServer, state: SocketState, roomId: string): Promise<void> {
@@ -131,6 +143,9 @@ export async function closeRoomIfEmpty(io: SocketIOServer, state: SocketState, r
     });
     state.spectators.delete(roomId);
   }
-  await updateGame(roomData.gameId, { result: toGameResult(roomData.status), endTime: new Date() });
+  if (roomData.status !== 'timeout') {
+    await updateGame(roomData.gameId, { result: toGameResult(roomData.status), endTime: new Date() });
+  }
+  stopRoomClock(roomId, roomData, 'ended');
   state.rooms.delete(roomId);
 }

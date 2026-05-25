@@ -15,6 +15,7 @@ const TERMINAL_STATUSES = new Set([
   'draw',
   'resigned',
   'abandoned',
+  'timeout',
   'draw-50move',
   'draw-repetition',
 ]);

@@ -1,6 +1,7 @@
 import type { Server as SocketIOServer, Socket } from 'socket.io';
 import type { SocketState } from './socketTypes';
 import { createGame, updateGame } from './repositories/gameRepository';
+import { attachRoomClock, emitClockSnapshot, startRoomClock, timeControlLabel } from './socketClock';
 
 const { createInitialGameState } = require('../gameState');
 
@@ -43,23 +44,27 @@ export function safePlayerName(value: unknown, fallback = 'Player'): string {
   return name || fallback;
 }
 
-export async function createRoom(socket: Socket, state: SocketState, data: any): Promise<void> {
+export async function createRoom(io: SocketIOServer, socket: Socket, state: SocketState, data: any): Promise<void> {
   const user = socket.data.user;
   const playerName = safePlayerName(data?.playerName, user?.username);
   const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
   const gameState = createInitialGameState();
   const userId = String(user.id || user._id);
+  const timeControlIndex = Number.isInteger(data?.timeControlIndex) ? Number(data.timeControlIndex) : null;
+  attachRoomClock(gameState, timeControlIndex);
 
   gameState.players.w.id = socket.id;
   gameState.players.w.name = playerName;
   gameState.players.w.userId = userId;
   gameState.players.w.disconnected = false;
 
-  const game = await createGame({ whitePlayerId: userId, status: 'WAITING' });
-  state.rooms.set(roomId, { ...gameState, gameId: game.id });
+  const game = await createGame({ whitePlayerId: userId, status: 'WAITING', timeControl: timeControlLabel(timeControlIndex) });
+  const roomData = { ...gameState, gameId: game.id };
+  state.rooms.set(roomId, roomData);
   state.players.set(socket.id, { roomId, color: 'w', playerName, userId });
   socket.join(roomId);
-  socket.emit('roomCreated', { roomId, gameState, chatHistory: gameState.chatHistory });
+  socket.emit('roomCreated', { roomId, gameState: roomData, chatHistory: gameState.chatHistory });
+  emitClockSnapshot(io, roomId, roomData);
 }
 
 export async function joinRoom(io: SocketIOServer, socket: Socket, state: SocketState, data: any): Promise<void> {
@@ -99,6 +104,7 @@ export async function joinRoom(io: SocketIOServer, socket: Socket, state: Socket
   socket.join(normalizedRoomId);
   socket.emit('joinedRoom', { roomId: normalizedRoomId, gameState, color, chatHistory: gameState.chatHistory });
   io.to(normalizedRoomId).emit('playerJoined', { gameState, newPlayer: { color, name: playerName } });
+  startRoomClock(io, state, normalizedRoomId);
 }
 
 export function spectateRoom(io: SocketIOServer, socket: Socket, state: SocketState, data: any): void {
@@ -124,6 +130,7 @@ export function spectateRoom(io: SocketIOServer, socket: Socket, state: SocketSt
   state.spectators.get(roomId)?.add(socket.id);
   socket.emit('spectatedRoom', { roomId, gameState: roomData, chatHistory: roomData.chatHistory || [], spectatorCount: getSpectatorCount(state, roomId) });
   emitSpectatorCount(io, state, roomId);
+  emitClockSnapshot(io, roomId, roomData);
 }
 
 export function rejoinRoom(io: SocketIOServer, socket: Socket, state: SocketState, data: any): void {
@@ -154,4 +161,6 @@ export function rejoinRoom(io: SocketIOServer, socket: Socket, state: SocketStat
   socket.join(roomId);
   socket.emit('rejoinedRoom', { roomId, gameState: roomData, color, chatHistory: roomData.chatHistory });
   socket.to(roomId).emit('playerRejoined', { gameState: roomData, color, name: playerSlot.name });
+  emitClockSnapshot(io, roomId, roomData);
+  startRoomClock(io, state, roomId);
 }

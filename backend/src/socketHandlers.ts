@@ -71,7 +71,7 @@ export function registerSocketHandlers(io: SocketIOServer, socket: Socket, state
   onSafe('createRoom', async (data) => {
     removeFromQueue(state, socket.id);
     cleanupSpectator(io, state, socket.id, true);
-    await createRoom(socket, state, data);
+    await createRoom(io, socket, state, data);
   });
 
   onSafe('joinRoom', async (data) => {

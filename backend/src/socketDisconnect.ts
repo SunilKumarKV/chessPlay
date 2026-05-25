@@ -4,6 +4,7 @@ import { cleanupSpectator } from './socketRooms';
 import { broadcastQueueUpdate, removeFromQueue } from './socketMatchmaking';
 import { closeRoomIfEmpty } from './socketGameplay';
 import { updateGame } from './repositories/gameRepository';
+import { emitClockSnapshot, pauseRoomClock, stopRoomClock } from './socketClock';
 
 const { updatePlayerStats } = require('../utils/elo');
 const { opponent } = require('../chessUtils');
@@ -36,6 +37,7 @@ export async function awardAbandonmentWin(io: SocketIOServer, state: SocketState
 
   roomData.status = 'abandoned';
   roomData.turn = abandonedColor;
+  stopRoomClock(roomId, roomData, 'ended');
   loserSlot.id = null;
   loserSlot.userId = null;
   loserSlot.disconnected = false;
@@ -48,6 +50,7 @@ export async function awardAbandonmentWin(io: SocketIOServer, state: SocketState
 
   if (winnerSlot?.userId) await updatePlayerStats(winnerSlot.userId, loserId);
   io.to(roomId).emit('playerAbandoned', { color: abandonedColor, winnerColor, gameState: roomData });
+  emitClockSnapshot(io, roomId, roomData);
 }
 
 export async function cleanupPlayer(io: SocketIOServer, socket: Socket, state: SocketState, notify = true): Promise<void> {
@@ -71,6 +74,7 @@ export async function cleanupPlayer(io: SocketIOServer, socket: Socket, state: S
 
     if (opponentUserId && isPlayableStatus(roomData.status)) {
       roomData.status = 'abandoned';
+      stopRoomClock(player.roomId, roomData, 'ended');
       await updateGame(roomData.gameId, {
         result: opponentColor === 'w' ? 'white' : 'black',
         winner: opponentUserId,
@@ -78,6 +82,7 @@ export async function cleanupPlayer(io: SocketIOServer, socket: Socket, state: S
       });
       await updatePlayerStats(opponentUserId, leavingUserId);
       io.to(player.roomId).emit('playerAbandoned', { winnerColor: opponentColor, gameState: roomData });
+      emitClockSnapshot(io, player.roomId, roomData);
       state.players.delete(socket.id);
       return;
     }
@@ -108,6 +113,7 @@ export function markPlayerDisconnected(io: SocketIOServer, socket: Socket, state
   playerSlot.userId = player.userId;
   playerSlot.name = player.playerName;
   state.players.delete(socket.id);
+  pauseRoomClock(io, player.roomId, roomData);
 
   io.to(player.roomId).emit('playerDisconnected', {
     color: player.color,

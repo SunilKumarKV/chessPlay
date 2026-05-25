@@ -1,6 +1,7 @@
 import type { Server as SocketIOServer } from 'socket.io';
 import type { MatchmakingEntry, SocketState } from './socketTypes';
 import { createGame } from './repositories/gameRepository';
+import { attachRoomClock, emitClockSnapshot, startRoomClock, timeControlLabel } from './socketClock';
 
 const { createInitialGameState } = require('../gameState');
 
@@ -38,6 +39,8 @@ export async function createMatchRoom(io: SocketIOServer, state: SocketState, pl
   if (!whiteSocket || !blackSocket) return null;
 
   const gameState = createInitialGameState();
+  const timeControlIndex = Number.isInteger(whitePlayer.timeControlIndex) ? whitePlayer.timeControlIndex : blackPlayer.timeControlIndex;
+  attachRoomClock(gameState, timeControlIndex);
   gameState.players.w.id = whiteSocket.id;
   gameState.players.w.name = whitePlayer.playerName;
   gameState.players.w.userId = whitePlayer.userId;
@@ -51,23 +54,27 @@ export async function createMatchRoom(io: SocketIOServer, state: SocketState, pl
     whitePlayerId: whitePlayer.userId,
     blackPlayerId: blackPlayer.userId,
     status: 'ACTIVE',
+    timeControl: timeControlLabel(timeControlIndex),
   });
 
   gameState.matchmaking = {
     mode: whitePlayer.mode || blackPlayer.mode || 'casual',
-    timeControlIndex: Number.isInteger(whitePlayer.timeControlIndex) ? whitePlayer.timeControlIndex : blackPlayer.timeControlIndex,
+    timeControlIndex,
   };
 
-  state.rooms.set(roomId, { ...gameState, gameId: game.id });
+  const roomData = { ...gameState, gameId: game.id };
+  state.rooms.set(roomId, roomData);
   state.players.set(whiteSocket.id, { roomId, color: 'w', playerName: whitePlayer.playerName, userId: whitePlayer.userId });
   state.players.set(blackSocket.id, { roomId, color: 'b', playerName: blackPlayer.playerName, userId: blackPlayer.userId });
 
   whiteSocket.join(roomId);
   blackSocket.join(roomId);
 
-  whiteSocket.emit('matchFound', { roomId, gameState, color: 'w', chatHistory: gameState.chatHistory });
-  blackSocket.emit('matchFound', { roomId, gameState, color: 'b', chatHistory: gameState.chatHistory });
-  io.to(roomId).emit('playerJoined', { gameState, newPlayer: { color: 'b', name: blackPlayer.playerName } });
+  whiteSocket.emit('matchFound', { roomId, gameState: roomData, color: 'w', chatHistory: gameState.chatHistory });
+  blackSocket.emit('matchFound', { roomId, gameState: roomData, color: 'b', chatHistory: gameState.chatHistory });
+  io.to(roomId).emit('playerJoined', { gameState: roomData, newPlayer: { color: 'b', name: blackPlayer.playerName } });
+  emitClockSnapshot(io, roomId, roomData);
+  startRoomClock(io, state, roomId);
 
   return roomId;
 }
