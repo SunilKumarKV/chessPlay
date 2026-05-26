@@ -17,18 +17,19 @@ const billingPaymentsCoreRoutes = require('../routes/billingPaymentsCore');
 const billingRoutes = require('../routes/billing');
 const socialCoreRoutes = require('../routes/socialCore');
 const socialRoutes = require('../routes/social');
+const automationCoreRoutes = require('../routes/automationCore');
 const automationRoutes = require('../routes/automation');
-const adminRoutes = require('../routes/admin');
 const adminCoreRoutes = require('../routes/adminCore');
+const adminRoutes = require('../routes/admin');
 const puzzleRoutes = require('../routes/puzzles');
 const feedbackRoutes = require('../routes/feedback');
-const paymentRoutes = require('../routes/payments');
 const paymentsCoreRoutes = require('../routes/paymentsCore');
+const paymentRoutes = require('../routes/payments');
 const waitlistRoutes = require('../routes/waitlist');
 const analysisRoutes = require('../routes/analysis');
 const referralRoutes = require('../routes/referrals');
-const tournamentRoutes = require('../routes/tournaments');
 const tournamentsCoreRoutes = require('../routes/tournamentsCore');
+const tournamentRoutes = require('../routes/tournaments');
 const meRoutes = require('../routes/me');
 const coachRoutes = require('../routes/coach');
 const openingRoutes = require('../routes/openings');
@@ -42,7 +43,6 @@ const settingsCoreRoutes = require('../routes/settingsCore');
 const settingsRoutes = require('../routes/settings');
 const profileCoreRoutes = require('../routes/profileCore');
 const profileRoutes = require('../routes/profile');
-const automationCoreRoutes = require('../routes/automationCore');
 
 type HealthState = {
   rooms?: () => number;
@@ -129,25 +129,40 @@ function registerRoutes(app: express.Express): void {
   app.use('/api/auth', authRoutes);
   app.use('/api/games', gameRoutes);
   app.use('/api/ai', aiRoutes);
+
   app.use('/api/billing', billingCoreRoutes);
   app.use('/api/billing', billingPaymentsCoreRoutes);
   app.use('/api/billing', billingRoutes);
-  app.use('/api/social', socialCoreRoutes);
-  app.use('/api/social', socialRoutes);
-  app.use('/api/automation', automationRoutes);
-  app.use('/api/admin', adminRoutes);
-  app.use('/api/admin', adminCoreRoutes);
-  app.use('/api/admin', adminRoutes);
-  app.use('/api/puzzles', puzzleRoutes);
-  app.use('/api/feedback', feedbackRoutes);
+
   app.use('/api/payments', paymentsCoreRoutes);
   app.use('/api/payments', paymentRoutes);
+
+  app.use('/api/social', socialCoreRoutes);
+  app.use('/api/social', socialRoutes);
+
+  app.use('/api/automation', automationCoreRoutes);
+  app.use('/api/automation', automationRoutes);
+
+  app.use('/api/admin', adminCoreRoutes);
+  app.use('/api/admin', adminRoutes);
+
+  app.use('/api/tournaments', tournamentsCoreRoutes);
+  app.use('/api/tournaments', tournamentRoutes);
+
+  app.use('/api/messages', messagesCoreRoutes);
+  app.use('/api/messages', messageRoutes);
+
+  app.use('/api/settings', settingsCoreRoutes);
+  app.use('/api/settings', settingsRoutes);
+
+  app.use('/api/profile', profileCoreRoutes);
+  app.use('/api/profile', profileRoutes);
+
+  app.use('/api/puzzles', puzzleRoutes);
+  app.use('/api/feedback', feedbackRoutes);
   app.use('/api/waitlist', waitlistRoutes);
   app.use('/api/analysis', analysisRoutes);
   app.use('/api/referrals', referralRoutes);
-  app.use('/api/tournaments', tournamentRoutes);
-  app.use('/api/tournaments', tournamentsCoreRoutes);
-  app.use('/api/tournaments', tournamentRoutes);
   app.use('/api/me', meRoutes);
   app.use('/api/coach', coachRoutes);
   app.use('/api/openings', openingRoutes);
@@ -155,15 +170,6 @@ function registerRoutes(app: express.Express): void {
   app.use('/api/blog', blogRoutes);
   app.use('/api/share', shareRoutes);
   app.use('/api/support', supportRoutes);
-  app.use('/api/messages', messagesCoreRoutes);
-  app.use('/api/messages', messageRoutes);
-  app.use('/api/settings', settingsCoreRoutes);
-  app.use('/api/settings', settingsRoutes);
-  app.use('/api/profile', profileCoreRoutes);
-  app.use('/api/profile', profileRoutes);
-  app.use('/api/billing', billingPaymentsCoreRoutes);
-  app.use('/api/automation', automationCoreRoutes);
-  app.use('/api/automation', automationRoutes);
 }
 
 export function createApp(healthState: HealthState = {}): express.Express {
