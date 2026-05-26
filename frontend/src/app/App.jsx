@@ -20,6 +20,7 @@ import ErrorBoundary from "../components/ErrorBoundary";
 const PrivacyPolicyPage = lazy(() => import("../pages/legal/PrivacyPolicyPage"));
 const TermsPage = lazy(() => import("../pages/legal/TermsPage"));
 const DeleteAccountPage = lazy(() => import("../pages/legal/DeleteAccountPage"));
+const SupportPage = lazy(() => import("../pages/legal/SupportPage"));
 const ForgotPasswordPage = lazy(() => import("../pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("../pages/ResetPasswordPage"));
 const VerifyEmailPage = lazy(() => import("../pages/VerifyEmailPage"));
@@ -324,26 +325,30 @@ export default function App() {
     );
   }
 
-  if (["privacy", "privacy-policy", "terms", "refund-policy", "cookie-policy", "contact", "chess-puzzles", "play-chess-online", "chess-ai", "chess-analysis", "coaching", "openings", "opening-explorer", "store", "hire-me", "services"].includes(currentPage)) {
+  if (["privacy", "privacy-policy", "terms", "delete-account", "support", "refund-policy", "cookie-policy", "contact", "chess-puzzles", "play-chess-online", "chess-ai", "chess-analysis", "coaching", "openings", "opening-explorer", "store", "hire-me", "services"].includes(currentPage)) {
     const page = currentPage === "privacy" || currentPage === "privacy-policy"
       ? <PrivacyPolicyPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
       : currentPage === "terms"
         ? <TermsPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-        : currentPage === "refund-policy"
-          ? <RefundPolicyPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-          : currentPage === "cookie-policy"
-            ? <CookiePolicyPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-            : currentPage === "contact"
-              ? <ContactPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-              : currentPage === "coaching"
-                ? <CoachingPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-                : currentPage === "openings" || currentPage === "opening-explorer"
-                  ? <OpeningExplorerPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-                : currentPage === "store"
-                  ? <StorePage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-                  : currentPage === "hire-me" || currentPage === "services"
-                    ? <ServicesPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-                    : <SeoLandingPage page={currentPage} onBack={() => navigateToAppPage("dashboard", setCurrentPage)} onNavigate={guardedNavigate} />;
+        : currentPage === "delete-account"
+          ? <DeleteAccountPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+          : currentPage === "support"
+            ? <SupportPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+            : currentPage === "refund-policy"
+              ? <RefundPolicyPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+              : currentPage === "cookie-policy"
+                ? <CookiePolicyPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                : currentPage === "contact"
+                  ? <ContactPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                  : currentPage === "coaching"
+                    ? <CoachingPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                    : currentPage === "openings" || currentPage === "opening-explorer"
+                      ? <OpeningExplorerPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                      : currentPage === "store"
+                        ? <StorePage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                        : currentPage === "hire-me" || currentPage === "services"
+                          ? <ServicesPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                          : <SeoLandingPage page={currentPage} onBack={() => navigateToAppPage("dashboard", setCurrentPage)} onNavigate={guardedNavigate} />;
     return <RouteFrame>{page}<DeferredFeedbackButton user={user} /></RouteFrame>;
   }
 
@@ -374,7 +379,7 @@ export default function App() {
     );
   }
 
-  if (!user && (currentPage === "pricing" || currentPage === "support" || currentPage === "monetization")) {
+  if (!user && (currentPage === "pricing" || currentPage === "monetization")) {
     return (
       <RouteFrame>
         {currentPage === "monetization" ? (
@@ -549,7 +554,6 @@ export default function App() {
       case "analysis":
         return <AnalysisPage user={user} onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "pricing":
-      case "support":
         return (
           <PricingPage
             user={user}
@@ -557,6 +561,8 @@ export default function App() {
             onNavigate={guardedNavigate}
           />
         );
+      case "support":
+        return <SupportPage onBack={goDashboard} />;
       case "billing":
         return (
           <BillingPage

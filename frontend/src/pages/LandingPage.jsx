@@ -332,8 +332,10 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
             <button type="button" onClick={openLogin} className="hover:text-white">Login</button>
             <button type="button" onClick={openSignup} className="hover:text-white">Register</button>
             <a href="#features" className="hover:text-white">Features</a>
-            <a href="/privacy-policy" onClick={(event) => { event.preventDefault(); onNavigatePath?.("/privacy-policy"); }} className="hover:text-white">Privacy</a>
+            <a href="/privacy" onClick={(event) => { event.preventDefault(); onNavigatePath?.("/privacy"); }} className="hover:text-white">Privacy</a>
             <a href="/terms" onClick={(event) => { event.preventDefault(); onNavigatePath?.("/terms"); }} className="hover:text-white">Terms</a>
+            <a href="/delete-account" onClick={(event) => { event.preventDefault(); onNavigatePath?.("/delete-account"); }} className="hover:text-white">Delete Account</a>
+            <a href="/support" onClick={(event) => { event.preventDefault(); onNavigatePath?.("/support"); }} className="hover:text-white">Support</a>
           </div>
         </div>
       </footer>
