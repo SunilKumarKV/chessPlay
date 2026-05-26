@@ -1,6 +1,8 @@
 const LINKS = [
-  ["Privacy Policy", "/privacy-policy"],
+  ["Privacy", "/privacy"],
   ["Terms", "/terms"],
+  ["Delete Account", "/delete-account"],
+  ["Support", "/support"],
   ["Refund Policy", "/refund-policy"],
   ["Cookie Policy", "/cookie-policy"],
   ["Contact", "/contact"],
