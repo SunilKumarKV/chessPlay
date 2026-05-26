@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const ORIGIN = "https://getchessplay.com";
+const ORIGIN = "https://getchessplay.vercel.app";
 
 function upsertMeta(selector, attributes) {
   let element = document.head.querySelector(selector);
