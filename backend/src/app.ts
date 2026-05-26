@@ -23,6 +23,7 @@ const adminCoreRoutes = require('../routes/adminCore');
 const puzzleRoutes = require('../routes/puzzles');
 const feedbackRoutes = require('../routes/feedback');
 const paymentRoutes = require('../routes/payments');
+const paymentsCoreRoutes = require('../routes/paymentsCore');
 const waitlistRoutes = require('../routes/waitlist');
 const analysisRoutes = require('../routes/analysis');
 const referralRoutes = require('../routes/referrals');
@@ -139,6 +140,7 @@ function registerRoutes(app: express.Express): void {
   app.use('/api/admin', adminRoutes);
   app.use('/api/puzzles', puzzleRoutes);
   app.use('/api/feedback', feedbackRoutes);
+  app.use('/api/payments', paymentsCoreRoutes);
   app.use('/api/payments', paymentRoutes);
   app.use('/api/waitlist', waitlistRoutes);
   app.use('/api/analysis', analysisRoutes);
