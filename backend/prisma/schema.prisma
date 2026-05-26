@@ -120,6 +120,7 @@ model User {
   gamesAsBlack  Game[]         @relation("BlackPlayer")
   payments      Payment[]
   subscriptions Subscription[]
+  deviceTokens  DeviceToken[]
   referralsMade Referral[]     @relation("Referrer")
   referralsUsed Referral[]     @relation("ReferredUser")
   tournaments   Tournament[]   @relation("TournamentCreator")
@@ -127,6 +128,25 @@ model User {
   @@index([email])
   @@index([username])
   @@index([deletedAt])
+}
+
+model DeviceToken {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token       String    @unique
+  platform    String
+  deviceId    String
+  appVersion  String?
+  revokedAt   DateTime?
+  lastSeenAt  DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, deviceId])
+  @@index([userId, revokedAt])
+  @@index([platform])
+  @@map("device_tokens")
 }
 
 model Game {

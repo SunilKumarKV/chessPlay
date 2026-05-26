@@ -89,6 +89,7 @@ const supportRoutes = require("./routes/support");
 const messageRoutes = require("./routes/messages");
 const settingsRoutes = require("./routes/settings");
 const profileRoutes = require("./routes/profile");
+const notificationRoutes = require("./routes/notifications");
 const User = require("./models/User");
 const Game = require("./models/Game");
 const { updatePlayerStats } = require("./utils/elo");
@@ -402,6 +403,7 @@ app.use("/api/support", supportRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Basic health check
 app.get("/health", (req, res) => {

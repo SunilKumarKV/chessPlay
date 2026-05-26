@@ -43,6 +43,7 @@ const settingsCoreRoutes = require('../routes/settingsCore');
 const settingsRoutes = require('../routes/settings');
 const profileCoreRoutes = require('../routes/profileCore');
 const profileRoutes = require('../routes/profile');
+const notificationRoutes = require('../routes/notifications');
 
 type HealthState = {
   rooms?: () => number;
@@ -157,6 +158,7 @@ function registerRoutes(app: express.Express): void {
 
   app.use('/api/profile', profileCoreRoutes);
   app.use('/api/profile', profileRoutes);
+  app.use('/api/notifications', notificationRoutes);
 
   app.use('/api/puzzles', puzzleRoutes);
   app.use('/api/feedback', feedbackRoutes);
