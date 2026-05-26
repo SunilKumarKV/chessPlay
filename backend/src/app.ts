@@ -27,6 +27,7 @@ const waitlistRoutes = require('../routes/waitlist');
 const analysisRoutes = require('../routes/analysis');
 const referralRoutes = require('../routes/referrals');
 const tournamentRoutes = require('../routes/tournaments');
+const tournamentsCoreRoutes = require('../routes/tournamentsCore');
 const meRoutes = require('../routes/me');
 const coachRoutes = require('../routes/coach');
 const openingRoutes = require('../routes/openings');
@@ -141,6 +142,8 @@ function registerRoutes(app: express.Express): void {
   app.use('/api/waitlist', waitlistRoutes);
   app.use('/api/analysis', analysisRoutes);
   app.use('/api/referrals', referralRoutes);
+  app.use('/api/tournaments', tournamentRoutes);
+  app.use('/api/tournaments', tournamentsCoreRoutes);
   app.use('/api/tournaments', tournamentRoutes);
   app.use('/api/me', meRoutes);
   app.use('/api/coach', coachRoutes);
