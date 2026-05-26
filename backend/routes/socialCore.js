@@ -221,4 +221,284 @@ router.get('/messaging/conversations', auth, async (req, res, next) => {
   }
 });
 
+async function getCurrentUser(req) {
+  const userId = authUserId(req);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user || user.deletedAt) {
+    const error = new Error('User not found');
+    error.status = 404;
+    throw error;
+  }
+
+  return user;
+}
+
+async function getOrCreatePublicRoom(roomKey) {
+  const room =
+    PUBLIC_ROOMS.find((item) => item.key === roomKey) || PUBLIC_ROOMS[0];
+
+  const existing = await prisma.conversation.findFirst({
+    where: {
+      type: 'PUBLIC',
+      roomKey: room.key,
+    },
+  });
+
+  if (existing) return existing;
+
+  return prisma.conversation.create({
+    data: {
+      type: 'PUBLIC',
+      roomKey: room.key,
+      title: room.title,
+      participants: [],
+      messages: [],
+      mutedBy: [],
+      blockedBy: [],
+      reports: [],
+      lastMessageAt: new Date(),
+    },
+  });
+}
+
+async function getOrCreatePrivateConversation(user, friendId) {
+  const friend = await prisma.user.findUnique({
+    where: { id: String(friendId || '') },
+  });
+
+  if (!friend || friend.deletedAt) {
+    const error = new Error('Friend not found');
+    error.status = 404;
+    throw error;
+  }
+
+  const participants = [user.id, friend.id].sort();
+
+  const existing = await prisma.conversation.findFirst({
+    where: {
+      type: 'PRIVATE',
+      participants: {
+        hasEvery: participants,
+      },
+    },
+  });
+
+  if (existing) return existing;
+
+  return prisma.conversation.create({
+    data: {
+      type: 'PRIVATE',
+      title: `${user.username} ↔ ${friend.username}`,
+      participants,
+      messages: [],
+      mutedBy: [],
+      blockedBy: [],
+      reports: [],
+      lastMessageAt: new Date(),
+    },
+  });
+}
+
+router.post('/messaging/open', auth, async (req, res, next) => {
+  try {
+    const user = await getCurrentUser(req);
+
+    const conversation =
+      req.body?.type === 'public'
+        ? await getOrCreatePublicRoom(
+            cleanText(req.body?.roomKey, 40).toLowerCase()
+          )
+        : await getOrCreatePrivateConversation(user, req.body?.friendId);
+
+    return res.json({
+      conversation: safeConversation(conversation),
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get(
+  '/messaging/conversations/:id/messages',
+  auth,
+  async (req, res, next) => {
+    try {
+      const userId = authUserId(req);
+
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: req.params.id },
+      });
+
+      if (!conversation) {
+        return res.status(404).json({
+          message: 'Conversation not found',
+        });
+      }
+
+      const allowed =
+        conversation.type === 'PUBLIC' ||
+        safeJsonArray(conversation.participants).some(
+          (id) => String(id) === userId
+        );
+
+      if (!allowed) {
+        return res.status(403).json({
+          message: 'Not allowed',
+        });
+      }
+
+      return res.json({
+        messages: safeJsonArray(conversation.messages).slice(-80),
+        conversation: safeConversation(conversation),
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
+
+router.post(
+  '/messaging/conversations/:id/messages',
+  auth,
+  async (req, res, next) => {
+    try {
+      const user = await getCurrentUser(req);
+
+      const text = cleanText(req.body?.text || req.body?.body, 1000);
+
+      if (!text) {
+        return res.status(400).json({
+          message: 'Message is required',
+        });
+      }
+
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: req.params.id },
+      });
+
+      if (!conversation) {
+        return res.status(404).json({
+          message: 'Conversation not found',
+        });
+      }
+
+      const allowed =
+        conversation.type === 'PUBLIC' ||
+        safeJsonArray(conversation.participants).some(
+          (id) => String(id) === user.id
+        );
+
+      if (!allowed) {
+        return res.status(403).json({
+          message: 'Not allowed',
+        });
+      }
+
+      if (
+        safeJsonArray(conversation.blockedBy).some(
+          (id) => String(id) === user.id
+        )
+      ) {
+        return res.status(403).json({
+          message: 'You blocked this conversation',
+        });
+      }
+
+      const message = {
+        _id: `${Date.now()}-${user.id}`,
+        sender: user.id,
+        senderId: user.id,
+        senderName: user.username,
+        text,
+        body: text,
+        readBy: [user.id],
+        createdAt: new Date().toISOString(),
+      };
+
+      const updated = await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: {
+          messages: [...safeJsonArray(conversation.messages), message].slice(
+            -300
+          ),
+          lastMessageAt: new Date(),
+        },
+      });
+
+      return res.status(201).json({
+        message,
+        conversation: safeConversation(updated),
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
+
+router.post(
+  '/messaging/conversations/:id/moderation',
+  auth,
+  async (req, res, next) => {
+    try {
+      const user = await getCurrentUser(req);
+
+      const action = req.body?.action;
+
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: req.params.id },
+      });
+
+      if (!conversation) {
+        return res.status(404).json({
+          message: 'Conversation not found',
+        });
+      }
+
+      const data = {};
+
+      if (action === 'mute') {
+        const mutedBy = safeJsonArray(conversation.mutedBy).map(String);
+
+        data.mutedBy = mutedBy.includes(user.id)
+          ? mutedBy.filter((id) => id !== user.id)
+          : [...mutedBy, user.id];
+      } else if (action === 'block') {
+        const blockedBy = safeJsonArray(conversation.blockedBy).map(String);
+
+        data.blockedBy = blockedBy.includes(user.id)
+          ? blockedBy.filter((id) => id !== user.id)
+          : [...blockedBy, user.id];
+      } else if (action === 'report') {
+        data.reports = [
+          ...safeJsonArray(conversation.reports),
+          {
+            reporter: user.id,
+            reason:
+              cleanText(req.body?.reason, 300) || 'Reported from app',
+            createdAt: new Date().toISOString(),
+          },
+        ].slice(-50);
+      } else {
+        return res.status(400).json({
+          message: 'Unsupported action',
+        });
+      }
+
+      const updated = await prisma.conversation.update({
+        where: { id: conversation.id },
+        data,
+      });
+
+      return res.json({
+        conversation: safeConversation(updated),
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
+
 module.exports = router;
