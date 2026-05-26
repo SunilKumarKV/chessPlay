@@ -39,7 +39,6 @@ const settingsCoreRoutes = require('../routes/settingsCore');
 const settingsRoutes = require('../routes/settings');
 const profileCoreRoutes = require('../routes/profileCore');
 const profileRoutes = require('../routes/profile');
-const billingPaymentsCoreRoutes = require('../routes/billingPaymentsCore');
 
 type HealthState = {
   rooms?: () => number;
