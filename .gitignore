@@ -8,6 +8,11 @@ dist
 dist-ssr
 *.local
 
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+
 # Editor
 .vscode/*
 !.vscode/extensions.json
@@ -54,3 +59,5 @@ frontend/.env.*
 # Large optional Lichess puzzle database downloads
 backend/data/lichess_db_puzzle.csv
 backend/data/lichess_db_puzzle.csv.zst
+
+.pnpm-store/

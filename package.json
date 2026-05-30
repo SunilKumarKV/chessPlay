@@ -11,6 +11,7 @@
     "lint": "pnpm --filter frontend lint",
     "test": "pnpm test:production && pnpm --filter backend test",
     "test:production": "node TEST_PRODUCTION_SMOKE.js && node TEST_STOCKFISH.js",
+    "test:prod-smoke": "playwright test tests/production-smoke.spec.ts",
     "preview": "pnpm --filter frontend preview",
     "install:all": "pnpm install",
     "start": "pnpm dev:multi",
@@ -18,6 +19,7 @@
     "build:backend": "pnpm --filter backend build"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.1",
     "concurrently": "^8.2.2"
   },
   "dependencies": {
