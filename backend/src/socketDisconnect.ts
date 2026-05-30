@@ -3,14 +3,14 @@ import type { SocketState } from './socketTypes';
 import { cleanupSpectator } from './socketRooms';
 import { broadcastQueueUpdate, removeFromQueue } from './socketMatchmaking';
 import { closeRoomIfEmpty } from './socketGameplay';
+import { updateGame } from './repositories/gameRepository';
+import { emitClockSnapshot, pauseRoomClock, stopRoomClock } from './socketClock';
 
-const Game = require('../models/Game');
 const { updatePlayerStats } = require('../utils/elo');
 const { opponent } = require('../chessUtils');
 const { isPlayableStatus } = require('../gameState');
 
 const RECONNECTION_GRACE_MS = 60 * 1000;
-
 const reconnectionTimers = new Map<string, NodeJS.Timeout>();
 
 function getReconnectKey(roomId: string, color: string): string {
@@ -37,19 +37,20 @@ export async function awardAbandonmentWin(io: SocketIOServer, state: SocketState
 
   roomData.status = 'abandoned';
   roomData.turn = abandonedColor;
+  stopRoomClock(roomId, roomData, 'ended');
   loserSlot.id = null;
   loserSlot.userId = null;
   loserSlot.disconnected = false;
 
-  await Game.findByIdAndUpdate(roomData.gameId, {
+  await updateGame(roomData.gameId, {
     result: winnerColor === 'w' ? 'white' : 'black',
     winner: winnerSlot?.userId || null,
     endTime: new Date(),
   });
 
   if (winnerSlot?.userId) await updatePlayerStats(winnerSlot.userId, loserId);
-
   io.to(roomId).emit('playerAbandoned', { color: abandonedColor, winnerColor, gameState: roomData });
+  emitClockSnapshot(io, roomId, roomData);
 }
 
 export async function cleanupPlayer(io: SocketIOServer, socket: Socket, state: SocketState, notify = true): Promise<void> {
@@ -73,13 +74,15 @@ export async function cleanupPlayer(io: SocketIOServer, socket: Socket, state: S
 
     if (opponentUserId && isPlayableStatus(roomData.status)) {
       roomData.status = 'abandoned';
-      await Game.findByIdAndUpdate(roomData.gameId, {
+      stopRoomClock(player.roomId, roomData, 'ended');
+      await updateGame(roomData.gameId, {
         result: opponentColor === 'w' ? 'white' : 'black',
         winner: opponentUserId,
         endTime: new Date(),
       });
       await updatePlayerStats(opponentUserId, leavingUserId);
       io.to(player.roomId).emit('playerAbandoned', { winnerColor: opponentColor, gameState: roomData });
+      emitClockSnapshot(io, player.roomId, roomData);
       state.players.delete(socket.id);
       return;
     }
@@ -110,6 +113,7 @@ export function markPlayerDisconnected(io: SocketIOServer, socket: Socket, state
   playerSlot.userId = player.userId;
   playerSlot.name = player.playerName;
   state.players.delete(socket.id);
+  pauseRoomClock(io, player.roomId, roomData);
 
   io.to(player.roomId).emit('playerDisconnected', {
     color: player.color,
@@ -157,6 +161,7 @@ export function handleDisconnect(io: SocketIOServer, socket: Socket, state: Sock
     if (key.startsWith(`${socket.id}:`)) state.socketEventRateLimits.delete(key);
   }
   const user = socket.data.user;
-  if (user?._id) socket.broadcast.emit('socialUserStatus', { userId: user._id, status: 'offline' });
+  const userId = user?.id || user?._id;
+  if (userId) socket.broadcast.emit('socialUserStatus', { userId, status: 'offline' });
   broadcastQueueUpdate(io, state);
 }

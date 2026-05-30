@@ -28,6 +28,7 @@ const router = express.Router();
 const PUBLIC_USER_FIELDS = "username avatar country title rating gamesPlayed gamesWon privacy friends";
 const FRIEND_USER_FIELDS = "username avatar country title rating gamesPlayed gamesWon";
 const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const MOBILE_ACCESS_EXPIRES_IN_SECONDS = 15 * 60;
 const MAX_SEARCH_QUERY_LENGTH = 32;
 const MAX_LEADERBOARD_LIMIT = 50;
 
@@ -94,6 +95,119 @@ function authUserPayloadLocal(user) {
 
 async function issueSession(res, user) {
   await issueSecureSession(res, user);
+}
+
+function signMobileAccessToken(user) {
+  return jwt.sign(
+    {
+      userId: String(user._id),
+      username: user.username,
+      tokenVersion: user.tokenVersion || 0,
+      type: "access",
+    },
+    getJwtSecret("access"),
+    { expiresIn: `${MOBILE_ACCESS_EXPIRES_IN_SECONDS}s` },
+  );
+}
+
+function signMobileRefreshToken(user) {
+  return jwt.sign(
+    {
+      userId: String(user._id),
+      tokenVersion: user.tokenVersion || 0,
+      type: "refresh",
+    },
+    getJwtSecret("refresh"),
+    { expiresIn: process.env.REFRESH_TOKEN_EXPIRES || "7d" },
+  );
+}
+
+async function issueMobileTokenSet(user) {
+  const accessToken = signMobileAccessToken(user);
+  const refreshToken = signMobileRefreshToken(user);
+  user.refreshTokenHash = hashToken(refreshToken);
+  await user.save();
+
+  return {
+    accessToken,
+    refreshToken,
+    // Socket.IO currently validates access JWTs in handshake.auth.accessToken.
+    // Keep this explicit alias until socket middleware supports a dedicated socket token type.
+    socketToken: signMobileAccessToken(user),
+    expiresIn: MOBILE_ACCESS_EXPIRES_IN_SECONDS,
+  };
+}
+
+function buildMobileAuthResponse(user, tokens, extra = {}) {
+  return {
+    user: authUserPayload(user),
+    ...tokens,
+    ...extra,
+  };
+}
+
+async function userFromMobileAccessToken(token) {
+  const decoded = jwt.verify(token, getJwtSecret("access"));
+  if (decoded.type && decoded.type !== "access") {
+    const error = new Error("Invalid token type");
+    error.statusCode = 401;
+    throw error;
+  }
+  if (!decoded.userId) {
+    const error = new Error("Invalid token payload");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const user = await User.findById(decoded.userId).select("+refreshTokenHash");
+  if (!user || user.deletedAt || user.isBanned) {
+    const error = new Error("Invalid session");
+    error.statusCode = 401;
+    throw error;
+  }
+  if (typeof decoded.tokenVersion === "number" && decoded.tokenVersion !== (user.tokenVersion || 0)) {
+    const error = new Error("Session has expired");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  return { user, decoded };
+}
+
+async function userFromMobileRefreshToken(refreshToken) {
+  const decoded = jwt.verify(refreshToken, getJwtSecret("refresh"));
+  if (decoded.type && decoded.type !== "refresh") {
+    const error = new Error("Invalid token type");
+    error.statusCode = 401;
+    throw error;
+  }
+  if (!decoded.userId) {
+    const error = new Error("Invalid token payload");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const user = await User.findById(decoded.userId).select("+refreshTokenHash");
+  if (!user || user.deletedAt || user.isBanned) {
+    const error = new Error("Invalid refresh session");
+    error.statusCode = 401;
+    throw error;
+  }
+  if (decoded.tokenVersion !== (user.tokenVersion || 0)) {
+    const error = new Error("Refresh session has expired");
+    error.statusCode = 401;
+    throw error;
+  }
+  if (!user.refreshTokenHash || user.refreshTokenHash !== hashToken(refreshToken)) {
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    user.refreshTokenHash = null;
+    await user.save();
+    const error = new Error("Refresh session was revoked");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  return { user, decoded };
 }
 
 function buildAuthResponse(message, user) {
@@ -351,6 +465,160 @@ router.post("/login", authLimiter, async (req, res) => {
   } catch (error) {
     logger.error("Login error:", error);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/mobile/register", authLimiter, async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const referralCode = req.body.referralCode || req.body.ref || "";
+    const emailValidation = validateProductionEmail(req.body.email);
+    if (!emailValidation.ok) {
+      return res.status(400).json({ message: emailValidation.message });
+    }
+    const email = emailValidation.email;
+
+    const passwordError = validateStrongPassword(password);
+    if (passwordError) {
+      return res.status(400).json({ message: passwordError });
+    }
+
+    const usernameRegex = /^[a-zA-Z0-9]+$/;
+    if (!username || !usernameRegex.test(username)) {
+      return res.status(400).json({ message: "Username must be alphanumeric only" });
+    }
+
+    const existingUser = await User.findOne({
+      $or: [{ email }, { username }],
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        message:
+          existingUser.email === email
+            ? "Email already exists"
+            : "Username already exists",
+      });
+    }
+
+    const user = new User({ username, email, password });
+    await user.save();
+    const referralConnected = await connectReferralForNewUser(user, referralCode);
+    const tokens = await issueMobileTokenSet(user);
+
+    await recordSecurityEvent(req, { type: "mobile_register_success", email: user.email, user: user._id });
+    await queueEmailEvent("welcome", { user: user._id, email: user.email, payload: { username: user.username } });
+
+    return res.status(201).json(buildMobileAuthResponse(user, tokens, { referralConnected }));
+  } catch (error) {
+    logger.error("Mobile registration error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/mobile/login", authLimiter, async (req, res) => {
+  try {
+    const { password } = req.body;
+    const referralCode = req.body.referralCode || req.body.ref || "";
+    const email = normalizeEmail(req.body.email);
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      await recordSecurityEvent(req, { type: "mobile_login_failed", email, reason: "user_not_found" });
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    if (user.deletedAt || user.isBanned) {
+      await recordSecurityEvent(req, { type: "mobile_login_failed", email, user: user._id, reason: user.deletedAt ? "deleted_account" : "banned_account" });
+      return res.status(403).json({ message: "This account is temporarily restricted. Contact support if you believe this is a mistake." });
+    }
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      await recordSecurityEvent(req, { type: "mobile_login_failed", email, user: user._id, reason: "wrong_password" });
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    user.lastLogin = new Date();
+    const referralConnected = await connectReferralForNewUser(user, referralCode);
+    const tokens = await issueMobileTokenSet(user);
+
+    await recordSecurityEvent(req, { type: user.isAdmin ? "mobile_admin_login" : "mobile_login_success", email: user.email, user: user._id });
+
+    return res.json(buildMobileAuthResponse(user, tokens, { referralConnected }));
+  } catch (error) {
+    logger.error("Mobile login error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/mobile/refresh", authLimiter, async (req, res) => {
+  try {
+    const refreshToken = String(req.body.refreshToken || "").trim();
+    if (!refreshToken) {
+      return res.status(400).json({ message: "Refresh token is required" });
+    }
+
+    const { user } = await userFromMobileRefreshToken(refreshToken);
+    const tokens = await issueMobileTokenSet(user);
+    await recordSecurityEvent(req, { type: "mobile_refresh_success", email: user.email, user: user._id });
+
+    return res.json(buildMobileAuthResponse(user, tokens));
+  } catch (error) {
+    return res.status(error.statusCode || 401).json({ message: error.message || "Invalid or expired refresh token" });
+  }
+});
+
+router.post("/mobile/logout", async (req, res) => {
+  try {
+    const refreshToken = String(req.body.refreshToken || "").trim();
+    const bearerToken = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i)?.[1]?.trim() || "";
+    let user = null;
+
+    if (bearerToken) {
+      ({ user } = await userFromMobileAccessToken(bearerToken));
+    } else if (refreshToken) {
+      ({ user } = await userFromMobileRefreshToken(refreshToken));
+    } else {
+      return res.status(400).json({ message: "Access token or refresh token is required" });
+    }
+
+    user.refreshTokenHash = null;
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    await user.save();
+    await recordSecurityEvent(req, { type: "mobile_logout", email: user.email, user: user._id });
+
+    return res.json({ message: "Logged out" });
+  } catch (error) {
+    return res.status(error.statusCode || 401).json({ message: error.message || "Invalid session" });
+  }
+});
+
+router.get("/mobile/session", async (req, res) => {
+  try {
+    const bearerToken = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i)?.[1]?.trim() || "";
+    if (!bearerToken) {
+      return res.status(401).json({ message: "No token provided" });
+    }
+
+    const { user } = await userFromMobileAccessToken(bearerToken);
+    return res.json({ user: authUserPayload(user) });
+  } catch (error) {
+    return res.status(error.statusCode || 401).json({ message: error.message || "Invalid or expired token" });
+  }
+});
+
+router.get("/mobile/socket-token", async (req, res) => {
+  try {
+    const bearerToken = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i)?.[1]?.trim() || "";
+    if (!bearerToken) {
+      return res.status(401).json({ message: "No token provided" });
+    }
+
+    const { user } = await userFromMobileAccessToken(bearerToken);
+    return res.json({ socketToken: signMobileAccessToken(user) });
+  } catch (error) {
+    return res.status(error.statusCode || 401).json({ message: error.message || "Unable to create socket token" });
   }
 });
 

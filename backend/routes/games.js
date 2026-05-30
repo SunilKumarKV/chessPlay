@@ -24,6 +24,7 @@ var import_express = __toESM(require("express"));
 const Game = require("../models/Game");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
+const { findActiveRoomForUserId } = require("../src/activeRooms");
 const router = import_express.default.Router();
 const VALID_RESULTS = /* @__PURE__ */ new Set(["white", "black", "draw"]);
 const VALID_COLORS = /* @__PURE__ */ new Set(["w", "b"]);
@@ -177,6 +178,17 @@ router.get("/leaderboard", async (req, res) => {
     res.status(500).json({ message: "Unable to load leaderboard" });
   }
 });
+
+router.get("/active-room", auth, async (req, res) => {
+  try {
+    const activeRoom = findActiveRoomForUserId(requestUserId(req));
+    res.json({ activeRoom });
+  } catch (error) {
+    console.error("Active room lookup error:", error);
+    res.status(500).json({ message: "Unable to load active room" });
+  }
+});
+
 router.get("/:gameId", auth, async (req, res) => {
   try {
     const game = await Game.findById(req.params.gameId).populate("whitePlayer", "username").populate("blackPlayer", "username").populate("winner", "username");

@@ -67,6 +67,7 @@ const {
 } = require("./gameState");
 const authRoutes = require("./routes/auth");
 const gameRoutes = require("./routes/games");
+const aiRoutes = require("./routes/ai");
 const billingRoutes = require("./routes/billing");
 const socialRoutes = require("./routes/social");
 const automationRoutes = require("./routes/automation");
@@ -88,6 +89,7 @@ const supportRoutes = require("./routes/support");
 const messageRoutes = require("./routes/messages");
 const settingsRoutes = require("./routes/settings");
 const profileRoutes = require("./routes/profile");
+const notificationRoutes = require("./routes/notifications");
 const User = require("./models/User");
 const Game = require("./models/Game");
 const { updatePlayerStats } = require("./utils/elo");
@@ -379,6 +381,7 @@ checkDatabase()
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/games", gameRoutes);
+app.use("/api/ai", aiRoutes);
 app.use("/api/billing", billingRoutes);
 app.use("/api/social", socialRoutes);
 app.use("/api/automation", automationRoutes);
@@ -400,6 +403,7 @@ app.use("/api/support", supportRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Basic health check
 app.get("/health", (req, res) => {

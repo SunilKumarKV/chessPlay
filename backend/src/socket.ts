@@ -3,11 +3,12 @@ import jwt from 'jsonwebtoken';
 import { Server as SocketIOServer, type Socket } from 'socket.io';
 
 import { getAllowedOrigins, isAllowedOrigin } from './app';
+import { setActiveSocketState } from './activeRooms';
 import { isProduction } from './config/env';
+import { findUserById } from './repositories/userRepository';
 import { registerSocketHandlers } from './socketHandlers';
 import type { SocketState } from './socketTypes';
 
-const User = require('../models/User');
 const { getJwtSecret } = require('../utils/security');
 
 const SOCKET_EVENT_LIMITS: Record<string, { count: number; windowMs: number }> = {
@@ -82,6 +83,8 @@ function onSafe(socket: Socket, state: SocketState, eventName: string, handler: 
 }
 
 export function registerSockets(server: HttpServer, state = createSocketState()): SocketIOServer {
+  setActiveSocketState(state);
+
   const allowedOrigins = getAllowedOrigins();
   const io = new SocketIOServer(server, {
     cors: {
@@ -107,8 +110,9 @@ export function registerSockets(server: HttpServer, state = createSocketState())
 
       const decoded = jwt.verify(token, getJwtSecret('access')) as { userId?: string; type?: string };
       if (decoded.type && decoded.type !== 'access') return next(new Error('Invalid token type'));
+      if (!decoded.userId) return next(new Error('Invalid token payload'));
 
-      const user = await User.findById(decoded.userId);
+      const user = await findUserById(decoded.userId);
       if (!user) return next(new Error('User not found'));
 
       socket.data.user = user;
@@ -122,9 +126,10 @@ export function registerSockets(server: HttpServer, state = createSocketState())
 
   io.on('connection', (socket) => {
     const user = socket.data.user;
-    if (user?._id) {
-      socket.join(`user:${user._id}`);
-      socket.broadcast.emit('socialUserStatus', { userId: user._id, status: 'online' });
+    const userId = user?.id || user?._id;
+    if (userId) {
+      socket.join(`user:${userId}`);
+      socket.broadcast.emit('socialUserStatus', { userId, status: 'online' });
     }
 
     registerSocketHandlers(io, socket, state, (eventName, handler) => onSafe(socket, state, eventName, handler));
