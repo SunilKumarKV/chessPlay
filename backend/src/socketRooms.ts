@@ -59,7 +59,7 @@ export async function createRoom(io: SocketIOServer, socket: Socket, state: Sock
   gameState.players.w.disconnected = false;
 
   const game = await createGame({ whitePlayerId: userId, status: 'WAITING', timeControl: timeControlLabel(timeControlIndex) });
-  const roomData = { ...gameState, gameId: game.id };
+  const roomData = { ...gameState, gameId: game.id, lastActivity: Date.now() }; // [stability-sprint1] track room activity for TTL cleanup
   state.rooms.set(roomId, roomData);
   state.players.set(socket.id, { roomId, color: 'w', playerName, userId });
   socket.join(roomId);

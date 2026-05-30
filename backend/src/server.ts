@@ -2,7 +2,8 @@ import http from 'http';
 
 import { createApp } from './app';
 import { env, validateEnv } from './config/env';
-import { createSocketState, registerSockets, socketHealthState } from './socket';
+import { prisma } from './config/prisma';
+import { createSocketState, registerSockets, socketHealthState, startSocketStateMaintenance } from './socket';
 
 const logger = require('../utils/safeLogger');
 const { captureException, initMonitoring } = require('../utils/monitoring');
@@ -25,7 +26,8 @@ const socketState = createSocketState();
 const app = createApp(socketHealthState(socketState));
 const server = http.createServer(app);
 
-registerSockets(server, socketState);
+const io = registerSockets(server, socketState);
+startSocketStateMaintenance(socketState);
 
 checkDatabase()
   .then((status: { ok: boolean; message?: string }) => {
@@ -69,3 +71,38 @@ server.listen(env.PORT, '0.0.0.0', () => {
   logger.info(`Chess server running on port ${env.PORT}`);
   logger.info(`Local network access: http://0.0.0.0:${env.PORT}`);
 });
+
+// [stability-sprint1] SIGTERM/SIGINT graceful shutdown handlers
+let shuttingDown = false;
+
+function gracefulShutdown(signal: string): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info(`${signal} received, shutting down gracefully`);
+
+  const forceExitTimer = setTimeout(() => {
+    logger.error('Forced shutdown after 10s timeout');
+    process.exit(1);
+  }, 10_000);
+
+  server.close(() => {
+    io.close(() => {
+      logger.info('Socket.IO closed');
+      prisma.$disconnect()
+        .then(() => {
+          logger.info('Prisma disconnected');
+          clearTimeout(forceExitTimer);
+          logger.info('Shutdown completed');
+          process.exit(0);
+        })
+        .catch((error: Error) => {
+          logger.error('Error during graceful shutdown', error);
+          clearTimeout(forceExitTimer);
+          process.exit(1);
+        });
+    });
+  });
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

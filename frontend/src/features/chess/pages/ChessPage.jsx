@@ -133,6 +133,17 @@ export default function Chess({
     loadSettings();
   }, []);
 
+  useEffect(() => () => {
+    if (aiMoveTimeoutRef.current) {
+      window.clearTimeout(aiMoveTimeoutRef.current);
+      aiMoveTimeoutRef.current = null;
+    }
+    if (aiFallbackTimeoutRef.current) {
+      window.clearTimeout(aiFallbackTimeoutRef.current);
+      aiFallbackTimeoutRef.current = null;
+    }
+  }, []); // [stability-sprint1] clear AI move timeout refs on component unmount
+
   useEffect(() => {
     dispatch(setAiEnabled(initialAiEnabled));
     if (initialTimeControlKey) {

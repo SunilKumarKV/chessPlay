@@ -144,3 +144,28 @@ export function socketHealthState(state: SocketState) {
     players: () => state.players.size,
   };
 }
+
+// [stability-sprint1] TTL cleanup for rate limit maps and stale rooms
+export function startSocketStateMaintenance(state: SocketState): void {
+  setInterval(() => {
+    const now = Date.now();
+    const rateLimitCutoff = now - 10 * 60 * 1000;
+    for (const [key, bucket] of state.socketEventRateLimits.entries()) {
+      if (bucket.resetAt < rateLimitCutoff) {
+        state.socketEventRateLimits.delete(key);
+      }
+    }
+    for (const [key, tracker] of state.chatRateLimits.entries()) {
+      if (tracker.resetAt < rateLimitCutoff) {
+        state.chatRateLimits.delete(key);
+      }
+    }
+    const roomInactivityCutoff = now - 60 * 60 * 1000;
+    for (const [roomId, roomData] of state.rooms.entries()) {
+      const hasConnectedSockets = Boolean(roomData.players?.w?.id || roomData.players?.b?.id);
+      if (!hasConnectedSockets && (roomData.lastActivity || 0) < roomInactivityCutoff) {
+        state.rooms.delete(roomId);
+      }
+    }
+  }, 5 * 60 * 1000);
+}

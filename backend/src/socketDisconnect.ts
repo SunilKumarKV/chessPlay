@@ -3,9 +3,11 @@ import type { SocketState } from './socketTypes';
 import { cleanupSpectator } from './socketRooms';
 import { broadcastQueueUpdate, removeFromQueue } from './socketMatchmaking';
 import { closeRoomIfEmpty } from './socketGameplay';
-import { updateGame } from './repositories/gameRepository';
+import { prisma } from './config/prisma';
+import { findGameById, updateGame } from './repositories/gameRepository';
 import { emitClockSnapshot, pauseRoomClock, stopRoomClock } from './socketClock';
 
+const logger = require('../utils/safeLogger');
 const { updatePlayerStats } = require('../utils/elo');
 const { opponent } = require('../chessUtils');
 const { isPlayableStatus } = require('../gameState');
@@ -19,16 +21,21 @@ function getReconnectKey(roomId: string, color: string): string {
 
 export function clearReconnectTimer(roomId: string, color: string): void {
   const key = getReconnectKey(roomId, color);
-  const timer = reconnectionTimers.get(key);
-  if (timer) {
-    clearTimeout(timer);
-    reconnectionTimers.delete(key);
+  if (reconnectionTimers.has(key)) {
+    clearTimeout(reconnectionTimers.get(key));
   }
+  reconnectionTimers.delete(key); // [stability-sprint1] idempotent reconnection timer cancellation
 }
 
 export async function awardAbandonmentWin(io: SocketIOServer, state: SocketState, roomId: string, abandonedColor: string): Promise<void> {
   const roomData = state.rooms.get(roomId);
   if (!roomData || !isPlayableStatus(roomData.status)) return;
+
+  const game = await findGameById(roomData.gameId);
+  if (game?.result != null) {
+    logger.warn(`awardAbandonmentWin skipped: game ${roomData.gameId} already has result ${game.result}`);
+    return; // [stability-sprint1] guard against duplicate abandonment writes
+  }
 
   const winnerColor = opponent(abandonedColor);
   const winnerSlot = roomData.players[winnerColor];
@@ -42,13 +49,21 @@ export async function awardAbandonmentWin(io: SocketIOServer, state: SocketState
   loserSlot.userId = null;
   loserSlot.disconnected = false;
 
-  await updateGame(roomData.gameId, {
-    result: winnerColor === 'w' ? 'white' : 'black',
-    winner: winnerSlot?.userId || null,
-    endTime: new Date(),
-  });
+  try {
+    await prisma.$transaction(async () => {
+      await updateGame(roomData.gameId, {
+        result: winnerColor === 'w' ? 'white' : 'black',
+        winner: winnerSlot?.userId || null,
+        endTime: new Date(),
+      });
 
-  if (winnerSlot?.userId) await updatePlayerStats(winnerSlot.userId, loserId);
+      if (winnerSlot?.userId) await updatePlayerStats(winnerSlot.userId, loserId);
+    });
+  } catch (error) {
+    logger.error(`Transaction failed for game ${roomData.gameId}:`, error);
+    throw error; // [stability-sprint1] wrap abandonment outcome + stats in prisma transaction
+  }
+
   io.to(roomId).emit('playerAbandoned', { color: abandonedColor, winnerColor, gameState: roomData });
   emitClockSnapshot(io, roomId, roomData);
 }
