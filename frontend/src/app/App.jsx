@@ -14,6 +14,7 @@ const ComingSoonPage = lazy(() => import("../pages/ComingSoonPage"));
 const AnalysisPage = lazy(() => import("../pages/AnalysisPage"));
 const LanPlayPage = lazy(() => import("../pages/LanPlayPage"));
 const PuzzlesPage = lazy(() => import("../pages/PuzzlesPage"));
+const ChallengePage = lazy(() => import("../pages/ChallengePage"));
 import AppSplash from "../components/AppSplash";
 const DashboardLayout = lazy(() => import("../layouts/DashboardLayout"));
 import ErrorBoundary from "../components/ErrorBoundary";
@@ -105,6 +106,7 @@ const routeMap = {
   admin: "/admin",
   "admin-supporters": "/admin/payments",
   ai: "/play",
+  challenge: "/challenge",
   multi: "/play/online",
   local: "/play/local",
   lan: "/wifi",
@@ -158,6 +160,7 @@ function pageFromPathname(pathname) {
   if (normalized === "/payment/failed") return "payment-failed";
   if (normalized === "/referrals") return "referrals";
   if (normalized === "/privacy") return "privacy";
+  if (normalized === "/challenge") return "challenge";
   if (normalized === "/admin" || normalized === "/admin/dashboard") return "admin";
   if (normalized.startsWith("/profile/") && normalized.split("/")[2]) return "profile-public";
   if (["/admin/payments", "/admin/supporters"].includes(normalized)) return "admin-supporters";
@@ -614,6 +617,13 @@ export default function App() {
         return (
           <PuzzlesPage
             user={user}
+            onBack={goDashboard}
+            onNavigate={guardedNavigate}
+          />
+        );
+      case "challenge":
+        return (
+          <ChallengePage
             onBack={goDashboard}
             onNavigate={guardedNavigate}
           />
