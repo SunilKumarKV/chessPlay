@@ -206,8 +206,19 @@ export default function App() {
     async function restoreSession() {
       try {
         localStorage.removeItem("token");
-        const data = await apiClient("/api/auth/session", { skipAuthRefresh: true });
+        let data = await apiClient("/api/auth/session", { skipAuthRefresh: true });
         if (cancelled) return;
+
+        if (!data.user && localStorage.getItem("user")) {
+          try {
+            await apiClient("/api/auth/refresh", { method: "POST" });
+            data = await apiClient("/api/auth/session", { skipAuthRefresh: true });
+            if (cancelled) return;
+          } catch {
+            // Refresh failed; fall through to clear stale local session below.
+          }
+        }
+
         const nextUser = data.user || null;
         if (nextUser) {
           localStorage.setItem("user", JSON.stringify(nextUser));
@@ -217,8 +228,7 @@ export default function App() {
         setUser(nextUser);
         notifyUserChanged();
       } catch {
-        if (!cancelled) {
-          localStorage.removeItem("user");
+        if (!cancelled && !localStorage.getItem("user")) {
           setUser(null);
           notifyUserChanged();
         }

@@ -63,16 +63,8 @@ function escapeRegex(value) {
 }
 
 function cookieOptions() {
-  const isProduction = process.env.NODE_ENV === "production";
-  const options = {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
-    path: "/",
-    maxAge: TOKEN_MAX_AGE_MS,
-  };
-  if (process.env.COOKIE_DOMAIN) options.domain = process.env.COOKIE_DOMAIN;
-  return options;
+  const { cookieOptions: buildCookieOptions } = require("../utils/security");
+  return buildCookieOptions(TOKEN_MAX_AGE_MS);
 }
 
 function clearCookieOptions() {

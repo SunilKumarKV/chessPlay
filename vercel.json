@@ -23,5 +23,5 @@
     { "source": "/stockfish/stockfish.wasm", "headers": [{ "key": "Content-Type", "value": "application/wasm" }] },
     { "source": "/stockfish/(.*)", "headers": [{ "key": "Cross-Origin-Resource-Policy", "value": "cross-origin" }] }
   ],
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [{ "source": "/((?!assets|stockfish|workers|.*\\..*).*)", "destination": "/index.html" }]
 }
