@@ -62,7 +62,7 @@ export async function createMatchRoom(io: SocketIOServer, state: SocketState, pl
     timeControlIndex,
   };
 
-  const roomData = { ...gameState, gameId: game.id };
+  const roomData = { ...gameState, gameId: game.id, lastActivity: Date.now() }; // [stability-sprint1] track room activity for TTL cleanup
   state.rooms.set(roomId, roomData);
   state.players.set(whiteSocket.id, { roomId, color: 'w', playerName: whitePlayer.playerName, userId: whitePlayer.userId });
   state.players.set(blackSocket.id, { roomId, color: 'b', playerName: blackPlayer.playerName, userId: blackPlayer.userId });

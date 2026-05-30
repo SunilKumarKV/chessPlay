@@ -1,9 +1,11 @@
 import type { Server as SocketIOServer, Socket } from 'socket.io';
 import type { SocketState } from './socketTypes';
+import { prisma } from './config/prisma';
 import { updateGame } from './repositories/gameRepository';
 import { recordUserDraw } from './repositories/userRepository';
 import { advanceClockAfterMove, emitClockSnapshot, stopRoomClock } from './socketClock';
 
+const logger = require('../utils/safeLogger');
 const { updatePlayerStats } = require('../utils/elo');
 const { isValidMove: validateMove, applyMove, opponent } = require('../chessUtils');
 const { isPlayableStatus, toGameResult } = require('../gameState');
@@ -58,6 +60,7 @@ export async function handleMove(io: SocketIOServer, socket: Socket, state: Sock
   if (!stillOnTime) return;
 
   applyMove(roomData, fromRow, fromCol, toRow, toCol, promotion);
+  roomData.lastActivity = Date.now(); // [stability-sprint1] track room activity for TTL cleanup
 
   const moveRecord = {
     from: `${String.fromCharCode(97 + fromCol)}${8 - fromRow}`,
@@ -76,19 +79,32 @@ export async function handleMove(io: SocketIOServer, socket: Socket, state: Sock
     updatePayload.result = winnerColor === 'w' ? 'white' : 'black';
     updatePayload.winner = winnerId;
     updatePayload.endTime = new Date();
-    await updatePlayerStats(winnerId, loserId);
-  } else if (['stalemate', 'draw-50move', 'draw-repetition'].includes(roomData.status)) {
-    updatePayload.result = 'draw';
-    updatePayload.winner = null;
-    updatePayload.endTime = new Date();
-    await updateDrawStats(roomData.players.w.userId, roomData.players.b.userId);
+    if (!isPlayableStatus(roomData.status)) {
+      stopRoomClock(player.roomId, roomData, 'ended');
+    }
+    roomData.moves = updatePayload.moves;
+    try {
+      await prisma.$transaction(async () => {
+        await updateGame(roomData.gameId, updatePayload);
+        await updatePlayerStats(winnerId, loserId);
+      });
+    } catch (error) {
+      logger.error(`Transaction failed for game ${roomData.gameId}:`, error);
+      throw error; // [stability-sprint1] wrap game outcome + stats writes in prisma transaction
+    }
+  } else {
+    if (['stalemate', 'draw-50move', 'draw-repetition'].includes(roomData.status)) {
+      updatePayload.result = 'draw';
+      updatePayload.winner = null;
+      updatePayload.endTime = new Date();
+      await updateDrawStats(roomData.players.w.userId, roomData.players.b.userId);
+    }
+    if (!isPlayableStatus(roomData.status)) {
+      stopRoomClock(player.roomId, roomData, 'ended');
+    }
+    roomData.moves = updatePayload.moves;
+    await updateGame(roomData.gameId, updatePayload);
   }
-  if (!isPlayableStatus(roomData.status)) {
-    stopRoomClock(player.roomId, roomData, 'ended');
-  }
-
-  roomData.moves = updatePayload.moves;
-  await updateGame(roomData.gameId, updatePayload);
   io.to(player.roomId).emit('moveMade', { gameState: roomData, move: { fromRow, fromCol, toRow, toCol } });
   emitClockSnapshot(io, player.roomId, roomData);
 }
