@@ -4,6 +4,7 @@ const bcrypt = require("bcryptjs");
 
 const {
   clearSessionCookies,
+  cookieOptions,
   getCookie,
   getJwtSecret,
   getRequestAccessToken,
@@ -68,14 +69,6 @@ function prismaUserPayload(user) {
 
 function userForJwt(user) {
   return { ...user, _id: user.id };
-}
-
-function cookieOptions(maxAgeMs) {
-  const isProduction = process.env.NODE_ENV === "production";
-  const options = { httpOnly: true, secure: isProduction, sameSite: isProduction ? "none" : "lax", path: "/" };
-  if (maxAgeMs) options.maxAge = maxAgeMs;
-  if (process.env.COOKIE_DOMAIN) options.domain = process.env.COOKIE_DOMAIN;
-  return options;
 }
 
 function signRefreshToken(user, tokenVersion = 0) {

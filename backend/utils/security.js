@@ -72,12 +72,20 @@ function randomToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+function requiresCrossSiteCookies() {
+  if (process.env.NODE_ENV === 'production') return true;
+  if (process.env.COOKIE_SAMESITE === 'none') return true;
+  // Render-hosted API + Vercel frontend needs SameSite=None even if NODE_ENV is mis-set.
+  if (process.env.RENDER || process.env.RENDER_EXTERNAL_URL) return true;
+  return false;
+}
+
 function cookieOptions(maxAgeMs) {
-  const isProduction = process.env.NODE_ENV === 'production';
+  const crossSite = requiresCrossSiteCookies();
   const options = {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
+    secure: crossSite,
+    sameSite: crossSite ? 'none' : 'lax',
     path: '/',
   };
   if (maxAgeMs) options.maxAge = maxAgeMs;
@@ -158,6 +166,7 @@ function sanitizeText(value, maxLength = 500) {
 module.exports = {
   authUserPayload,
   clearSessionCookies,
+  cookieOptions,
   getBearerToken,
   getCookie,
   getJwtSecret,
@@ -167,6 +176,7 @@ module.exports = {
   getRequestAccessToken,
   isConfiguredAdminEmail,
   randomToken,
+  requiresCrossSiteCookies,
   sanitizeText,
   signAccessToken,
   validateProductionEmail,
