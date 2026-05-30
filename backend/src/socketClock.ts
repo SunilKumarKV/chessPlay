@@ -1,6 +1,7 @@
 import type { Server as SocketIOServer } from 'socket.io';
 import type { SocketState } from './socketTypes';
 import { updateGame } from './repositories/gameRepository';
+import { prisma } from './config/prisma';
 
 const { opponent } = require('../chessUtils');
 const { isPlayableStatus } = require('../gameState');
@@ -109,12 +110,13 @@ export async function handleTimeout(io: SocketIOServer, state: SocketState, room
 
   roomData.status = 'timeout';
   roomData.turn = timedOutColor;
-  await updateGame(roomData.gameId, {
-    result: winnerColor === 'w' ? 'white' : 'black',
-    winner: winnerSlot?.userId || null,
-    endTime: new Date(),
+  await prisma.$transaction(async (tx) => {
+    await updateGame(roomData.gameId, {
+      result: winnerColor === 'w' ? 'WHITE_WIN' : 'BLACK_WIN',
+      endedAt: new Date(),
+    }, tx);
+    if (winnerSlot?.userId) await updatePlayerStats(winnerSlot.userId, loserSlot?.userId || null, tx);
   });
-  if (winnerSlot?.userId) await updatePlayerStats(winnerSlot.userId, loserSlot?.userId || null);
 
   io.to(roomId).emit('timeoutResult', {
     roomId,

@@ -1,4 +1,8 @@
+import { Prisma, PrismaClient } from '@prisma/client';
+
 import { prisma } from '../config/prisma';
+
+type PrismaClientLike = PrismaClient | Prisma.TransactionClient;
 
 type CreateUserInput = {
   email: string;
@@ -10,32 +14,32 @@ type CreateUserInput = {
   emailVerified?: boolean;
 };
 
-export async function findUserById(id: string) {
-  return prisma.user.findUnique({ where: { id } });
+export async function findUserById(id: string, client: PrismaClientLike = prisma) {
+  return client.user.findUnique({ where: { id } });
 }
 
-export async function findUserByEmail(email: string) {
-  return prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+export async function findUserByEmail(email: string, client: PrismaClientLike = prisma) {
+  return client.user.findUnique({ where: { email: email.toLowerCase() } });
 }
 
-export async function findUserByUsername(username: string) {
-  return prisma.user.findUnique({ where: { username } });
+export async function findUserByUsername(username: string, client: PrismaClientLike = prisma) {
+  return client.user.findUnique({ where: { username } });
 }
 
-export async function findUserByEmailOrUsername(email: string, username: string) {
-  return prisma.user.findFirst({ where: { OR: [{ email: email.toLowerCase() }, { username }] } });
+export async function findUserByEmailOrUsername(email: string, username: string, client: PrismaClientLike = prisma) {
+  return client.user.findFirst({ where: { OR: [{ email: email.toLowerCase() }, { username }] } });
 }
 
-export async function findUserByEmailVerificationHash(tokenHash: string, now = new Date()) {
-  return prisma.user.findFirst({ where: { emailVerificationTokenHash: tokenHash, emailVerificationExpires: { gt: now } } });
+export async function findUserByEmailVerificationHash(tokenHash: string, now = new Date(), client: PrismaClientLike = prisma) {
+  return client.user.findFirst({ where: { emailVerificationTokenHash: tokenHash, emailVerificationExpires: { gt: now } } });
 }
 
-export async function findUserByPasswordResetHash(tokenHash: string, now = new Date()) {
-  return prisma.user.findFirst({ where: { passwordResetTokenHash: tokenHash, passwordResetExpires: { gt: now } } });
+export async function findUserByPasswordResetHash(tokenHash: string, now = new Date(), client: PrismaClientLike = prisma) {
+  return client.user.findFirst({ where: { passwordResetTokenHash: tokenHash, passwordResetExpires: { gt: now } } });
 }
 
-export async function createUser(input: CreateUserInput) {
-  return prisma.user.create({
+export async function createUser(input: CreateUserInput, client: PrismaClientLike = prisma) {
+  return client.user.create({
     data: {
       email: input.email.toLowerCase(),
       username: input.username,
@@ -48,16 +52,16 @@ export async function createUser(input: CreateUserInput) {
   });
 }
 
-export async function updateUserRating(userId: string, rating: number) {
-  return prisma.user.update({ where: { id: userId }, data: { rating } });
+export async function updateUserRating(userId: string, rating: number, client: PrismaClientLike = prisma) {
+  return client.user.update({ where: { id: userId }, data: { rating } });
 }
 
-export async function setUserPremium(userId: string, isPremium: boolean) {
-  return prisma.user.update({ where: { id: userId }, data: { isPremium } });
+export async function setUserPremium(userId: string, isPremium: boolean, client: PrismaClientLike = prisma) {
+  return client.user.update({ where: { id: userId }, data: { isPremium } });
 }
 
-export async function updateUserAuthSession(userId: string, input: { refreshTokenHash?: string | null; lastLogin?: Date; tokenVersion?: number }) {
-  return prisma.user.update({
+export async function updateUserAuthSession(userId: string, input: { refreshTokenHash?: string | null; lastLogin?: Date; tokenVersion?: number }, client: PrismaClientLike = prisma) {
+  return client.user.update({
     where: { id: userId },
     data: {
       ...(Object.prototype.hasOwnProperty.call(input, 'refreshTokenHash') ? { refreshTokenHash: input.refreshTokenHash } : {}),
@@ -67,28 +71,39 @@ export async function updateUserAuthSession(userId: string, input: { refreshToke
   });
 }
 
-export async function clearUserRefreshToken(userId: string) {
-  return prisma.user.update({ where: { id: userId }, data: { refreshTokenHash: null } });
+export async function clearUserRefreshToken(userId: string, client: PrismaClientLike = prisma) {
+  return client.user.update({ where: { id: userId }, data: { refreshTokenHash: null } });
 }
 
-export async function setEmailVerificationToken(userId: string, tokenHash: string, expiresAt: Date) {
-  return prisma.user.update({ where: { id: userId }, data: { emailVerificationTokenHash: tokenHash, emailVerificationExpires: expiresAt } });
+export async function setEmailVerificationToken(userId: string, tokenHash: string, expiresAt: Date, client: PrismaClientLike = prisma) {
+  return client.user.update({ where: { id: userId }, data: { emailVerificationTokenHash: tokenHash, emailVerificationExpires: expiresAt } });
 }
 
-export async function markEmailVerified(userId: string) {
-  return prisma.user.update({ where: { id: userId }, data: { emailVerified: true, emailVerificationTokenHash: null, emailVerificationExpires: null } });
+export async function markEmailVerified(userId: string, client: PrismaClientLike = prisma) {
+  return client.user.update({ where: { id: userId }, data: { emailVerified: true, emailVerificationTokenHash: null, emailVerificationExpires: null } });
 }
 
-export async function setPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date) {
-  return prisma.user.update({ where: { id: userId }, data: { passwordResetTokenHash: tokenHash, passwordResetExpires: expiresAt } });
+export async function setPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date, client: PrismaClientLike = prisma) {
+  return client.user.update({ where: { id: userId }, data: { passwordResetTokenHash: tokenHash, passwordResetExpires: expiresAt } });
 }
 
-export async function recordUserDraw(userId: string) {
-  const current = await prisma.stats.findUnique({ where: { userId } });
+export async function incrementUserStats(userId: string, delta: Record<string, number>, client: PrismaClientLike = prisma) {
+  const current = await client.stats.findUnique({ where: { userId } });
   const data = {
     ...((current?.data as Record<string, unknown>) || {}),
-    gamesPlayed: Number((current?.data as any)?.gamesPlayed || 0) + 1,
-    gamesDrawn: Number((current?.data as any)?.gamesDrawn || 0) + 1,
-  };
-  return prisma.stats.upsert({ where: { userId }, create: { userId, data }, update: { data } });
+  } as Record<string, number>;
+
+  for (const [key, value] of Object.entries(delta)) {
+    data[key] = Number(data[key] || 0) + Number(value);
+  }
+
+  return client.stats.upsert({
+    where: { userId },
+    create: { userId, data },
+    update: { data },
+  });
+}
+
+export async function recordUserDraw(userId: string, client: PrismaClientLike = prisma) {
+  return incrementUserStats(userId, { gamesPlayed: 1, gamesDrawn: 1 }, client);
 }
