@@ -249,7 +249,7 @@ export default function App() {
       if (user) window.clearTimeout(restoreTimer);
       else cancelIdleRun(restoreTimer);
     };
-  }, []);
+  }, [user]);
 
   const handleLogin = (userData) => {
     localStorage.removeItem("guestMode");
