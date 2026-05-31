@@ -127,37 +127,37 @@ function enforceProductionOrigin(req: Request, res: Response, next: NextFunction
 
 function registerRoutes(app: express.Express): void {
   app.use('/api/auth', authCoreRoutes);
-  app.use('/api/auth', authRoutes);
+  if (!isProduction) app.use('/api/auth', authRoutes);
   app.use('/api/games', gameRoutes);
   app.use('/api/ai', aiRoutes);
 
   app.use('/api/billing', billingCoreRoutes);
   app.use('/api/billing', billingPaymentsCoreRoutes);
-  app.use('/api/billing', billingRoutes);
+  if (!isProduction) app.use('/api/billing', billingRoutes);
 
   app.use('/api/payments', paymentsCoreRoutes);
   app.use('/api/payments', paymentRoutes);
 
   app.use('/api/social', socialCoreRoutes);
-  app.use('/api/social', socialRoutes);
+  if (!isProduction) app.use('/api/social', socialRoutes);
 
   app.use('/api/automation', automationCoreRoutes);
-  app.use('/api/automation', automationRoutes);
+  if (!isProduction) app.use('/api/automation', automationRoutes);
 
   app.use('/api/admin', adminCoreRoutes);
-  app.use('/api/admin', adminRoutes);
+  if (!isProduction) app.use('/api/admin', adminRoutes);
 
   app.use('/api/tournaments', tournamentsCoreRoutes);
-  app.use('/api/tournaments', tournamentRoutes);
+  if (!isProduction) app.use('/api/tournaments', tournamentRoutes);
 
   app.use('/api/messages', messagesCoreRoutes);
-  app.use('/api/messages', messageRoutes);
+  if (!isProduction) app.use('/api/messages', messageRoutes);
 
   app.use('/api/settings', settingsCoreRoutes);
-  app.use('/api/settings', settingsRoutes);
+  if (!isProduction) app.use('/api/settings', settingsRoutes);
 
   app.use('/api/profile', profileCoreRoutes);
-  app.use('/api/profile', profileRoutes);
+  if (!isProduction) app.use('/api/profile', profileRoutes);
   app.use('/api/notifications', notificationRoutes);
 
   app.use('/api/puzzles', puzzleRoutes);

@@ -33,6 +33,7 @@ const {
   softDeleteUser,
   updateUserAuthSession,
 } = require("../src/repositories/userRepository");
+const { getFriendsAndRequests, sendFriendRequest, respondFriendRequest } = require('../src/repositories/userDocumentRepository');
 
 const router = express.Router();
 const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -535,6 +536,41 @@ router.delete("/account", authLimiter, auth, async (req, res) => {
   } catch (error) {
     logger.error("Prisma delete account error:", error);
     return res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Friends endpoints (Prisma-backed via document records)
+router.get('/friends', auth, async (req, res) => {
+  try {
+    const data = await getFriendsAndRequests(req.user.userId);
+    return res.json({ friends: data.friends, requests: data.requests, count: data.friends.length });
+  } catch (error) {
+    logger.error('Prisma friends error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/friends/request', auth, async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId || userId === req.user.userId) return res.status(400).json({ message: 'Invalid user' });
+    await sendFriendRequest(req.user.userId, userId);
+    return res.json({ message: 'Friend request sent' });
+  } catch (error) {
+    logger.error('Prisma friend request error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/friends/respond', auth, async (req, res) => {
+  try {
+    const { requestId, action } = req.body;
+    if (!['accept', 'decline'].includes(action)) return res.status(400).json({ message: 'Invalid action' });
+    const result = await respondFriendRequest(req.user.userId, requestId, action);
+    return res.json({ message: result.message });
+  } catch (error) {
+    logger.error('Prisma friend respond error:', error);
+    return res.status(500).json({ message: 'Server error' });
   }
 });
 
