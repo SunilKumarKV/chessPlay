@@ -50,18 +50,17 @@ export async function awardAbandonmentWin(io: SocketIOServer, state: SocketState
   loserSlot.disconnected = false;
 
   try {
-    await prisma.$transaction(async () => {
+    await prisma.$transaction(async (tx) => {
       await updateGame(roomData.gameId, {
-        result: winnerColor === 'w' ? 'white' : 'black',
-        winner: winnerSlot?.userId || null,
-        endTime: new Date(),
-      });
+        result: winnerColor === 'w' ? 'WHITE_WIN' : 'BLACK_WIN',
+        endedAt: new Date(),
+      }, tx);
 
-      if (winnerSlot?.userId) await updatePlayerStats(winnerSlot.userId, loserId);
+      if (winnerSlot?.userId) await updatePlayerStats(winnerSlot.userId, loserId, tx);
     });
   } catch (error) {
     logger.error(`Transaction failed for game ${roomData.gameId}:`, error);
-    throw error; // [stability-sprint1] wrap abandonment outcome + stats in prisma transaction
+    throw error;
   }
 
   io.to(roomId).emit('playerAbandoned', { color: abandonedColor, winnerColor, gameState: roomData });
@@ -90,12 +89,13 @@ export async function cleanupPlayer(io: SocketIOServer, socket: Socket, state: S
     if (opponentUserId && isPlayableStatus(roomData.status)) {
       roomData.status = 'abandoned';
       stopRoomClock(player.roomId, roomData, 'ended');
-      await updateGame(roomData.gameId, {
-        result: opponentColor === 'w' ? 'white' : 'black',
-        winner: opponentUserId,
-        endTime: new Date(),
+      await prisma.$transaction(async (tx) => {
+        await updateGame(roomData.gameId, {
+          result: opponentColor === 'w' ? 'WHITE_WIN' : 'BLACK_WIN',
+          endedAt: new Date(),
+        }, tx);
+        await updatePlayerStats(opponentUserId, leavingUserId, tx);
       });
-      await updatePlayerStats(opponentUserId, leavingUserId);
       io.to(player.roomId).emit('playerAbandoned', { winnerColor: opponentColor, gameState: roomData });
       emitClockSnapshot(io, player.roomId, roomData);
       state.players.delete(socket.id);

@@ -334,7 +334,28 @@ router.get("/mobile/socket-token", async (req, res) => {
   }
 });
 
-router.post("/logout", (_req, res) => {
+router.post("/logout", async (req, res) => {
+  try {
+    const refreshToken = getCookie(req, "refreshToken");
+    if (refreshToken) {
+      const decoded = jwt.verify(refreshToken, getJwtSecret("refresh"));
+      if (!decoded.type || decoded.type === "refresh") {
+        const user = await findUserById(decoded.userId);
+        if (
+          user &&
+          !user.deletedAt &&
+          decoded.tokenVersion === (user.tokenVersion || 0) &&
+          user.refreshTokenHash &&
+          user.refreshTokenHash === hashToken(refreshToken)
+        ) {
+          await updateUserAuthSession(user.id, { refreshTokenHash: null, tokenVersion: (user.tokenVersion || 0) + 1 });
+        }
+      }
+    }
+  } catch {
+    // Logout remains idempotent; invalid browser sessions are cleared below.
+  }
+
   clearSessionCookies(res);
   return res.json({ message: "Logged out" });
 });
@@ -344,11 +365,23 @@ router.post("/refresh", async (req, res) => {
     const refreshToken = getCookie(req, "refreshToken");
     if (!refreshToken) return res.status(401).json({ message: "Refresh token missing" });
     const decoded = jwt.verify(refreshToken, getJwtSecret("refresh"));
-    if (decoded.type && decoded.type !== "refresh") return res.status(401).json({ message: "Invalid token type" });
+    if (decoded.type && decoded.type !== "refresh") {
+      clearSessionCookies(res);
+      return res.status(401).json({ message: "Invalid token type" });
+    }
     const user = await findUserById(decoded.userId);
-    if (!user || user.deletedAt || user.refreshTokenHash !== hashToken(refreshToken)) {
+    if (!user || user.deletedAt) {
       clearSessionCookies(res);
       return res.status(401).json({ message: "Invalid refresh session" });
+    }
+    if (decoded.tokenVersion !== (user.tokenVersion || 0)) {
+      clearSessionCookies(res);
+      return res.status(401).json({ message: "Refresh session has expired" });
+    }
+    if (!user.refreshTokenHash || user.refreshTokenHash !== hashToken(refreshToken)) {
+      await updateUserAuthSession(user.id, { refreshTokenHash: null, tokenVersion: (user.tokenVersion || 0) + 1 });
+      clearSessionCookies(res);
+      return res.status(401).json({ message: "Refresh session was revoked" });
     }
     await issuePrismaSession(res, user);
     return res.json(buildAuthResponse("Session refreshed", user));
@@ -363,9 +396,16 @@ router.get("/session", async (req, res) => {
     const token = getRequestAccessToken(req);
     if (!token) return res.json({ user: null });
     const decoded = jwt.verify(token, getJwtSecret("access"));
-    if (!decoded.userId) return res.json({ user: null });
+    if ((decoded.type && decoded.type !== "access") || !decoded.userId) {
+      clearSessionCookies(res);
+      return res.json({ user: null });
+    }
     const user = await findUserById(decoded.userId);
     if (!user || user.deletedAt) {
+      clearSessionCookies(res);
+      return res.json({ user: null });
+    }
+    if (decoded.tokenVersion !== (user.tokenVersion || 0)) {
       clearSessionCookies(res);
       return res.json({ user: null });
     }

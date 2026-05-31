@@ -1,4 +1,5 @@
 import type { Server as SocketIOServer, Socket } from 'socket.io';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import type { SocketState } from './socketTypes';
 import { prisma } from './config/prisma';
 import { updateGame } from './repositories/gameRepository';
@@ -14,10 +15,12 @@ function emitServerError(socket: Socket, message: string): void {
   socket.emit('serverError', { message });
 }
 
-export async function updateDrawStats(whiteUserId?: string, blackUserId?: string): Promise<void> {
+type PrismaClientLike = PrismaClient | Prisma.TransactionClient;
+
+export async function updateDrawStats(whiteUserId?: string, blackUserId?: string, client: PrismaClientLike = prisma): Promise<void> {
   const updates = [];
-  if (whiteUserId) updates.push(recordUserDraw(String(whiteUserId)));
-  if (blackUserId) updates.push(recordUserDraw(String(blackUserId)));
+  if (whiteUserId) updates.push(recordUserDraw(String(whiteUserId), client));
+  if (blackUserId) updates.push(recordUserDraw(String(blackUserId), client));
   await Promise.all(updates);
 }
 
@@ -76,34 +79,36 @@ export async function handleMove(io: SocketIOServer, socket: Socket, state: Sock
     const loserColor = roomData.turn;
     const winnerId = player.userId;
     const loserId = roomData.players[loserColor]?.userId || null;
-    updatePayload.result = winnerColor === 'w' ? 'white' : 'black';
-    updatePayload.winner = winnerId;
-    updatePayload.endTime = new Date();
+    updatePayload.result = winnerColor === 'w' ? 'WHITE_WIN' : 'BLACK_WIN';
+    updatePayload.endedAt = new Date();
     if (!isPlayableStatus(roomData.status)) {
       stopRoomClock(player.roomId, roomData, 'ended');
     }
     roomData.moves = updatePayload.moves;
     try {
-      await prisma.$transaction(async () => {
-        await updateGame(roomData.gameId, updatePayload);
-        await updatePlayerStats(winnerId, loserId);
+      await prisma.$transaction(async (tx) => {
+        await updateGame(roomData.gameId, updatePayload, tx);
+        await updatePlayerStats(winnerId, loserId, tx);
       });
     } catch (error) {
       logger.error(`Transaction failed for game ${roomData.gameId}:`, error);
-      throw error; // [stability-sprint1] wrap game outcome + stats writes in prisma transaction
+      throw error;
     }
   } else {
     if (['stalemate', 'draw-50move', 'draw-repetition'].includes(roomData.status)) {
-      updatePayload.result = 'draw';
-      updatePayload.winner = null;
-      updatePayload.endTime = new Date();
-      await updateDrawStats(roomData.players.w.userId, roomData.players.b.userId);
+      updatePayload.result = 'DRAW';
+      updatePayload.endedAt = new Date();
+      await prisma.$transaction(async (tx) => {
+        await updateGame(roomData.gameId, updatePayload, tx);
+        await updateDrawStats(roomData.players.w.userId, roomData.players.b.userId, tx);
+      });
+    } else {
+      if (!isPlayableStatus(roomData.status)) {
+        stopRoomClock(player.roomId, roomData, 'ended');
+      }
+      roomData.moves = updatePayload.moves;
+      await updateGame(roomData.gameId, updatePayload);
     }
-    if (!isPlayableStatus(roomData.status)) {
-      stopRoomClock(player.roomId, roomData, 'ended');
-    }
-    roomData.moves = updatePayload.moves;
-    await updateGame(roomData.gameId, updatePayload);
   }
   io.to(player.roomId).emit('moveMade', { gameState: roomData, move: { fromRow, fromCol, toRow, toCol } });
   emitClockSnapshot(io, player.roomId, roomData);
@@ -122,8 +127,10 @@ export async function acceptDraw(io: SocketIOServer, socket: Socket, state: Sock
   }
   roomData.status = 'draw';
   stopRoomClock(player.roomId, roomData, 'ended');
-  await updateGame(roomData.gameId, { result: 'draw', winner: null, endTime: new Date() });
-  await updateDrawStats(roomData.players.w.userId, roomData.players.b.userId);
+  await prisma.$transaction(async (tx) => {
+    await updateGame(roomData.gameId, { result: 'DRAW', endedAt: new Date() }, tx);
+    await updateDrawStats(roomData.players.w.userId, roomData.players.b.userId, tx);
+  });
   io.to(player.roomId).emit('drawAccepted', { gameState: roomData });
   emitClockSnapshot(io, player.roomId, roomData);
 }
@@ -140,8 +147,11 @@ export async function resignGame(io: SocketIOServer, socket: Socket, state: Sock
   const winnerSlot = roomData.players[winnerColor];
   roomData.status = 'resigned';
   stopRoomClock(player.roomId, roomData, 'ended');
-  await updateGame(roomData.gameId, { result: winnerColor === 'w' ? 'white' : 'black', winner: winnerSlot?.userId || null, endTime: new Date() });
-  if (winnerSlot?.userId) await updatePlayerStats(winnerSlot.userId, player.userId);
+  const resultValue = winnerColor === 'w' ? 'WHITE_WIN' : 'BLACK_WIN';
+  await prisma.$transaction(async (tx) => {
+    await updateGame(roomData.gameId, { result: resultValue, endedAt: new Date() }, tx);
+    if (winnerSlot?.userId) await updatePlayerStats(winnerSlot.userId, player.userId, tx);
+  });
   io.to(player.roomId).emit('playerResigned', { color: player.color, winnerColor, gameState: roomData });
   emitClockSnapshot(io, player.roomId, roomData);
 }
@@ -160,7 +170,7 @@ export async function closeRoomIfEmpty(io: SocketIOServer, state: SocketState, r
     state.spectators.delete(roomId);
   }
   if (roomData.status !== 'timeout') {
-    await updateGame(roomData.gameId, { result: toGameResult(roomData.status), endTime: new Date() });
+    await updateGame(roomData.gameId, { result: toGameResult(roomData.status), endedAt: new Date() });
   }
   stopRoomClock(roomId, roomData, 'ended');
   state.rooms.delete(roomId);

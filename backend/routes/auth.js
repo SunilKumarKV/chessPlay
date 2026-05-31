@@ -661,7 +661,31 @@ router.post("/google", authLimiter, async (req, res) => {
 });
 
 // Logout
-router.post("/logout", (req, res) => {
+router.post("/logout", async (req, res) => {
+  try {
+    const refreshToken = getCookie(req, "refreshToken");
+    if (refreshToken) {
+      const decoded = jwt.verify(refreshToken, getJwtSecret("refresh"));
+      if (!decoded.type || decoded.type === "refresh") {
+        const user = await User.findById(decoded.userId).select("+refreshTokenHash");
+        if (
+          user &&
+          !user.deletedAt &&
+          !user.isBanned &&
+          decoded.tokenVersion === (user.tokenVersion || 0) &&
+          user.refreshTokenHash &&
+          user.refreshTokenHash === hashToken(refreshToken)
+        ) {
+          user.refreshTokenHash = null;
+          user.tokenVersion = (user.tokenVersion || 0) + 1;
+          await user.save();
+        }
+      }
+    }
+  } catch {
+    // Logout remains idempotent; invalid browser sessions are cleared below.
+  }
+
   clearSessionCookies(res);
   res.json({ message: "Logged out" });
 });
@@ -675,8 +699,16 @@ router.get("/session", async (req, res) => {
     }
 
     const decoded = jwt.verify(token, getJwtSecret("access"));
+    if (decoded.type && decoded.type !== "access") {
+      clearSessionCookies(res);
+      return res.json({ user: null });
+    }
     const user = await User.findById(decoded.userId).select("-password");
-    if (!user) {
+    if (!user || user.deletedAt || user.isBanned) {
+      clearSessionCookies(res);
+      return res.json({ user: null });
+    }
+    if (decoded.tokenVersion !== (user.tokenVersion || 0)) {
       clearSessionCookies(res);
       return res.json({ user: null });
     }
@@ -716,13 +748,19 @@ router.post("/refresh", async (req, res) => {
 
     const decoded = jwt.verify(refreshToken, getJwtSecret("refresh"));
     if (decoded.type && decoded.type !== "refresh") {
+      clearSessionCookies(res);
       return res.status(401).json({ message: "Invalid token type" });
     }
 
     const user = await User.findById(decoded.userId).select("+refreshTokenHash");
-    if (!user || user.deletedAt) {
+    if (!user || user.deletedAt || user.isBanned) {
       clearSessionCookies(res);
       return res.status(401).json({ message: "Invalid refresh session" });
+    }
+
+    if (decoded.tokenVersion !== (user.tokenVersion || 0)) {
+      clearSessionCookies(res);
+      return res.status(401).json({ message: "Refresh session has expired" });
     }
 
     if (user.refreshTokenHash !== hashToken(refreshToken)) {
