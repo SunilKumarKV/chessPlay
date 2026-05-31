@@ -87,6 +87,28 @@ export async function setPasswordResetToken(userId: string, tokenHash: string, e
   return client.user.update({ where: { id: userId }, data: { passwordResetTokenHash: tokenHash, passwordResetExpires: expiresAt } });
 }
 
+export async function clearPasswordResetToken(userId: string, client: PrismaClientLike = prisma) {
+  return client.user.update({ where: { id: userId }, data: { passwordResetTokenHash: null, passwordResetExpires: null } });
+}
+
+export async function updateUserPassword(userId: string, passwordHash: string, client: PrismaClientLike = prisma) {
+  return client.user.update({ where: { id: userId }, data: { passwordHash } });
+}
+
+export async function softDeleteUser(userId: string, input: { email: string; username: string; passwordHash: string; deletedAt: Date; refreshTokenHash?: string | null }, client: PrismaClientLike = prisma) {
+  return client.user.update({
+    where: { id: userId },
+    data: {
+      email: input.email.toLowerCase(),
+      username: input.username,
+      passwordHash: input.passwordHash,
+      refreshTokenHash: input.refreshTokenHash ?? null,
+      deletedAt: input.deletedAt,
+      tokenVersion: { increment: 1 },
+    },
+  });
+}
+
 export async function incrementUserStats(userId: string, delta: Record<string, number>, client: PrismaClientLike = prisma) {
   const current = await client.stats.findUnique({ where: { userId } });
   const data = {

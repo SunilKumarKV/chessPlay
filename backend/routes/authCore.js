@@ -27,6 +27,9 @@ const {
   markEmailVerified,
   setEmailVerificationToken,
   setPasswordResetToken,
+  clearPasswordResetToken,
+  updateUserPassword,
+  softDeleteUser,
   updateUserAuthSession,
 } = require("../src/repositories/userRepository");
 
@@ -471,6 +474,65 @@ router.post("/forgot-password", authLimiter, async (req, res) => {
     return res.json({ message: "If the account exists, a reset email was sent" });
   } catch (error) {
     logger.error("Prisma forgot password error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/reset-password", authLimiter, async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    const passwordError = validateStrongPassword(password);
+    if (passwordError) return res.status(400).json({ message: passwordError });
+    const user = await findUserByPasswordResetHash(hashToken(token));
+    if (!user || user.deletedAt) return res.status(400).json({ message: "Invalid or expired reset token" });
+    const passwordHash = await bcrypt.hash(String(password), 12);
+    await updateUserPassword(user.id, passwordHash);
+    await updateUserAuthSession(user.id, { refreshTokenHash: null, tokenVersion: (user.tokenVersion || 0) + 1 });
+    await clearPasswordResetToken(user.id);
+    clearSessionCookies(res);
+    return res.json({ message: "Password reset successful. Please log in again." });
+  } catch (error) {
+    logger.error("Prisma reset password error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.put("/password", authLimiter, auth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const passwordError = validateStrongPassword(newPassword);
+    if (passwordError) return res.status(400).json({ message: passwordError });
+    const user = await findUserById(req.user.userId);
+    if (!user || user.deletedAt || !user.passwordHash) return res.status(404).json({ message: "User not found" });
+    const isMatch = await bcrypt.compare(String(currentPassword || ""), user.passwordHash);
+    if (!isMatch) return res.status(400).json({ message: "Current password is incorrect" });
+    const passwordHash = await bcrypt.hash(String(newPassword), 12);
+    await updateUserPassword(user.id, passwordHash);
+    return res.json({ message: "Password updated successfully" });
+  } catch (error) {
+    logger.error("Prisma password update error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.delete("/account", authLimiter, auth, async (req, res) => {
+  try {
+    const user = await findUserById(req.user.userId);
+    if (!user || user.deletedAt) return res.status(404).json({ message: "User not found" });
+    const anonymizedEmail = `deleted-${user.id}@deleted.chessplay.local`;
+    const anonymizedUsername = `DeletedUser${String(user.id).slice(-6)}`;
+    const passwordHash = await bcrypt.hash(`${randomToken()}A1`, 12);
+    await softDeleteUser(user.id, {
+      email: anonymizedEmail,
+      username: anonymizedUsername,
+      passwordHash,
+      deletedAt: new Date(),
+      refreshTokenHash: null,
+    });
+    clearSessionCookies(res);
+    return res.json({ message: "Account deleted" });
+  } catch (error) {
+    logger.error("Prisma delete account error:", error);
     return res.status(500).json({ message: "Server error" });
   }
 });
