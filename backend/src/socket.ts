@@ -20,6 +20,12 @@ const SOCKET_EVENT_LIMITS: Record<string, { count: number; windowMs: number }> =
   default: { count: 40, windowMs: 10_000 },
 };
 
+type AccessTokenPayload = {
+  userId?: string;
+  type?: string;
+  tokenVersion?: number;
+};
+
 export function createSocketState(): SocketState {
   return {
     rooms: new Map(),
@@ -108,12 +114,15 @@ export function registerSockets(server: HttpServer, state = createSocketState())
       const token = socket.handshake.auth?.accessToken || cookies.accessToken || cookies.authToken;
       if (!token) return next(new Error('Authentication required'));
 
-      const decoded = jwt.verify(token, getJwtSecret('access')) as { userId?: string; type?: string };
+      const decoded = jwt.verify(token, getJwtSecret('access')) as AccessTokenPayload;
       if (decoded.type && decoded.type !== 'access') return next(new Error('Invalid token type'));
       if (!decoded.userId) return next(new Error('Invalid token payload'));
 
       const user = await findUserById(decoded.userId);
-      if (!user) return next(new Error('User not found'));
+      if (!user || user.deletedAt) return next(new Error('Invalid or restricted session'));
+      if (typeof decoded.tokenVersion === 'number' && decoded.tokenVersion !== (user.tokenVersion || 0)) {
+        return next(new Error('Session has expired'));
+      }
 
       socket.data.user = user;
       return next();
