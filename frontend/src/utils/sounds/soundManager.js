@@ -34,10 +34,15 @@ class SoundManager {
   async preloadSounds() {
     const soundNames = ["move", "capture", "check", "castle", "promote", "gameStart", "gameEnd"];
     const appBaseUrl = new URL(import.meta.env.BASE_URL || "/", window.location.origin);
+    const usePackagedAssets = import.meta.env.VITE_USE_SOUND_ASSETS === "true";
 
     for (const themeId of Object.keys(SOUND_THEMES)) {
       this.sounds[themeId] = {};
       for (const soundName of soundNames) {
+        if (!usePackagedAssets) {
+          this.sounds[themeId][soundName] = this.createFallbackSound(soundName, themeId);
+          continue;
+        }
         const extension = themeId === "classic" ? "wav" : themeId === "modern" ? "ogg" : "mp3";
         const soundUrl = new URL(`sounds/${themeId}/${soundName.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}.${extension}`, appBaseUrl).href;
         try {

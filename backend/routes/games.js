@@ -21,6 +21,24 @@ function requestUserId(req) {
   return String(req.user?.userId || '');
 }
 
+function settingsDocumentId(userId) {
+  return `user_settings:${userId}`;
+}
+
+async function getUserPrivacy(userId) {
+  const record = await prisma.documentRecord.findUnique({ where: { id: settingsDocumentId(userId) } });
+  const settingsPrivacy = record?.data?.privacy || {};
+  return {
+    gameHistory: settingsPrivacy.gameHistoryVisibility !== 'private',
+  };
+}
+
+async function canViewGameHistory(targetUserId, currentUserId) {
+  if (String(targetUserId) === String(currentUserId)) return true;
+  const privacy = await getUserPrivacy(targetUserId);
+  return privacy?.gameHistory === false ? false : true;
+}
+
 function normalizeMove(move) {
   return {
     from: String(move.from || ''),
@@ -80,11 +98,15 @@ router.get('/history', auth, async (req, res) => {
     const limit = parsePositiveInt(req.query.limit, 10, MAX_PAGE_SIZE);
     const skip = (page - 1) * limit;
     const currentUserId = requestUserId(req);
-    const targetUserId = String(req.query.userId || currentUserId);
+    const targetUserId = req.query.userId ? String(req.query.userId) : currentUserId;
 
     const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!targetUser) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (!(await canViewGameHistory(targetUserId, currentUserId))) {
+      return res.status(403).json({ message: 'This game history is private' });
     }
 
     const where = {
