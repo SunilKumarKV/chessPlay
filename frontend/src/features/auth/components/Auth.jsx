@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormInput, PasswordInput, PrimaryBtn } from "../../../components/ui";
-import { GOOGLE_CLIENT_ID } from "../../../config/runtime";
+import { GOOGLE_AUTH_ENABLED, GOOGLE_CLIENT_ID } from "../../../config/runtime";
 
 const GOOGLE_CLIENT_ID_ENV_NAME = "VITE_GOOGLE_CLIENT_ID";
 const GOOGLE_BACKEND_ENDPOINT = "/api/auth/google";
@@ -211,7 +211,7 @@ export default function Auth({
   useEffect(() => {
     googleCredentialHandler = handleGoogleCredential;
 
-    if (!GOOGLE_CLIENT_ID || !googleButtonRef.current) {
+    if (!GOOGLE_AUTH_ENABLED || !GOOGLE_CLIENT_ID || !googleButtonRef.current) {
       setGoogleReady(false);
       return () => {
         googleCredentialHandler = null;
@@ -286,7 +286,7 @@ export default function Auth({
 
       <div className="relative mt-5 grid gap-3">
         {/* Google client ID env: {GOOGLE_CLIENT_ID_ENV_NAME}; backend endpoint: {GOOGLE_BACKEND_ENDPOINT} */}
-        {GOOGLE_CLIENT_ID ? (
+        {GOOGLE_AUTH_ENABLED ? (
           <div className="relative min-h-11 w-full overflow-hidden rounded-full bg-white">
             {!googleReady && (
               <div className="grid min-h-11 place-items-center px-4 text-sm font-bold text-slate-700">
