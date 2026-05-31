@@ -7,6 +7,7 @@ import { ThemeProvider } from "../context/ThemeContext";
 import { I18nProvider } from "../i18n/I18nContext";
 import { initMonitoring } from "../services/monitoring";
 import { store } from "../store";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 initMonitoring();
 
@@ -21,7 +22,9 @@ ReactDOM.createRoot(root).render(
     <Provider store={store}>
       <ThemeProvider>
         <I18nProvider>
-          <App />
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
         </I18nProvider>
       </ThemeProvider>
     </Provider>
