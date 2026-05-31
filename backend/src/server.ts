@@ -1,7 +1,7 @@
 import http from 'http';
 
 import { createApp } from './app';
-import { env, validateEnv } from './config/env';
+import { env, isProduction, validateEnv } from './config/env';
 import { prisma } from './config/prisma';
 import { createSocketState, registerSockets, socketHealthState, startSocketStateMaintenance } from './socket';
 
@@ -36,12 +36,12 @@ checkDatabase()
       return;
     }
     const message = `PostgreSQL connection unavailable: ${status.message}`;
-    if (env.NODE_ENV === 'production') fatalConfigError(message);
+    if (isProduction) fatalConfigError(message);
     logger.warn(message);
   })
   .catch((error: Error) => {
     captureException(error, { area: 'postgres' });
-    if (env.NODE_ENV === 'production') fatalConfigError('PostgreSQL connection failed.');
+    if (isProduction) fatalConfigError('PostgreSQL connection failed.');
     logger.error('PostgreSQL connection error', error);
   });
 
