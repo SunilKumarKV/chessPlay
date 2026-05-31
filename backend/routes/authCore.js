@@ -23,6 +23,7 @@ const {
   findUserByEmail,
   findUserByEmailOrUsername,
   findUserByEmailVerificationHash,
+  findUserByPasswordResetHash,
   findUserById,
   markEmailVerified,
   setEmailVerificationToken,
