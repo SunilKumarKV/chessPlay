@@ -22,7 +22,7 @@ const auth = async (req, res, next) => {
     if (!user || user.deletedAt) {
       return res.status(401).json({ message: 'Invalid or restricted session' });
     }
-    if (typeof decoded.tokenVersion === 'number' && decoded.tokenVersion !== user.tokenVersion) {
+    if (typeof decoded.tokenVersion === 'number' && decoded.tokenVersion !== (user.tokenVersion || 0)) {
       return res.status(401).json({ message: 'Session has expired' });
     }
 

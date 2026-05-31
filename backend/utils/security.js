@@ -50,7 +50,7 @@ function getJwtSecret(kind = 'access') {
 
 function signAccessToken(user) {
   return jwt.sign(
-    { userId: String(user._id), username: user.username, type: 'access' },
+    { userId: String(user._id), username: user.username, tokenVersion: user.tokenVersion || 0, type: 'access' },
     getJwtSecret('access'),
     { expiresIn: process.env.ACCESS_TOKEN_EXPIRES || '15m' },
   );
