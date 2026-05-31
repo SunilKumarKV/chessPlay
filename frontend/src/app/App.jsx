@@ -241,15 +241,16 @@ export default function App() {
       }
     }
 
-    const restoreTimer = user ? window.setTimeout(restoreSession, 0) : runWhenIdle(restoreSession);
+    const hadStoredUser = Boolean(getStoredUser());
+    const restoreTimer = hadStoredUser ? window.setTimeout(restoreSession, 0) : runWhenIdle(restoreSession);
     return () => {
       cancelled = true;
       window.removeEventListener("popstate", syncPageFromUrl);
       window.clearTimeout(fallbackTimer);
-      if (user) window.clearTimeout(restoreTimer);
+      if (hadStoredUser) window.clearTimeout(restoreTimer);
       else cancelIdleRun(restoreTimer);
     };
-  }, [user]);
+  }, []);
 
   const handleLogin = (userData) => {
     localStorage.removeItem("guestMode");
