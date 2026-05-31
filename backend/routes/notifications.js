@@ -35,6 +35,22 @@ function requirePrisma(res) {
   return false;
 }
 
+router.get("/", auth, async (req, res, next) => {
+  try {
+    if (!requirePrisma(res)) return;
+    const user = await prisma.user.findUnique({
+      where: { id: String(req.user.userId) },
+      select: { id: true },
+    });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ notifications: [], count: 0 });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post("/device-token", auth, deviceTokenLimiter, validateRegisterDeviceToken, async (req, res, next) => {
   try {
     if (!requirePrisma(res)) return;

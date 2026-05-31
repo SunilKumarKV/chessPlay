@@ -23,6 +23,7 @@ const { sendSecurityEmail } = require("../utils/email");
 const logger = require("../utils/safeLogger");
 const auth = require("../middleware/auth");
 const { queueEmailEvent } = require("../services/emailEventService");
+const { prisma } = require("../lib/prisma");
 
 const router = express.Router();
 const PUBLIC_USER_FIELDS = "username avatar country title rating gamesPlayed gamesWon privacy friends";
@@ -1031,11 +1032,18 @@ router.get("/friends", auth, async (req, res) => {
       .populate("friendRequests.from", FRIEND_USER_FIELDS);
 
     if (!user) {
+      const prismaUser = prisma
+        ? await prisma.user.findUnique({ where: { id: String(req.user.userId) }, select: { id: true } })
+        : null;
+      if (prismaUser) {
+        return res.json({ friends: [], requests: [], count: 0 });
+      }
       return res.status(404).json({ message: "User not found" });
     }
 
+    const friends = user.friends.map((friend) => publicUser(friend, "friend"));
     res.json({
-      friends: user.friends.map((friend) => publicUser(friend, "friend")),
+      friends,
       requests: user.friendRequests
         .filter((request) => request.status === "pending" && request.from)
         .map((request) => ({
@@ -1043,6 +1051,7 @@ router.get("/friends", auth, async (req, res) => {
           from: publicUser(request.from, "incoming"),
           createdAt: request.createdAt,
         })),
+      count: friends.length,
     });
   } catch (error) {
     logger.error("Friends load error:", error);
