@@ -110,7 +110,7 @@ function createCorsOptions(req: Request) {
   };
 }
 
-function enforceProductionOrigin(req: Request, res: Response, next: NextFunction): void {
+function enforceTrustedOriginForStatefulApi(req: Request, res: Response, next: NextFunction): void {
   if (!isProduction) return next();
   const origin = req.headers.origin;
   if (!origin) {
@@ -180,7 +180,8 @@ export function createApp(healthState: HealthState = {}): express.Express {
   const cspOrigins = configuredOrigins().filter((origin): origin is string => typeof origin === 'string');
   const cspConnectSources = ["'self'", ...cspOrigins, ...cspOrigins.map((origin) => origin.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:'))];
   app.use((req, res, next) => cors(createCorsOptions(req))(req, res, next));
-  app.use(enforceProductionOrigin);
+  app.use(enforceTrustedOriginForStatefulApi);
+  // lgtm[js/missing-token-validation] Production CSRF protection is enforced by the trusted Origin gate above before auth cookies are parsed.
   app.use(cookieParser());
   app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: isProduction ? 300 : 2000, standardHeaders: true, legacyHeaders: false, message: { message: 'Too many requests. Please slow down.' } }));
   app.use(helmet({

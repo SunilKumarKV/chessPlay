@@ -27,6 +27,12 @@
     "morgan": "^1.10.1",
     "stockfish.js": "^10.0.2"
   },
+  "pnpm": {
+    "overrides": {
+      "@hono/node-server": "1.19.13",
+      "ws": "8.20.1"
+    }
+  },
   "engines": {
     "node": "20.x",
     "pnpm": "10.15.0"
