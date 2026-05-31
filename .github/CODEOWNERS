@@ -1,0 +1,26 @@
+# ChessPlay CODEOWNERS
+# Sensitive production areas must route back to the repository owner.
+
+* @SunilKumarKV
+
+# GitHub security, workflows, and repository governance
+.github/ @SunilKumarKV
+.github/workflows/ @SunilKumarKV
+.github/CODEOWNERS @SunilKumarKV
+SECURITY.md @SunilKumarKV
+RELEASE_CHECKLIST.md @SunilKumarKV
+
+# Backend, auth, payments, database, and deployment
+backend/ @SunilKumarKV
+backend/src/config/ @SunilKumarKV
+backend/middleware/ @SunilKumarKV
+backend/routes/ @SunilKumarKV
+backend/prisma/ @SunilKumarKV
+prisma/ @SunilKumarKV
+render.yaml @SunilKumarKV
+vercel.json @SunilKumarKV
+
+# Frontend production config
+frontend/ @SunilKumarKV
+package.json @SunilKumarKV
+pnpm-lock.yaml @SunilKumarKV

@@ -15,9 +15,9 @@ concurrency:
 
 jobs:
   validate:
-    name: Install, generate, typecheck, lint, and build
+    name: Install, audit, generate, typecheck, lint, and build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     env:
       NODE_ENV: test
@@ -35,6 +35,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -49,6 +51,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: pnpm audit --audit-level high
 
       - name: Generate backend Prisma client
         run: pnpm --filter backend exec prisma generate --schema=prisma/schema.prisma

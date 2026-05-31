@@ -15,6 +15,14 @@ function isAdminUser(user) {
   return String(user?.role || '').toUpperCase() === 'ADMIN' || String(process.env.ADMIN_EMAILS || '').toLowerCase().split(',').map((email) => email.trim()).includes(String(user?.email || '').toLowerCase());
 }
 
+function parseStrictBoolean(value) {
+  if (value === true) return true;
+  if (value === false) return false;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return null;
+}
+
 function asyncRoute(handler) {
   return async (req, res, next) => {
     try {
@@ -27,6 +35,8 @@ function asyncRoute(handler) {
 
 async function requireAdmin(req, res, next) {
   const userId = String(req.user?.userId || req.user?.id || '');
+  if (!userId) return res.status(401).json({ message: 'Session expired. Please sign in again.' });
+
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user || user.deletedAt || !isAdminUser(user)) return res.status(403).json({ message: 'Admin access required.' });
   req.adminUser = user;
@@ -235,8 +245,19 @@ router.get('/security', asyncRoute(async (_req, res) => {
 }));
 
 router.patch('/users/:id/admin', asyncRoute(async (req, res) => {
-  if (req.params.id === req.adminUser.id && req.body.isAdmin === false) return res.status(409).json({ message: 'You cannot remove your own admin access.' });
-  const user = await prisma.user.update({ where: { id: req.params.id }, data: { role: req.body.isAdmin ? 'ADMIN' : 'USER' } });
+  const nextAdmin = parseStrictBoolean(req.body.isAdmin);
+  if (nextAdmin === null) return res.status(400).json({ message: 'isAdmin must be true or false.' });
+  if (req.params.id === req.adminUser.id && nextAdmin === false) return res.status(409).json({ message: 'You cannot remove your own admin access.' });
+
+  const targetUser = await prisma.user.findUnique({ where: { id: req.params.id } });
+  if (!targetUser || targetUser.deletedAt) return res.status(404).json({ message: 'User not found.' });
+
+  if (nextAdmin === false && String(targetUser.role || '').toUpperCase() === 'ADMIN') {
+    const adminCount = await prisma.user.count({ where: { role: 'ADMIN', deletedAt: null } });
+    if (adminCount <= 1) return res.status(409).json({ message: 'At least one database admin must remain.' });
+  }
+
+  const user = await prisma.user.update({ where: { id: req.params.id }, data: { role: nextAdmin ? 'ADMIN' : 'USER' } });
   res.json({ message: 'User updated successfully.', user: safeUser(user) });
 }));
 
