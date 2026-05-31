@@ -110,7 +110,7 @@ function createCorsOptions(req: Request) {
   };
 }
 
-function enforceProductionOrigin(req: Request, res: Response, next: NextFunction): void {
+function enforceTrustedOriginForStatefulApi(req: Request, res: Response, next: NextFunction): void {
   if (!isProduction) return next();
   const origin = req.headers.origin;
   if (!origin) {
@@ -127,37 +127,37 @@ function enforceProductionOrigin(req: Request, res: Response, next: NextFunction
 
 function registerRoutes(app: express.Express): void {
   app.use('/api/auth', authCoreRoutes);
-  app.use('/api/auth', authRoutes);
+  if (!isProduction) app.use('/api/auth', authRoutes);
   app.use('/api/games', gameRoutes);
   app.use('/api/ai', aiRoutes);
 
   app.use('/api/billing', billingCoreRoutes);
   app.use('/api/billing', billingPaymentsCoreRoutes);
-  app.use('/api/billing', billingRoutes);
+  if (!isProduction) app.use('/api/billing', billingRoutes);
 
   app.use('/api/payments', paymentsCoreRoutes);
   app.use('/api/payments', paymentRoutes);
 
   app.use('/api/social', socialCoreRoutes);
-  app.use('/api/social', socialRoutes);
+  if (!isProduction) app.use('/api/social', socialRoutes);
 
   app.use('/api/automation', automationCoreRoutes);
-  app.use('/api/automation', automationRoutes);
+  if (!isProduction) app.use('/api/automation', automationRoutes);
 
   app.use('/api/admin', adminCoreRoutes);
-  app.use('/api/admin', adminRoutes);
+  if (!isProduction) app.use('/api/admin', adminRoutes);
 
   app.use('/api/tournaments', tournamentsCoreRoutes);
-  app.use('/api/tournaments', tournamentRoutes);
+  if (!isProduction) app.use('/api/tournaments', tournamentRoutes);
 
   app.use('/api/messages', messagesCoreRoutes);
-  app.use('/api/messages', messageRoutes);
+  if (!isProduction) app.use('/api/messages', messageRoutes);
 
   app.use('/api/settings', settingsCoreRoutes);
-  app.use('/api/settings', settingsRoutes);
+  if (!isProduction) app.use('/api/settings', settingsRoutes);
 
   app.use('/api/profile', profileCoreRoutes);
-  app.use('/api/profile', profileRoutes);
+  if (!isProduction) app.use('/api/profile', profileRoutes);
   app.use('/api/notifications', notificationRoutes);
 
   app.use('/api/puzzles', puzzleRoutes);
@@ -180,7 +180,8 @@ export function createApp(healthState: HealthState = {}): express.Express {
   const cspOrigins = configuredOrigins().filter((origin): origin is string => typeof origin === 'string');
   const cspConnectSources = ["'self'", ...cspOrigins, ...cspOrigins.map((origin) => origin.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:'))];
   app.use((req, res, next) => cors(createCorsOptions(req))(req, res, next));
-  app.use(enforceProductionOrigin);
+  app.use(enforceTrustedOriginForStatefulApi);
+  // lgtm[js/missing-token-validation] Production CSRF protection is enforced by the trusted Origin gate above before auth cookies are parsed.
   app.use(cookieParser());
   app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: isProduction ? 300 : 2000, standardHeaders: true, legacyHeaders: false, message: { message: 'Too many requests. Please slow down.' } }));
   app.use(helmet({
