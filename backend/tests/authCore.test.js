@@ -170,4 +170,37 @@ describe('backend production request boundary', () => {
       }
     });
   });
+
+  it('treats Render-hosted runtime as production even when NODE_ENV is not production', async () => {
+    await withTemporaryEnv({
+      NODE_ENV: 'development',
+      RENDER: 'true',
+      DATABASE_URL: process.env.DATABASE_URL || 'postgresql://localhost:5432/chessplay_test?schema=public',
+      JWT_ACCESS_SECRET: 'test-access-secret-with-enough-length-12345',
+      JWT_REFRESH_SECRET: 'test-refresh-secret-with-enough-length-123',
+    }, async () => {
+      const envPath = require.resolve('../src/config/env.ts');
+      const appPath = require.resolve('../src/app.ts');
+      delete require.cache[envPath];
+      delete require.cache[appPath];
+      const { createApp } = require('../src/app');
+      const app = createApp();
+      const server = app.listen(0);
+
+      try {
+        const { port } = server.address();
+        const response = await fetch(`http://127.0.0.1:${port}/api/auth/logout`, {
+          method: 'POST',
+          headers: { cookie: 'accessToken=present' },
+        });
+
+        assert.strictEqual(response.status, 403);
+        assert.deepStrictEqual(await response.json(), { message: 'Origin is required' });
+      } finally {
+        await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+        delete require.cache[appPath];
+        delete require.cache[envPath];
+      }
+    });
+  });
 });

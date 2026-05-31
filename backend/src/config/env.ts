@@ -26,7 +26,7 @@ export const env = {
   ],
 };
 
-export const isProduction = env.NODE_ENV === 'production';
+export const isProduction = env.NODE_ENV === 'production' || Boolean(process.env.RENDER || process.env.RENDER_EXTERNAL_URL);
 
 export function validateEnv() {
   if (!env.JWT_ACCESS_SECRET || !env.JWT_REFRESH_SECRET) throw new Error('JWT secrets missing');
