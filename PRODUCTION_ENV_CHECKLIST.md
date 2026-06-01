@@ -38,6 +38,12 @@ curl -I https://getchessplay.vercel.app/        # must include X-Content-Type-Op
 | `FRONTEND_URL` | `https://getchessplay.vercel.app` | Same as above |
 | `COOKIE_DOMAIN` | *(leave empty)* | **Do not set** when API is on Render and frontend is on Vercel |
 | `PORT` | `10000` or Render default | Render sets `PORT` automatically |
+| `SMTP_HOST` | SMTP host name | Required for all production emails |
+| `SMTP_PORT` | SMTP port number | Required for all production emails |
+| `SMTP_USER` | SMTP username | Required for all production emails |
+| `SMTP_PASS` | SMTP password | Required for all production emails |
+| `SMTP_FROM` | sender address | Required for all production emails; `MAIL_FROM` may also be used |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID | Optional; enable Google login with frontend `VITE_ENABLE_GOOGLE_AUTH=true` |
 
 After deploy, verify:
 

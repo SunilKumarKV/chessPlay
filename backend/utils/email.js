@@ -51,12 +51,12 @@ async function sendSecurityEmail({ to, subject, text }) {
   const validation = validateEmailProviderConfig();
 
   if (validation.mode === 'mock') {
-    logger.info('[email:mock] Security email queued', { to, subject });
+    logger.info('EMAIL_PROVIDER_MOCK_MODE', { to, subject });
     return { ok: true, mocked: true };
   }
 
   if (!validation.ok) {
-    logger.error('[email] Security email delivery skipped: SMTP is not configured', {
+    logger.error('EMAIL_PROVIDER_NOT_CONFIGURED', {
       to,
       subject,
       missing: validation.missing,
@@ -72,19 +72,18 @@ async function sendSecurityEmail({ to, subject, text }) {
       subject,
       text,
     });
-    logger.info('[email] Security email sent', {
+    logger.info('EMAIL_SEND_SUCCESS', {
       to,
       subject,
       messageId: info.messageId,
     });
     return { ok: true, messageId: info.messageId };
   } catch (error) {
-    logger.error('[email] Security email delivery failed', {
+    logger.error('EMAIL_SEND_FAILED', {
       to,
       subject,
-      error: error.message,
-      code: error.code,
-      command: error.command,
+      code: error?.code,
+      command: error?.command,
     });
     throw new Error('Email delivery failed');
   }
