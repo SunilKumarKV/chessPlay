@@ -48,3 +48,15 @@ export function findActiveRoomForUserId(userId: string): ActiveRoomResponse | nu
 
   return null;
 }
+
+export function countActiveRooms(): number {
+  if (!activeSocketState) return 0;
+
+  let activeRooms = 0;
+  for (const roomData of activeSocketState.rooms.values()) {
+    const status = String(roomData?.status || '').toLowerCase();
+    if (!TERMINAL_STATUSES.has(status)) activeRooms += 1;
+  }
+
+  return activeRooms;
+}

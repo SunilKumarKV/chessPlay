@@ -105,7 +105,9 @@ const routeMap = {
   admin: "/admin",
   "admin-supporters": "/admin/payments",
   ai: "/play",
+  "play-ai": "/play-ai",
   multi: "/play/online",
+  multiplayer: "/multiplayer",
   local: "/play/local",
   lan: "/wifi",
   dashboard: "/dashboard",
@@ -161,6 +163,8 @@ function pageFromPathname(pathname) {
   if (normalized === "/admin" || normalized === "/admin/dashboard") return "admin";
   if (normalized.startsWith("/profile/") && normalized.split("/")[2]) return "profile-public";
   if (["/admin/payments", "/admin/supporters"].includes(normalized)) return "admin-supporters";
+  if (["/play-ai", "/play/computer"].includes(normalized)) return "ai";
+  if (["/multiplayer", "/play-online"].includes(normalized)) return "multi";
   if (["/play-player", "/play/local"].includes(normalized)) return "local";
   if (["/lan", "/wifi", "/play-wifi"].includes(normalized)) return "lan";
   const entry = Object.entries(routeMap).find(([, path]) => path === normalized);
@@ -372,6 +376,22 @@ export default function App() {
             timeControl={selectedTimeControl}
             onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
             onNavigate={guardedNavigate}
+          />
+        </RouteProviders>
+      </RouteFrame>
+    );
+  }
+
+  if (!user && currentPage === "ai") {
+    const selectedTimeControl = localStorage.getItem("selectedTimeControl") || "3+0";
+    return (
+      <RouteFrame>
+        <RouteProviders page={currentPage}>
+          <Chess
+            onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
+            onNavigate={guardedNavigate}
+            initialAiEnabled
+            timeControl={selectedTimeControl}
           />
         </RouteProviders>
       </RouteFrame>

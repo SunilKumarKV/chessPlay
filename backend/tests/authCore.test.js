@@ -4,6 +4,7 @@ const { describe, it } = require('node:test');
 process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://localhost:5432/chessplay_test?schema=public';
 
 const authCore = require('../routes/authCore');
+const publicRoutes = require('../routes/public');
 const repo = require('../src/repositories/userRepository');
 
 function withTemporaryEnv(nextEnv, fn) {
@@ -104,6 +105,46 @@ describe('backend userRepository helper behavior', () => {
     const result = await repo.clearPasswordResetToken('user-id', client);
     assert(called, 'Expected clearPasswordResetToken to call prisma user.update');
     assert.strictEqual(result.id, 'user-id');
+  });
+});
+
+describe('backend public stats route', () => {
+  it('registers GET /stats', () => {
+    const routePaths = publicRoutes.stack.filter((layer) => layer.route).map((layer) => layer.route.path);
+    assert(routePaths.includes('/stats'), 'Missing /stats route');
+  });
+
+  it('builds safe aggregate stats without exposing user data', async () => {
+    const stats = await publicRoutes.getPublicStats({
+      game: {
+        count(args) {
+          if (args.where?.OR) return 4;
+          if (args.where?.whitePlayerId?.not === null) return 3;
+          return 7;
+        },
+      },
+      user: {
+        count(args) {
+          assert.deepStrictEqual(args, { where: { deletedAt: null } });
+          return 5;
+        },
+      },
+      puzzleAttempt: {
+        count(args) {
+          assert.deepStrictEqual(args, { where: { success: true } });
+          return 2;
+        },
+      },
+    });
+
+    assert.deepStrictEqual(stats, {
+      totalGames: 7,
+      registeredUsers: 5,
+      aiGames: 4,
+      multiplayerGames: 3,
+      puzzlesSolved: 2,
+      activeRooms: 0,
+    });
   });
 });
 
