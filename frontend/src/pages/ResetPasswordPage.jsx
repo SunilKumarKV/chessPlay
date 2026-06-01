@@ -74,8 +74,11 @@ export default function ResetPasswordPage({ onBack }) {
         method: "POST",
         body: JSON.stringify({ email: email.trim().toLowerCase(), otp: otp.trim(), password }),
       });
-      setStatus(data.message || "Password reset successful.");
+      setStatus(data.message || "Password reset successful. Please log in again.");
       setStatusTone("success");
+      window.setTimeout(() => {
+        window.location.href = "/login";
+      }, 1200);
     } catch (error) {
       setStatus(error.message);
       setStatusTone("error");

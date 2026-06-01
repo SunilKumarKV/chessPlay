@@ -276,11 +276,19 @@ router.post("/register", authLimiter, async (req, res) => {
     const passwordHash = await bcrypt.hash(String(password), 12);
     const user = await createUser({ username, email, passwordHash });
     await issuePrismaSession(res, user);
-    await sendEmailVerificationOtp(user).catch((error) => {
-      logger.error("Email verification OTP delivery failed after registration", { userId: user.id, email: user.email, error: error.message });
-    });
+    let message = "Account created successfully";
+    try {
+      await sendEmailVerificationOtp(user);
+    } catch (error) {
+      logger.error("Email verification OTP delivery failed after registration", {
+        userId: user.id,
+        email: user.email,
+        error: error.message,
+      });
+      message = "Account created, but we could not send the verification code. Please resend the code.";
+    }
     await queueEmailEvent("welcome", { user: user.id, email: user.email, payload: { username: user.username } }).catch(() => {});
-    return res.status(201).json({ ...buildAuthResponse("Account created successfully", user), referralConnected: false });
+    return res.status(201).json({ ...buildAuthResponse(message, user), referralConnected: false });
   } catch (error) {
     logger.error("Prisma registration error:", error);
     return res.status(500).json({ message: "Server error" });
@@ -390,11 +398,19 @@ router.post("/mobile/register", authLimiter, async (req, res) => {
     const passwordHash = await bcrypt.hash(String(password), 12);
     const user = await createUser({ username, email, passwordHash });
     const tokens = await issueMobileTokenSet(user);
-    await sendEmailVerificationOtp(user).catch((error) => {
-      logger.error("Email verification OTP delivery failed after mobile registration", { userId: user.id, email: user.email, error: error.message });
-    });
+    let message = "Account created successfully";
+    try {
+      await sendEmailVerificationOtp(user);
+    } catch (error) {
+      logger.error("Email verification OTP delivery failed after mobile registration", {
+        userId: user.id,
+        email: user.email,
+        error: error.message,
+      });
+      message = "Account created, but we could not send the verification code. Please resend the code.";
+    }
     await queueEmailEvent("welcome", { user: user.id, email: user.email, payload: { username: user.username } }).catch(() => {});
-    return res.status(201).json(buildMobileAuthResponse(user, tokens, { referralConnected: false }));
+    return res.status(201).json({ ...buildMobileAuthResponse(user, tokens, { referralConnected: false }), message });
   } catch (error) {
     logger.error("Prisma mobile registration error:", error);
     return res.status(500).json({ message: "Server error" });
@@ -575,8 +591,8 @@ router.post("/resend-verification", authLimiter, auth, async (req, res) => {
     await sendEmailVerificationOtp(user);
     return res.json({ message: GENERIC_VERIFICATION_MESSAGE });
   } catch (error) {
-    logger.error("Prisma resend verification error:", error);
-    return res.json({ message: GENERIC_VERIFICATION_MESSAGE });
+    logger.error("Prisma resend verification error:", { message: error.message });
+    return res.status(500).json({ message: "We could not send the verification code. Please try again." });
   }
 });
 
