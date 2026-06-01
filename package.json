@@ -16,11 +16,18 @@
     "install:all": "pnpm install",
     "start": "pnpm dev:multi",
     "build:frontend": "pnpm --filter frontend build",
-    "build:backend": "pnpm --filter backend build"
+    "build:backend": "pnpm --filter backend build",
+    "test:frontend": "pnpm --filter frontend test:run",
+    "test:backend": "pnpm --filter backend test",
+    "test:e2e": "playwright test",
+    "test:all": "pnpm test:frontend && pnpm test:backend && pnpm test:e2e && pnpm build",
+    "lighthouse": "lighthouse http://localhost:5173 --view"
   },
   "devDependencies": {
     "@playwright/test": "^1.51.1",
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "k6": "^0.0.0",
+    "lighthouse": "^13.3.0"
   },
   "dependencies": {
     "helmet": "^8.2.0",
