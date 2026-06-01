@@ -28,7 +28,7 @@ export default function BrandConceptsPage({ onBack }) {
             <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-600 dark:text-amber-300">Internal brand concept preview</p>
             <h1 className="mt-3 font-['Montserrat'] text-4xl font-black md:text-6xl">ChessPlay logo directions</h1>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-300">
-              Exploratory marks only. These are not wired into the production navbar, favicon, manifest, or Open Graph assets until a final direction is approved.
+              Internal archive of the approved brand exploration. The production navbar uses Knight + Growth Arrow, while favicon and app icons use the simplified CP + Hidden Knight mark.
             </p>
           </div>
           <button
@@ -51,7 +51,7 @@ export default function BrandConceptsPage({ onBack }) {
         <section className="mt-8 rounded-3xl border border-slate-200 bg-white/85 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.1)] dark:border-white/10 dark:bg-slate-950/70">
           <h2 className="font-['Montserrat'] text-2xl font-black">Recommendation</h2>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 dark:text-slate-300">
-            Move forward with Knight + Growth Arrow for the primary brand mark, then derive a simplified CP + Hidden Knight favicon from it. That gives ChessPlay a clear chess-improvement signal without becoming a generic chess-piece logo.
+            Final direction: use Knight + Growth Arrow for the primary brand mark and CP + Hidden Knight for favicon and app icons. This gives ChessPlay a clear chess-improvement signal without becoming a generic chess-piece logo.
           </p>
         </section>
       </div>
