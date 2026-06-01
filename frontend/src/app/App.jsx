@@ -322,14 +322,7 @@ export default function App() {
   if (currentPage === "forgot-password") {
     return (
       <RouteFrame>
-        <ForgotPasswordPage
-          onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
-          onResetRequested={(email) => {
-            const query = email ? `?email=${encodeURIComponent(email)}` : "";
-            window.history.pushState({}, "", `/reset-password${query}`);
-            setCurrentPage("reset-password");
-          }}
-        />
+        <ForgotPasswordPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
       </RouteFrame>
     );
   }
