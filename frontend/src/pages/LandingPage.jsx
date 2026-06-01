@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Modal } from "../components/ui";
 import LegalFooter from "../components/common/LegalFooter";
 import { BACKEND_URL } from "../config/runtime";
+import { SOCIAL_LINKS } from "../config/socialLinks";
 
 const Auth = lazy(() => import("../features/auth/components/Auth"));
 
@@ -559,7 +560,7 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
             </div>
             <p className="mt-3 max-w-sm leading-6">Play chess, review progress, and train smarter at getchessplay.com.</p>
           </div>
-          <div className="grid gap-6 sm:grid-cols-3">
+          <div className={`grid gap-6 sm:grid-cols-2 ${SOCIAL_LINKS.length ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
             <div>
               <h3 className="font-black text-[var(--home-text)]">Product</h3>
               <div className="mt-3 grid gap-2">
@@ -584,6 +585,25 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
                 <a href="/delete-account" onClick={(event) => { event.preventDefault(); onNavigatePath?.("/delete-account"); }} className="transition hover:text-[var(--home-text)]">Delete account</a>
               </div>
             </div>
+            {SOCIAL_LINKS.length ? (
+              <div>
+                <h3 className="font-black text-[var(--home-text)]">Social</h3>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {SOCIAL_LINKS.map((link) => (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      aria-label={link.ariaLabel}
+                      target={link.external ? "_blank" : undefined}
+                      rel={link.external ? "noopener noreferrer" : undefined}
+                      className="rounded-xl border border-[var(--home-border)] bg-[var(--home-card)] px-3 py-2 text-xs font-black text-[var(--home-text)] shadow-[0_10px_24px_var(--home-shadow)] transition duration-200 hover:-translate-y-0.5 hover:border-[var(--home-accent)] hover:text-[var(--home-accent)] hover:shadow-[0_16px_42px_var(--home-glow)] focus:outline-none focus:ring-2 focus:ring-[var(--home-accent)]"
+                    >
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </footer>
