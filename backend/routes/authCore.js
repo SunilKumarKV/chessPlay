@@ -1,6 +1,7 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
 const {
   clearSessionCookies,
@@ -15,6 +16,7 @@ const {
   validateStrongPassword,
 } = require("../utils/security");
 const { sendSecurityEmail } = require("../utils/email");
+const { generateOtp, hashOtp } = require("../utils/otp");
 const logger = require("../utils/safeLogger");
 const auth = require("../middleware/auth");
 const { queueEmailEvent } = require("../services/emailEventService");
@@ -22,13 +24,13 @@ const {
   createUser,
   findUserByEmail,
   findUserByEmailOrUsername,
-  findUserByEmailVerificationHash,
-  findUserByPasswordResetHash,
   findUserById,
   markEmailVerified,
   setEmailVerificationToken,
   setPasswordResetToken,
   clearPasswordResetToken,
+  incrementEmailVerificationAttempts,
+  incrementPasswordResetAttempts,
   updateUserPassword,
   softDeleteUser,
   updateUserAuthSession,
@@ -38,6 +40,11 @@ const { getFriendsAndRequests, sendFriendRequest, respondFriendRequest } = requi
 const router = express.Router();
 const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MOBILE_ACCESS_EXPIRES_IN_SECONDS = 15 * 60;
+const OTP_EXPIRES_MS = 10 * 60 * 1000;
+const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
+const OTP_MAX_ATTEMPTS = 5;
+const GENERIC_RESET_MESSAGE = "If an account exists, a reset code has been sent.";
+const GENERIC_VERIFICATION_MESSAGE = "If the account needs verification, a verification code has been sent.";
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
@@ -54,6 +61,34 @@ function validateAuthUsername(username) {
 
 function frontendBaseUrl() {
   return process.env.FRONTEND_ORIGINS?.split(",")[0] || "http://localhost:5173";
+}
+
+function isCooldownActive(sentAt) {
+  return sentAt && Date.now() - new Date(sentAt).getTime() < OTP_RESEND_COOLDOWN_MS;
+}
+
+function isExpired(expiresAt) {
+  return !expiresAt || new Date(expiresAt).getTime() <= Date.now();
+}
+
+async function sendPasswordResetOtp(user) {
+  const otp = generateOtp();
+  await setPasswordResetToken(user.id, hashOtp({ userId: user.id, otp, purpose: "password-reset" }), new Date(Date.now() + OTP_EXPIRES_MS));
+  await sendSecurityEmail({
+    to: user.email,
+    subject: "Your ChessPlay password reset code",
+    text: `Your ChessPlay password reset code is ${otp}. It expires in 10 minutes. If you did not request this, you can ignore this email.`,
+  });
+}
+
+async function sendEmailVerificationOtp(user) {
+  const otp = generateOtp();
+  await setEmailVerificationToken(user.id, hashOtp({ userId: user.id, otp, purpose: "email-verification" }), new Date(Date.now() + OTP_EXPIRES_MS));
+  await sendSecurityEmail({
+    to: user.email,
+    subject: "Verify your ChessPlay email",
+    text: `Your ChessPlay verification code is ${otp}. It expires in 10 minutes.`,
+  });
 }
 
 function prismaUserPayload(user) {
@@ -241,6 +276,9 @@ router.post("/register", authLimiter, async (req, res) => {
     const passwordHash = await bcrypt.hash(String(password), 12);
     const user = await createUser({ username, email, passwordHash });
     await issuePrismaSession(res, user);
+    await sendEmailVerificationOtp(user).catch((error) => {
+      logger.error("Email verification OTP delivery failed after registration", { userId: user.id, email: user.email, error: error.message });
+    });
     await queueEmailEvent("welcome", { user: user.id, email: user.email, payload: { username: user.username } }).catch(() => {});
     return res.status(201).json({ ...buildAuthResponse("Account created successfully", user), referralConnected: false });
   } catch (error) {
@@ -262,6 +300,71 @@ router.post("/login", authLimiter, async (req, res) => {
   } catch (error) {
     logger.error("Prisma login error:", error);
     return res.status(500).json({ message: "Server error" });
+  }
+});
+
+async function verifyGoogleCredential(credential) {
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    const error = new Error("Google authentication is not configured");
+    error.statusCode = 503;
+    throw error;
+  }
+  const params = new URLSearchParams({ id_token: String(credential || "") });
+  const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?${params}`);
+  if (!response.ok) {
+    const error = new Error("Invalid Google credential");
+    error.statusCode = 401;
+    throw error;
+  }
+  const profile = await response.json();
+  if (profile.aud !== clientId || profile.email_verified !== "true" || !profile.email) {
+    const error = new Error("Invalid Google credential");
+    error.statusCode = 401;
+    throw error;
+  }
+  return {
+    email: normalizeEmail(profile.email),
+    name: String(profile.name || profile.email.split("@")[0] || "ChessPlayer"),
+  };
+}
+
+function googleUsernameFromProfile(profile) {
+  return String(profile.name || profile.email.split("@")[0] || "ChessPlayer")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(0, 14) || "ChessPlayer";
+}
+
+async function uniqueGoogleUsername(profile) {
+  const base = googleUsernameFromProfile(profile);
+  for (let index = 0; index < 10; index += 1) {
+    const suffix = index === 0 ? "" : String(crypto.randomInt(10, 9999));
+    const username = `${base}${suffix}`.slice(0, 16);
+    const existing = await findUserByEmailOrUsername(`unused-${randomToken()}@local.invalid`, username);
+    if (!existing) return username;
+  }
+  return `Player${crypto.randomInt(100000, 999999)}`;
+}
+
+router.post("/google", authLimiter, async (req, res) => {
+  try {
+    const profile = await verifyGoogleCredential(req.body.credential);
+    let user = await findUserByEmail(profile.email);
+    let isNewUser = false;
+    if (!user) {
+      const username = await uniqueGoogleUsername(profile);
+      user = await createUser({ username, email: profile.email, passwordHash: null, emailVerified: true });
+      isNewUser = true;
+    } else if (!user.emailVerified) {
+      user = await markEmailVerified(user.id);
+    }
+    if (user.deletedAt) return res.status(400).json({ message: "Invalid credentials" });
+    await issuePrismaSession(res, user);
+    if (isNewUser) await queueEmailEvent("welcome", { user: user.id, email: user.email, payload: { username: user.username, provider: "google" } }).catch(() => {});
+    return res.json(buildAuthResponse("Login successful", user));
+  } catch (error) {
+    logger.error("Prisma Google auth error:", { message: error.message, statusCode: error.statusCode });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : "Google login failed" });
   }
 });
 
@@ -287,6 +390,9 @@ router.post("/mobile/register", authLimiter, async (req, res) => {
     const passwordHash = await bcrypt.hash(String(password), 12);
     const user = await createUser({ username, email, passwordHash });
     const tokens = await issueMobileTokenSet(user);
+    await sendEmailVerificationOtp(user).catch((error) => {
+      logger.error("Email verification OTP delivery failed after mobile registration", { userId: user.id, email: user.email, error: error.message });
+    });
     await queueEmailEvent("welcome", { user: user.id, email: user.email, payload: { username: user.username } }).catch(() => {});
     return res.status(201).json(buildMobileAuthResponse(user, tokens, { referralConnected: false }));
   } catch (error) {
@@ -462,25 +568,36 @@ router.get("/socket-token", auth, async (req, res) => {
 router.post("/resend-verification", authLimiter, auth, async (req, res) => {
   try {
     const user = await findUserById(req.user.userId);
-    if (!user || user.deletedAt) return res.status(404).json({ message: "User not found" });
-    if (user.emailVerified) return res.json({ message: "Email is already verified" });
-    const token = randomToken();
-    await setEmailVerificationToken(user.id, hashToken(token), new Date(Date.now() + 24 * 60 * 60 * 1000));
-    const verifyUrl = `${frontendBaseUrl()}/verify-email?token=${token}`;
-    await sendSecurityEmail({ to: user.email, subject: "Verify your ChessPlay account", text: `Verify your email: ${verifyUrl}` });
-    return res.json({ message: "Verification email sent" });
+    if (!user || user.deletedAt || user.emailVerified) return res.json({ message: GENERIC_VERIFICATION_MESSAGE });
+    if (isCooldownActive(user.emailVerificationSentAt)) {
+      return res.status(429).json({ message: "Please wait before requesting another verification code." });
+    }
+    await sendEmailVerificationOtp(user);
+    return res.json({ message: GENERIC_VERIFICATION_MESSAGE });
   } catch (error) {
     logger.error("Prisma resend verification error:", error);
-    return res.status(500).json({ message: "Server error" });
+    return res.json({ message: GENERIC_VERIFICATION_MESSAGE });
   }
 });
 
-router.post("/verify-email", authLimiter, async (req, res) => {
+router.post("/verify-email", authLimiter, auth, async (req, res) => {
   try {
-    const token = String(req.body.token || "");
-    if (!token) return res.status(400).json({ message: "Verification token is required" });
-    const user = await findUserByEmailVerificationHash(hashToken(token));
-    if (!user) return res.status(400).json({ message: "Invalid or expired verification token" });
+    const otp = String(req.body.otp || req.body.code || "").trim();
+    if (!/^\d{6}$/.test(otp)) return res.status(400).json({ message: "Enter the 6-digit verification code." });
+    const user = await findUserById(req.user.userId);
+    if (!user || user.deletedAt) return res.status(401).json({ message: "Invalid session" });
+    if (user.emailVerified) return res.json({ message: "Email verified successfully" });
+    if ((user.emailVerificationAttempts || 0) >= OTP_MAX_ATTEMPTS) {
+      return res.status(429).json({ message: "Too many incorrect codes. Request a new verification code." });
+    }
+    if (isExpired(user.emailVerificationExpires)) {
+      return res.status(400).json({ message: "Verification code expired. Request a new code." });
+    }
+    const expectedHash = hashOtp({ userId: user.id, otp, purpose: "email-verification" });
+    if (!user.emailVerificationTokenHash || user.emailVerificationTokenHash !== expectedHash) {
+      await incrementEmailVerificationAttempts(user.id);
+      return res.status(400).json({ message: "Invalid verification code." });
+    }
     await markEmailVerified(user.id);
     return res.json({ message: "Email verified successfully" });
   } catch (error) {
@@ -491,27 +608,40 @@ router.post("/verify-email", authLimiter, async (req, res) => {
 
 router.post("/forgot-password", authLimiter, async (req, res) => {
   try {
-    const email = normalizeEmail(req.body.email);
+    const emailValidation = validateProductionEmail(req.body.email);
+    if (!emailValidation.ok) return res.json({ message: GENERIC_RESET_MESSAGE });
+    const email = emailValidation.email;
     const user = await findUserByEmail(email);
-    if (!user || user.deletedAt) return res.json({ message: "If the account exists, a reset email was sent" });
-    const token = randomToken();
-    await setPasswordResetToken(user.id, hashToken(token), new Date(Date.now() + 30 * 60 * 1000));
-    const resetUrl = `${frontendBaseUrl()}/reset-password?token=${token}`;
-    await sendSecurityEmail({ to: user.email, subject: "Reset your ChessPlay password", text: `Reset your password: ${resetUrl}` });
-    return res.json({ message: "If the account exists, a reset email was sent" });
+    if (!user || user.deletedAt) return res.json({ message: GENERIC_RESET_MESSAGE });
+    if (isCooldownActive(user.passwordResetSentAt)) return res.json({ message: GENERIC_RESET_MESSAGE });
+    await sendPasswordResetOtp(user);
+    return res.json({ message: GENERIC_RESET_MESSAGE });
   } catch (error) {
-    logger.error("Prisma forgot password error:", error);
-    return res.status(500).json({ message: "Server error" });
+    logger.error("Prisma forgot password OTP error:", { message: error.message });
+    return res.json({ message: GENERIC_RESET_MESSAGE });
   }
 });
 
 router.post("/reset-password", authLimiter, async (req, res) => {
   try {
-    const { token, password } = req.body;
+    const { password } = req.body;
+    const otp = String(req.body.otp || req.body.code || "").trim();
+    const emailValidation = validateProductionEmail(req.body.email);
+    if (!emailValidation.ok) return res.status(400).json({ message: "Invalid or expired reset code" });
+    if (!/^\d{6}$/.test(otp)) return res.status(400).json({ message: "Enter the 6-digit reset code." });
     const passwordError = validateStrongPassword(password);
     if (passwordError) return res.status(400).json({ message: passwordError });
-    const user = await findUserByPasswordResetHash(hashToken(token));
-    if (!user || user.deletedAt) return res.status(400).json({ message: "Invalid or expired reset token" });
+    const user = await findUserByEmail(emailValidation.email);
+    if (!user || user.deletedAt) return res.status(400).json({ message: "Invalid or expired reset code" });
+    if ((user.passwordResetAttempts || 0) >= OTP_MAX_ATTEMPTS) {
+      return res.status(429).json({ message: "Too many incorrect codes. Request a new reset code." });
+    }
+    if (isExpired(user.passwordResetExpires)) return res.status(400).json({ message: "Invalid or expired reset code" });
+    const expectedHash = hashOtp({ userId: user.id, otp, purpose: "password-reset" });
+    if (!user.passwordResetTokenHash || user.passwordResetTokenHash !== expectedHash) {
+      await incrementPasswordResetAttempts(user.id);
+      return res.status(400).json({ message: "Invalid or expired reset code" });
+    }
     const passwordHash = await bcrypt.hash(String(password), 12);
     await updateUserPassword(user.id, passwordHash);
     await updateUserAuthSession(user.id, { refreshTokenHash: null, tokenVersion: (user.tokenVersion || 0) + 1 });

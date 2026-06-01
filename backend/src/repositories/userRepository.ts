@@ -34,8 +34,16 @@ export async function findUserByEmailVerificationHash(tokenHash: string, now = n
   return client.user.findFirst({ where: { emailVerificationTokenHash: tokenHash, emailVerificationExpires: { gt: now } } });
 }
 
+export async function findUserByEmailVerificationOtpHash(tokenHash: string, client: PrismaClientLike = prisma) {
+  return client.user.findFirst({ where: { emailVerificationTokenHash: tokenHash } });
+}
+
 export async function findUserByPasswordResetHash(tokenHash: string, now = new Date(), client: PrismaClientLike = prisma) {
   return client.user.findFirst({ where: { passwordResetTokenHash: tokenHash, passwordResetExpires: { gt: now } } });
+}
+
+export async function findUserByPasswordResetOtpHash(tokenHash: string, client: PrismaClientLike = prisma) {
+  return client.user.findFirst({ where: { passwordResetTokenHash: tokenHash } });
 }
 
 export async function createUser(input: CreateUserInput, client: PrismaClientLike = prisma) {
@@ -76,23 +84,64 @@ export async function clearUserRefreshToken(userId: string, client: PrismaClient
 }
 
 export async function setEmailVerificationToken(userId: string, tokenHash: string, expiresAt: Date, client: PrismaClientLike = prisma) {
-  return client.user.update({ where: { id: userId }, data: { emailVerificationTokenHash: tokenHash, emailVerificationExpires: expiresAt } });
+  return client.user.update({
+    where: { id: userId },
+    data: {
+      emailVerificationTokenHash: tokenHash,
+      emailVerificationExpires: expiresAt,
+      emailVerificationAttempts: 0,
+      emailVerificationSentAt: new Date(),
+    },
+  });
 }
 
 export async function markEmailVerified(userId: string, client: PrismaClientLike = prisma) {
-  return client.user.update({ where: { id: userId }, data: { emailVerified: true, emailVerificationTokenHash: null, emailVerificationExpires: null } });
+  return client.user.update({
+    where: { id: userId },
+    data: {
+      emailVerified: true,
+      emailVerificationTokenHash: null,
+      emailVerificationExpires: null,
+      emailVerificationAttempts: 0,
+      emailVerificationSentAt: null,
+    },
+  });
 }
 
 export async function setPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date, client: PrismaClientLike = prisma) {
-  return client.user.update({ where: { id: userId }, data: { passwordResetTokenHash: tokenHash, passwordResetExpires: expiresAt } });
+  return client.user.update({
+    where: { id: userId },
+    data: {
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpires: expiresAt,
+      passwordResetAttempts: 0,
+      passwordResetSentAt: new Date(),
+    },
+  });
 }
 
 export async function clearPasswordResetToken(userId: string, client: PrismaClientLike = prisma) {
-  return client.user.update({ where: { id: userId }, data: { passwordResetTokenHash: null, passwordResetExpires: null } });
+  return client.user.update({
+    where: { id: userId },
+    data: {
+      passwordResetTokenHash: null,
+      passwordResetExpires: null,
+      passwordResetAttempts: 0,
+      passwordResetSentAt: null,
+    },
+  });
 }
 
 export async function updateUserPassword(userId: string, passwordHash: string, client: PrismaClientLike = prisma) {
   return client.user.update({ where: { id: userId }, data: { passwordHash } });
+}
+
+export async function incrementPasswordResetAttempts(userId: string, client: PrismaClientLike = prisma) {
+  return client.user.update({ where: { id: userId }, data: { passwordResetAttempts: { increment: 1 } } });
+}
+
+export async function incrementEmailVerificationAttempts(userId: string, client: PrismaClientLike = prisma) {
+  return client.user.update({ where: { id: userId }, data: { emailVerificationAttempts: { increment: 1 } } });
 }
 
 export async function softDeleteUser(userId: string, input: { email: string; username: string; passwordHash: string; deletedAt: Date; refreshTokenHash?: string | null }, client: PrismaClientLike = prisma) {

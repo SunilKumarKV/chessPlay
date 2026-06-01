@@ -24,6 +24,7 @@ const SupportPage = lazy(() => import("../pages/legal/SupportPage"));
 const ForgotPasswordPage = lazy(() => import("../pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("../pages/ResetPasswordPage"));
 const VerifyEmailPage = lazy(() => import("../pages/VerifyEmailPage"));
+const Auth = lazy(() => import("../features/auth/components/Auth"));
 const PricingPage = lazy(() => import("../pages/billing/PricingPage"));
 const BillingPage = lazy(() => import("../pages/billing/BillingPage"));
 const AdminSupportersPage = lazy(() => import("../pages/billing/AdminSupportersPage"));
@@ -149,6 +150,8 @@ const routeMap = {
   "forgot-password": "/forgot-password",
   "reset-password": "/reset-password",
   "verify-email": "/verify-email",
+  login: "/login",
+  register: "/register",
   "payment-success": "/payment/success",
   "payment-failed": "/payment/failed",
   "brand-concepts": "/internal/brand-concepts",
@@ -262,7 +265,7 @@ export default function App() {
   const handleLogin = (userData) => {
     localStorage.removeItem("guestMode");
     setUser(userData);
-    navigateToAppPage("dashboard", setCurrentPage, true);
+    navigateToAppPage(userData?.emailVerified === false ? "verify-email" : "dashboard", setCurrentPage, true);
     notifyUserChanged();
   };
 
@@ -313,7 +316,14 @@ export default function App() {
   if (currentPage === "forgot-password") {
     return (
       <RouteFrame>
-        <ForgotPasswordPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+        <ForgotPasswordPage
+          onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
+          onResetRequested={(email) => {
+            const query = email ? `?email=${encodeURIComponent(email)}` : "";
+            window.history.pushState({}, "", `/reset-password${query}`);
+            setCurrentPage("reset-password");
+          }}
+        />
       </RouteFrame>
     );
   }
@@ -329,7 +339,34 @@ export default function App() {
   if (currentPage === "verify-email") {
     return (
       <RouteFrame>
-        <VerifyEmailPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+        <VerifyEmailPage
+          user={user}
+          onVerified={(nextUser) => {
+            const verifiedUser = nextUser || { ...user, emailVerified: true };
+            localStorage.setItem("user", JSON.stringify(verifiedUser));
+            setUser(verifiedUser);
+            notifyUserChanged();
+            navigateToAppPage("dashboard", setCurrentPage, true);
+          }}
+          onLogout={handleLogout}
+          onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
+        />
+      </RouteFrame>
+    );
+  }
+
+  if (currentPage === "login" || currentPage === "register") {
+    return (
+      <RouteFrame>
+        <Auth
+          onLogin={handleLogin}
+          initialIsLogin={currentPage === "login"}
+          onToggleMode={() => navigateToAppPage(currentPage === "login" ? "register" : "login", setCurrentPage, true)}
+          onNavigatePath={(path) => {
+            window.history.pushState({}, "", path);
+            setCurrentPage(pageFromPathname(path));
+          }}
+        />
       </RouteFrame>
     );
   }
@@ -494,6 +531,25 @@ export default function App() {
     return (
       <RouteFrame>
         <LandingPage onLogin={handleLogin} onGuestPlay={handleGuestPlay} onNavigatePath={(path) => { window.history.pushState({}, "", path); setCurrentPage(pageFromPathname(path)); }} />
+      </RouteFrame>
+    );
+  }
+
+  if (user?.emailVerified === false && !isGuestUser(user)) {
+    return (
+      <RouteFrame>
+        <VerifyEmailPage
+          user={user}
+          onVerified={(nextUser) => {
+            const verifiedUser = nextUser || { ...user, emailVerified: true };
+            localStorage.setItem("user", JSON.stringify(verifiedUser));
+            setUser(verifiedUser);
+            notifyUserChanged();
+            navigateToAppPage("dashboard", setCurrentPage, true);
+          }}
+          onLogout={handleLogout}
+          onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
+        />
       </RouteFrame>
     );
   }

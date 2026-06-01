@@ -11,10 +11,11 @@ import {
 import { apiClient } from "../services/apiClient";
 import { validateProductionEmail } from "../utils/emailValidation";
 
-export default function ForgotPasswordPage({ onBack }) {
+export default function ForgotPasswordPage({ onBack, onResetRequested }) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState("");
   const [statusTone, setStatusTone] = useState("neutral");
+  const [requestedEmail, setRequestedEmail] = useState("");
   const [loading, setLoading] = useState(false);
 
   const submit = async (event) => {
@@ -35,6 +36,7 @@ export default function ForgotPasswordPage({ onBack }) {
       });
       setStatus(data.message);
       setStatusTone("success");
+      setRequestedEmail(email.trim().toLowerCase());
     } catch (error) {
       setStatus(error.message);
       setStatusTone("error");
@@ -50,7 +52,7 @@ export default function ForgotPasswordPage({ onBack }) {
           <AuthBrandHeader
             eyebrow="Account recovery"
             title="Reset your password"
-            subtitle="Enter your verified email and we’ll send a secure reset link."
+            subtitle="Enter your verified email and we’ll send a secure 6-digit reset code."
           />
 
           {onBack ? (
@@ -81,11 +83,20 @@ export default function ForgotPasswordPage({ onBack }) {
             />
 
             <PrimaryAuthButton type="submit" loading={loading} loadingText="Sending reset link...">
-              Send reset link
+              Send reset code
             </PrimaryAuthButton>
           </div>
 
           <AuthStatus status={statusTone === "error" ? "" : status} tone={statusTone} />
+          {requestedEmail ? (
+            <button
+              type="button"
+              onClick={() => onResetRequested?.(requestedEmail)}
+              className="mt-4 w-full rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-4 py-3 text-sm font-black text-[var(--auth-text)] transition hover:-translate-y-0.5 hover:border-[#F4B400] hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400]"
+            >
+              Enter reset code
+            </button>
+          ) : null}
           <TrustIndicators />
         </form>
       </PremiumAuthShell>
