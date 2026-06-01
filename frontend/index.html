@@ -6,18 +6,21 @@
     <link rel="apple-touch-icon" href="/chess-icon.svg" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ChessPlay — Online Chess, AI Practice & Multiplayer</title>
-    <meta name="description" content="Play ChessPlay online with AI practice, real-time multiplayer rooms, game history, leaderboards, and a secure player dashboard." />
+    <title>ChessPlay — Play Chess, Analyze Mistakes & Improve Faster</title>
+    <meta name="description" content="Play chess online, practice against AI, review your games, track progress, and improve faster with ChessPlay." />
     <meta name="robots" content="index,follow" />
-    <meta property="og:title" content="ChessPlay — Online Chess, AI Practice & Multiplayer" />
-    <meta property="og:description" content="Play chess online with AI, friends, real-time multiplayer, secure accounts, game history, and leaderboards." />
+    <meta property="og:title" content="ChessPlay — Play Chess, Analyze Mistakes & Improve Faster" />
+    <meta property="og:description" content="Play chess online, practice against AI, review your games, track progress, and improve faster with ChessPlay." />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://getchessplay.vercel.app/" />
-    <meta property="og:image" content="https://getchessplay.vercel.app/chess-icon.svg" />
+    <meta property="og:url" content="https://getchessplay.com/" />
+    <meta property="og:site_name" content="ChessPlay" />
+    <meta property="og:image" content="https://getchessplay.com/chess-icon.svg" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="https://getchessplay.vercel.app/chess-icon.svg" />
-    <meta name="theme-color" content="#171512" />
-    <link rel="canonical" href="https://getchessplay.vercel.app/" />
+    <meta name="twitter:title" content="ChessPlay — Play Chess, Analyze Mistakes & Improve Faster" />
+    <meta name="twitter:description" content="Play chess online, practice against AI, review your games, track progress, and improve faster with ChessPlay." />
+    <meta name="twitter:image" content="https://getchessplay.com/chess-icon.svg" />
+    <meta name="theme-color" content="#0B0F19" />
+    <link rel="canonical" href="https://getchessplay.com/" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -28,5 +31,21 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/app/main.tsx"></script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "ChessPlay",
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Web",
+        "url": "https://getchessplay.com/",
+        "description": "Play chess online, practice against AI, review your games, track progress, and improve faster with ChessPlay.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    </script>
   </body>
 </html>

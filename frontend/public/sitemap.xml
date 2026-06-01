@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://getchessplay.vercel.app/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>https://getchessplay.vercel.app/play-chess-online</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://getchessplay.vercel.app/chess-ai</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://getchessplay.vercel.app/chess-puzzles</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://getchessplay.vercel.app/chess-analysis</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://getchessplay.vercel.app/pricing</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://getchessplay.vercel.app/privacy</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
-  <url><loc>https://getchessplay.vercel.app/terms</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
-  <url><loc>https://getchessplay.vercel.app/delete-account</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
-  <url><loc>https://getchessplay.vercel.app/support</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getchessplay.com/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://getchessplay.com/play-chess-online</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://getchessplay.com/chess-ai</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://getchessplay.com/chess-puzzles</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://getchessplay.com/chess-analysis</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://getchessplay.com/pricing</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://getchessplay.com/privacy</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://getchessplay.com/terms</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://getchessplay.com/delete-account</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://getchessplay.com/support</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
 </urlset>
