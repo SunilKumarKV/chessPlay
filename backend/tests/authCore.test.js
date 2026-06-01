@@ -146,6 +146,27 @@ describe('backend public stats route', () => {
       activeRooms: 0,
     });
   });
+
+  it('returns zero for a metric when an aggregate query fails', async () => {
+    const stats = await publicRoutes.getPublicStats({
+      game: {
+        count(args) {
+          if (args.where?.OR) throw new Error('database offline');
+          if (args.where?.whitePlayerId?.not === null) return 3;
+          return 7;
+        },
+      },
+      user: { count: () => 5 },
+      puzzleAttempt: { count: () => 2 },
+    });
+
+    assert.strictEqual(stats.aiGames, 0);
+    assert.strictEqual(stats.totalGames, 7);
+    assert.strictEqual(stats.registeredUsers, 5);
+    assert.strictEqual(stats.multiplayerGames, 3);
+    assert.strictEqual(stats.puzzlesSolved, 2);
+    assert.strictEqual(stats.activeRooms, 0);
+  });
 });
 
 describe('backend production request boundary', () => {

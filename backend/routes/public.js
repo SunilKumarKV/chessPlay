@@ -4,13 +4,23 @@ const { countActiveRooms } = require('../src/activeRooms');
 
 const router = express.Router();
 
-async function safeCount(label, countPromise) {
+async function safeCount(label, countOperation) {
   try {
-    const value = await countPromise;
-    return Number.isFinite(value) ? value : null;
+    const value = await countOperation();
+    return Number.isFinite(value) ? value : 0;
   } catch (error) {
     console.warn(`Public stats ${label} unavailable:`, error?.message || error);
-    return null;
+    return 0;
+  }
+}
+
+function safeActiveRooms() {
+  try {
+    const value = countActiveRooms();
+    return Number.isFinite(value) ? value : 0;
+  } catch (error) {
+    console.warn('Public stats activeRooms unavailable:', error?.message || error);
+    return 0;
   }
 }
 
@@ -22,9 +32,9 @@ async function getPublicStats(client = prisma) {
     multiplayerGames,
     puzzlesSolved,
   ] = await Promise.all([
-    safeCount('totalGames', client.game.count({ where: { status: 'COMPLETED' } })),
-    safeCount('registeredUsers', client.user.count({ where: { deletedAt: null } })),
-    safeCount('aiGames', client.game.count({
+    safeCount('totalGames', () => client.game.count({ where: { status: 'COMPLETED' } })),
+    safeCount('registeredUsers', () => client.user.count({ where: { deletedAt: null } })),
+    safeCount('aiGames', () => client.game.count({
       where: {
         status: 'COMPLETED',
         OR: [
@@ -33,14 +43,14 @@ async function getPublicStats(client = prisma) {
         ],
       },
     })),
-    safeCount('multiplayerGames', client.game.count({
+    safeCount('multiplayerGames', () => client.game.count({
       where: {
         status: 'COMPLETED',
         whitePlayerId: { not: null },
         blackPlayerId: { not: null },
       },
     })),
-    safeCount('puzzlesSolved', client.puzzleAttempt.count({ where: { success: true } })),
+    safeCount('puzzlesSolved', () => client.puzzleAttempt.count({ where: { success: true } })),
   ]);
 
   return {
@@ -49,7 +59,7 @@ async function getPublicStats(client = prisma) {
     aiGames,
     multiplayerGames,
     puzzlesSolved,
-    activeRooms: countActiveRooms(),
+    activeRooms: safeActiveRooms(),
   };
 }
 

@@ -22,12 +22,12 @@ const PIECES = {
 };
 
 const STAT_LABELS = [
-  ["totalGames", "Total games played"],
-  ["registeredUsers", "Registered players"],
-  ["aiGames", "AI games played"],
-  ["multiplayerGames", "Multiplayer games"],
-  ["puzzlesSolved", "Puzzles solved"],
-  ["activeRooms", "Active rooms"],
+  ["totalGames", "Games Played"],
+  ["registeredUsers", "Players"],
+  ["aiGames", "AI Games"],
+  ["multiplayerGames", "Multiplayer Games"],
+  ["puzzlesSolved", "Puzzles Solved"],
+  ["activeRooms", "Active Rooms"],
 ];
 
 const VALUE_PROPS = [
@@ -141,8 +141,20 @@ function homeThemeVars(themeMode) {
 }
 
 function formatMetric(value) {
-  if (!Number.isFinite(Number(value))) return "";
+  if (!Number.isFinite(Number(value))) return "0";
   return new Intl.NumberFormat("en").format(Number(value));
+}
+
+function runWhenIdle(callback) {
+  if ("requestIdleCallback" in window) {
+    return window.requestIdleCallback(callback, { timeout: 1800 });
+  }
+  return window.setTimeout(callback, 250);
+}
+
+function cancelIdleRun(id) {
+  if ("cancelIdleCallback" in window) window.cancelIdleCallback(id);
+  else window.clearTimeout(id);
 }
 
 export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
@@ -151,12 +163,11 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
   const [loadingAction, setLoadingAction] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showGuestConfirm, setShowGuestConfirm] = useState(false);
-  const [publicStats, setPublicStats] = useState(null);
+  const [publicStats, setPublicStats] = useState({});
   const [statsLoaded, setStatsLoaded] = useState(false);
   const [themeMode, setThemeMode] = useState(getInitialHomepageTheme);
 
   const productPoints = useMemo(() => ["Play", "Analyze", "Improve", "Track"], []);
-  const displayedStats = STAT_LABELS.filter(([key]) => Number.isFinite(Number(publicStats?.[key])));
   const themeVars = useMemo(() => homeThemeVars(themeMode), [themeMode]);
 
   useEffect(() => {
@@ -188,16 +199,17 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
         if (!response.ok) throw new Error("Stats unavailable");
         setPublicStats(await response.json());
       } catch {
-        setPublicStats(null);
+        setPublicStats({});
       } finally {
         window.clearTimeout(timeout);
         setStatsLoaded(true);
       }
     }
 
-    loadPublicStats();
+    const idleId = runWhenIdle(loadPublicStats);
     return () => {
       window.clearTimeout(timeout);
+      cancelIdleRun(idleId);
       controller.abort();
     };
   }, []);
@@ -313,7 +325,7 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
               ))}
             </nav>
             <div className="mt-4 grid gap-2">
-              <button type="button" onClick={toggleTheme} className="rounded-xl border border-[var(--home-border)] bg-[var(--home-card)] px-4 py-3 text-sm font-black text-[var(--home-text)]">{themeMode === "dark" ? "Light mode" : "Dark mode"}</button>
+              <button type="button" onClick={toggleTheme} className="rounded-xl border border-[var(--home-border)] bg-[var(--home-card)] px-4 py-3 text-sm font-black text-[var(--home-text)]" aria-label={`Switch to ${themeMode === "dark" ? "light" : "dark"} mode`}>{themeMode === "dark" ? "Light mode" : "Dark mode"}</button>
               <button type="button" onClick={openLogin} className="rounded-xl border border-[var(--home-border)] bg-[var(--home-card)] px-4 py-3 text-sm font-black text-[var(--home-text)]">Log in</button>
               <button type="button" onClick={openSignup} className="rounded-xl bg-[var(--home-accent)] px-4 py-3 text-sm font-black text-[var(--home-accent-ink)]">Create account</button>
             </div>
@@ -402,24 +414,17 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
         <section id="stats" className={SECTION_CLASS} aria-labelledby="stats-heading">
           <div className="mb-6 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
-              <h2 id="stats-heading" className="font-['Montserrat'] text-3xl font-black md:text-4xl">Live product stats</h2>
-              <p className="mt-2 text-sm leading-6 text-[var(--home-muted)]">Only real aggregate backend data is shown. Metrics that cannot be calculated safely are omitted.</p>
+              <h2 id="stats-heading" className="font-['Montserrat'] text-3xl font-black md:text-4xl">Live platform stats</h2>
             </div>
-            <span className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--home-muted)]">{statsLoaded ? "Updated from API" : "Loading API data"}</span>
+            <span className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--home-muted)]">{statsLoaded ? "Live data" : "Loading"}</span>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-            {(statsLoaded ? displayedStats : STAT_LABELS).map(([key, label]) => (
+            {STAT_LABELS.map(([key, label]) => (
               <article key={key} className={`${INTERACTIVE_CARD_CLASS} cursor-default p-4`}>
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--home-muted)]">{label}</p>
-                <p className="mt-3 font-['Montserrat'] text-2xl font-black text-[var(--home-text)]">{statsLoaded ? formatMetric(publicStats?.[key]) : "..."}</p>
+                <p className="text-xs font-bold text-[var(--home-muted)]">{label}</p>
+                <p className="mt-3 font-['Montserrat'] text-2xl font-black text-[var(--home-text)]">{statsLoaded ? formatMetric(publicStats?.[key]) : "0"}</p>
               </article>
             ))}
-            {statsLoaded && displayedStats.length === 0 ? (
-              <article className={`${INTERACTIVE_CARD_CLASS} sm:col-span-2 lg:col-span-6`}>
-                <p className="font-['Montserrat'] text-xl font-black">Stats are temporarily unavailable.</p>
-                <p className="mt-2 text-sm leading-6 text-[var(--home-muted)]">The homepage is not showing placeholder numbers. Live aggregates will appear when the backend can calculate them safely.</p>
-              </article>
-            ) : null}
           </div>
         </section>
 

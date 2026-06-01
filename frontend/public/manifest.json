@@ -1,11 +1,11 @@
 {
   "name": "ChessPlay",
   "short_name": "ChessPlay",
-  "description": "Online chess with AI practice, multiplayer rooms, puzzles, history, and leaderboards.",
+  "description": "Play chess online, practice against AI, review your games, track progress, and improve faster with ChessPlay.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#171512",
-  "theme_color": "#171512",
+  "background_color": "#0B0F19",
+  "theme_color": "#0B0F19",
   "icons": [
     {
       "src": "/chess-icon.svg",
