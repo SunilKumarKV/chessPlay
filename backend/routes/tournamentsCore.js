@@ -7,7 +7,35 @@ const { getRequestAccessToken, getJwtSecret } = require('../utils/security');
 const router = express.Router();
 
 function clean(value, max = 1000) {
-  return String(value || '').replace(/<[^>]*>/g, '').replace(/[<>]/g, '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+  let output = '';
+  let previousWasSpace = false;
+
+  for (const char of String(value || '')) {
+    const code = char.charCodeAt(0);
+    if (char === '<' || char === '>' || code === 127) continue;
+
+    if (code <= 31) {
+      if (!previousWasSpace && output.length < max) {
+        output += ' ';
+        previousWasSpace = true;
+      }
+      continue;
+    }
+
+    if (/\s/.test(char)) {
+      if (!previousWasSpace && output.length < max) {
+        output += ' ';
+        previousWasSpace = true;
+      }
+      continue;
+    }
+
+    output += char;
+    previousWasSpace = false;
+    if (output.length >= max) break;
+  }
+
+  return output.trim();
 }
 
 function optionalAuth(req, _res, next) {
