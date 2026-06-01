@@ -6,9 +6,11 @@ export const FormInput = ({
   error,
   type = 'text',
   className = '',
+  'aria-describedby': ariaDescribedBy,
   ...props
 }) => {
   const inputId = props.id || props.name;
+  const describedBy = [ariaDescribedBy, error ? `${inputId}-error` : null].filter(Boolean).join(' ') || undefined;
 
   return (
     <div className="space-y-1">
@@ -20,11 +22,14 @@ export const FormInput = ({
       <input
         id={inputId}
         type={type}
+        aria-describedby={describedBy}
         className={`w-full bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-2 text-[#e0e0e0] placeholder-[#7a7a7a] focus:outline-none focus:border-[#81b64c] transition-colors font-['Inter'] ${className}`}
         {...props}
       />
       {error && (
-        <p className="text-sm text-red-500 font-['Inter']">{error}</p>
+        <p id={`${inputId}-error`} role="alert" className="text-sm text-red-500 font-['Inter']">
+          {error}
+        </p>
       )}
     </div>
   );
@@ -35,10 +40,12 @@ export const PasswordInput = ({
   label,
   error,
   className = '',
+  'aria-describedby': ariaDescribedBy,
   ...props
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const inputId = props.id || props.name;
+  const describedBy = [ariaDescribedBy, error ? `${inputId}-error` : null].filter(Boolean).join(' ') || undefined;
 
   return (
     <div className="space-y-1">
@@ -51,6 +58,7 @@ export const PasswordInput = ({
         <input
           id={inputId}
           type={showPassword ? 'text' : 'password'}
+          aria-describedby={describedBy}
           className={`w-full bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-2 pr-10 text-[#e0e0e0] placeholder-[#7a7a7a] focus:outline-none focus:border-[#81b64c] transition-colors font-['Inter'] ${className}`}
           {...props}
         />
@@ -64,7 +72,9 @@ export const PasswordInput = ({
         </button>
       </div>
       {error && (
-        <p className="text-sm text-red-500 font-['Inter']">{error}</p>
+        <p id={`${inputId}-error`} role="alert" className="text-sm text-red-500 font-['Inter']">
+          {error}
+        </p>
       )}
     </div>
   );

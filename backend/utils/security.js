@@ -39,7 +39,10 @@ function validateProductionEmail(email) {
 function validateStrongPassword(password) {
   const value = String(password || '');
   if (value.length < 8) return 'Password must be at least 8 characters.';
-  if (!/[A-Za-z]/.test(value) || !/\d/.test(value)) return 'Password must include at least one letter and one number.';
+  if (!/[a-z]/.test(value)) return 'Password must include a lowercase letter.';
+  if (!/[A-Z]/.test(value)) return 'Password must include an uppercase letter.';
+  if (!/\d/.test(value)) return 'Password must include a number.';
+  if (!/[^A-Za-z0-9]/.test(value)) return 'Password must include a symbol.';
   return '';
 }
 

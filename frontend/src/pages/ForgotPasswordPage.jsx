@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { apiClient } from "../services/apiClient";
+import { validateProductionEmail } from "../utils/emailValidation";
 
 export default function ForgotPasswordPage({ onBack }) {
   const [email, setEmail] = useState("");
@@ -8,12 +9,17 @@ export default function ForgotPasswordPage({ onBack }) {
 
   const submit = async (event) => {
     event.preventDefault();
-    setLoading(true);
     setStatus("");
+    const emailError = validateProductionEmail(email);
+    if (emailError) {
+      setStatus(emailError);
+      return;
+    }
+    setLoading(true);
     try {
       const data = await apiClient("/api/auth/forgot-password", {
         method: "POST",
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
       setStatus(data.message);
     } catch (error) {
@@ -29,9 +35,19 @@ export default function ForgotPasswordPage({ onBack }) {
         <button type="button" onClick={onBack} className="mb-6 rounded-lg border border-white/10 px-4 py-2 text-sm">← Back</button>
         <h1 className="mb-2 text-2xl font-black">Forgot password</h1>
         <p className="mb-5 text-sm text-slate-400">Enter your verified email and we’ll send a reset link.</p>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required autoComplete="email" className="mb-4 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3" placeholder="you@gmail.com" />
+        <label htmlFor="forgot-password-email" className="sr-only">Email</label>
+        <input
+          id="forgot-password-email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          type="email"
+          required
+          autoComplete="email"
+          className="mb-4 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3"
+          placeholder="you@gmail.com"
+        />
         <button disabled={loading} className="w-full rounded-lg bg-[#81b64c] px-4 py-3 font-bold text-black">{loading ? "Sending..." : "Send reset link"}</button>
-        {status && <p className="mt-4 text-sm text-slate-300">{status}</p>}
+        {status && <p role="status" className="mt-4 text-sm text-slate-300">{status}</p>}
       </form>
     </main>
   );

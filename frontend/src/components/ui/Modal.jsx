@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 // Modal - Backdrop blur, dark modal bg, close X button
 export const Modal = ({
@@ -9,6 +9,10 @@ export const Modal = ({
   className = '',
   ...props
 }) => {
+  const modalRef = useRef(null);
+  const previousActiveElementRef = useRef(null);
+  const [titleId] = useState(() => `modal-title-${Math.random().toString(36).slice(2)}`);
+
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
@@ -17,13 +21,25 @@ export const Modal = ({
     };
 
     if (isOpen) {
+      previousActiveElementRef.current = document.activeElement;
       document.addEventListener('keydown', handleEscape);
       document.body.style.overflow = 'hidden';
+      window.setTimeout(() => {
+        if (modalRef.current) {
+          const focusTarget = modalRef.current.querySelector(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+          );
+          focusTarget?.focus();
+        }
+      }, 0);
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = 'unset';
+      if (previousActiveElementRef.current instanceof HTMLElement) {
+        previousActiveElementRef.current.focus();
+      }
     };
   }, [isOpen, onClose]);
 
@@ -39,6 +55,10 @@ export const Modal = ({
 
       {/* Modal */}
       <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
         className={`relative bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto ${className}`}
         {...props}
       >
@@ -46,7 +66,7 @@ export const Modal = ({
         {(title || onClose) && (
           <div className="flex items-center justify-between p-6 border-b border-[#2a2a2a]">
             {title && (
-              <h2 className="text-xl font-bold text-[#e0e0e0] font-['Montserrat']">
+              <h2 id={titleId} className="text-xl font-bold text-[#e0e0e0] font-['Montserrat']">
                 {title}
               </h2>
             )}

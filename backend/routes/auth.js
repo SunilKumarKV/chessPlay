@@ -53,6 +53,15 @@ function validateProductionEmail(email) {
   return validateSecureEmail(email);
 }
 
+const GENERIC_DUPLICATE_ACCOUNT_MESSAGE = "Unable to create account. Please verify your details or sign in.";
+
+function validateAuthUsername(username) {
+  const value = String(username || "").trim();
+  if (value.length < 3 || value.length > 16) return "Username must be 3–16 characters.";
+  if (!/^[a-zA-Z0-9]+$/.test(value)) return "Username can use letters and numbers only.";
+  return "";
+}
+
 function parsePositiveInt(value, fallback, max = Number.MAX_SAFE_INTEGER) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed < 1) return fallback;
@@ -385,9 +394,9 @@ router.post("/register", authLimiter, async (req, res) => {
       return res.status(400).json({ message: passwordError });
     }
 
-    const usernameRegex = /^[a-zA-Z0-9]+$/;
-    if (!username || !usernameRegex.test(username)) {
-      return res.status(400).json({ message: "Username must be alphanumeric only" });
+    const usernameError = validateAuthUsername(username);
+    if (usernameError) {
+      return res.status(400).json({ message: usernameError });
     }
 
     // Check if user already exists
@@ -396,12 +405,12 @@ router.post("/register", authLimiter, async (req, res) => {
     });
 
     if (existingUser) {
-      return res.status(400).json({
-        message:
-          existingUser.email === email
-            ? "Email already exists"
-            : "Username already exists",
+      logger.warn("Registration duplicate attempt", {
+        reason: existingUser.email === email ? "email" : "username",
+        email,
+        username,
       });
+      return res.status(400).json({ message: GENERIC_DUPLICATE_ACCOUNT_MESSAGE });
     }
 
     // Create new user
@@ -476,9 +485,9 @@ router.post("/mobile/register", authLimiter, async (req, res) => {
       return res.status(400).json({ message: passwordError });
     }
 
-    const usernameRegex = /^[a-zA-Z0-9]+$/;
-    if (!username || !usernameRegex.test(username)) {
-      return res.status(400).json({ message: "Username must be alphanumeric only" });
+    const usernameError = validateAuthUsername(username);
+    if (usernameError) {
+      return res.status(400).json({ message: usernameError });
     }
 
     const existingUser = await User.findOne({
@@ -486,12 +495,12 @@ router.post("/mobile/register", authLimiter, async (req, res) => {
     });
 
     if (existingUser) {
-      return res.status(400).json({
-        message:
-          existingUser.email === email
-            ? "Email already exists"
-            : "Username already exists",
+      logger.warn("Registration duplicate attempt", {
+        reason: existingUser.email === email ? "email" : "username",
+        email,
+        username,
       });
+      return res.status(400).json({ message: GENERIC_DUPLICATE_ACCOUNT_MESSAGE });
     }
 
     const user = new User({ username, email, password });
@@ -1302,5 +1311,11 @@ router.get("/leaderboard", auth, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+router.authHelpers = {
+  validateAuthUsername,
+  validateAuthPassword: validateStrongPassword,
+  GENERIC_DUPLICATE_ACCOUNT_MESSAGE,
+};
 
 module.exports = router;
