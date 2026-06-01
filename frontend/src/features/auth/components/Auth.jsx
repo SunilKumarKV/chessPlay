@@ -1,14 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BrandLogo } from "../../../components/brand/BrandLogo";
 import { GOOGLE_AUTH_ENABLED, GOOGLE_CLIENT_ID } from "../../../config/runtime";
-
-const GOOGLE_CLIENT_ID_ENV_NAME = "VITE_GOOGLE_CLIENT_ID";
-const GOOGLE_BACKEND_ENDPOINT = "/api/auth/google";
+import {
+  AuthBrandHeader,
+  PremiumAuthPage,
+  AuthStatus,
+  PremiumAuthShell,
+  PremiumInput,
+  PremiumPasswordInput,
+  PrimaryAuthButton,
+  TrustIndicators,
+} from "./PremiumAuthUI";
 import { validateProductionEmail } from "../../../utils/emailValidation";
 import { loginWithEmail, loginWithGoogleCredential, registerWithEmail } from "../services/authApi";
 import { persistAuthSession } from "../services/authStorage";
 import { trackEvent } from "../../../services/analytics";
 
+const GOOGLE_CLIENT_ID_ENV_NAME = "VITE_GOOGLE_CLIENT_ID";
+const GOOGLE_BACKEND_ENDPOINT = "/api/auth/google";
 let googleInitializedClientId = "";
 let googleCredentialHandler = null;
 
@@ -17,35 +25,6 @@ const REGISTER_BENEFITS = [
   "Review your games",
   "Improve faster with AI",
 ];
-
-const TRUST_ITEMS = ["Secure authentication", "Privacy-first", "Free to start"];
-
-function getAuthThemeVars() {
-  const isLight = document.documentElement.dataset.theme === "light";
-  if (isLight) {
-    return {
-      "--auth-card": "rgba(255,255,255,0.9)",
-      "--auth-card-strong": "rgba(255,255,255,0.98)",
-      "--auth-text": "#0B1220",
-      "--auth-muted": "#526072",
-      "--auth-border": "rgba(15,23,42,0.12)",
-      "--auth-input": "rgba(248,250,252,0.92)",
-      "--auth-shadow": "rgba(15,23,42,0.18)",
-      "--auth-glow": "rgba(244,180,0,0.22)",
-    };
-  }
-
-  return {
-    "--auth-card": "rgba(11,15,25,0.84)",
-    "--auth-card-strong": "rgba(17,24,39,0.82)",
-    "--auth-text": "#F8FAFC",
-    "--auth-muted": "#AAB3C2",
-    "--auth-border": "rgba(255,255,255,0.13)",
-    "--auth-input": "rgba(15,23,42,0.86)",
-    "--auth-shadow": "rgba(0,0,0,0.42)",
-    "--auth-glow": "rgba(244,180,0,0.24)",
-  };
-}
 
 function loadGoogleIdentityScript() {
   return new Promise((resolve, reject) => {
@@ -91,68 +70,6 @@ function navigateToForgotPassword(onNavigatePath) {
   if (typeof onNavigatePath === "function") {
     onNavigatePath("/forgot-password");
   }
-}
-
-function PremiumInput({ label, error, className = "", ...props }) {
-  const inputId = props.id || props.name;
-  const describedBy = error ? `${inputId}-error` : undefined;
-
-  return (
-    <div className="space-y-2">
-      <label htmlFor={inputId} className="block text-sm font-bold text-[var(--auth-text)]">
-        {label}
-      </label>
-      <input
-        id={inputId}
-        aria-describedby={describedBy}
-        aria-invalid={Boolean(error)}
-        className={`h-11 w-full rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-input)] px-4 text-[var(--auth-text)] outline-none transition duration-200 placeholder:text-[var(--auth-muted)]/70 focus:border-[#F4B400] focus:shadow-[0_0_0_4px_rgba(244,180,0,0.16)] sm:h-12 ${className}`}
-        {...props}
-      />
-      {error ? (
-        <p id={`${inputId}-error`} role="alert" className="text-sm font-semibold text-red-400">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function PremiumPasswordInput({ label, error, className = "", ...props }) {
-  const [showPassword, setShowPassword] = useState(false);
-  const inputId = props.id || props.name;
-  const describedBy = error ? `${inputId}-error` : undefined;
-
-  return (
-    <div className="space-y-2">
-      <label htmlFor={inputId} className="block text-sm font-bold text-[var(--auth-text)]">
-        {label}
-      </label>
-      <div className="relative">
-        <input
-          id={inputId}
-          type={showPassword ? "text" : "password"}
-          aria-describedby={describedBy}
-          aria-invalid={Boolean(error)}
-          className={`h-11 w-full rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-input)] px-4 pr-20 text-[var(--auth-text)] outline-none transition duration-200 placeholder:text-[var(--auth-muted)]/70 focus:border-[#F4B400] focus:shadow-[0_0_0_4px_rgba(244,180,0,0.16)] sm:h-12 ${className}`}
-          {...props}
-        />
-        <button
-          type="button"
-          onClick={() => setShowPassword((value) => !value)}
-          aria-label={showPassword ? "Hide password" : "Show password"}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl px-3 py-2 text-xs font-black text-[var(--auth-muted)] transition hover:bg-[#F4B400]/10 hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400]"
-        >
-          {showPassword ? "Hide" : "Show"}
-        </button>
-      </div>
-      {error ? (
-        <p id={`${inputId}-error`} role="alert" className="text-sm font-semibold text-red-400">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
 }
 
 export default function Auth({
@@ -338,7 +255,7 @@ export default function Auth({
           theme: "outline",
           size: "large",
           type: "standard",
-          text: isLogin ? "signin_with" : "signup_with",
+          text: isLogin ? "continue_with" : "signup_with",
           shape: "pill",
           width: Math.min(googleButtonRef.current.offsetWidth || 360, 390),
         });
@@ -360,44 +277,27 @@ export default function Auth({
   }, [handleGoogleCredential, isLogin]);
 
   const formContent = (
-    <div
-      className="relative mx-auto w-full max-w-[560px] overflow-hidden rounded-[28px] border border-[var(--auth-border)] bg-[var(--auth-card)] p-4 text-[var(--auth-text)] shadow-[0_30px_120px_var(--auth-shadow)] backdrop-blur-2xl sm:p-8"
-      style={getAuthThemeVars()}
-    >
-      <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-[#F4B400]/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-[#4F46E5]/20 blur-3xl" />
+    <PremiumAuthShell>
+      <AuthBrandHeader title={heading} subtitle={helperText} headingLevel={isModal ? "h2" : "h1"} />
 
-      <div className="relative">
-        <div className="mb-4 flex items-center justify-between gap-4 sm:mb-7">
-          <BrandLogo className="h-9 w-32 text-[var(--auth-text)] sm:h-11 sm:w-40" />
-          <span className="rounded-full border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#F4B400] shadow-sm">
-            Secure access
-          </span>
+      {referralCode && !isLogin ? (
+        <div className="mb-5 rounded-2xl border border-emerald-400/25 bg-emerald-400/10 p-3 text-sm font-semibold text-emerald-300">
+          Referral code <span className="font-mono">{referralCode}</span> will be connected after registration if valid.
         </div>
+      ) : null}
 
-        {referralCode && !isLogin ? (
-          <div className="mb-5 rounded-2xl border border-emerald-400/25 bg-emerald-400/10 p-3 text-sm font-semibold text-emerald-300">
-            Referral code <span className="font-mono">{referralCode}</span> will be connected after registration if valid.
-          </div>
-        ) : null}
-
-        <div className="mb-4 sm:mb-6">
-          <h2 className="font-['Montserrat'] text-2xl font-black tracking-tight text-[var(--auth-text)] sm:text-4xl">{heading}</h2>
-          <p className="mt-1.5 text-sm leading-6 text-[var(--auth-muted)] sm:text-base sm:leading-7">{helperText}</p>
+      {!isLogin ? (
+        <div className="mb-4 grid gap-1.5 rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] p-2.5 sm:mb-6 sm:gap-2 sm:p-3">
+          {REGISTER_BENEFITS.map((benefit) => (
+            <div key={benefit} className="flex items-center gap-3 text-sm font-bold text-[var(--auth-text)]">
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#F4B400]/15 text-[#B77900]">✓</span>
+              {benefit}
+            </div>
+          ))}
         </div>
+      ) : null}
 
-        {!isLogin ? (
-          <div className="mb-4 grid gap-1.5 rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] p-2.5 sm:mb-6 sm:gap-2 sm:p-3">
-            {REGISTER_BENEFITS.map((benefit) => (
-              <div key={benefit} className="flex items-center gap-3 text-sm font-bold text-[var(--auth-text)]">
-                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#F4B400]/15 text-[#B77900]">✓</span>
-                {benefit}
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {GOOGLE_AUTH_ENABLED ? (
+      {GOOGLE_AUTH_ENABLED ? (
         <div className="grid gap-2.5 sm:gap-3">
           {/* Google client ID env: {GOOGLE_CLIENT_ID_ENV_NAME}; backend endpoint: {GOOGLE_BACKEND_ENDPOINT} */}
           <div className="relative min-h-11 w-full overflow-hidden rounded-2xl border border-[var(--auth-border)] bg-white sm:min-h-12">
@@ -412,31 +312,31 @@ export default function Auth({
 
           <div className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-[var(--auth-muted)]">
             <span className="h-px flex-1 bg-[var(--auth-border)]" />
-            or use email
+            or continue with email
             <span className="h-px flex-1 bg-[var(--auth-border)]" />
           </div>
         </div>
-        ) : null}
+      ) : null}
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-3 sm:mt-5 sm:space-y-4" noValidate>
-          {!isLogin ? (
-            <div>
-              <PremiumInput
-                label="Username"
-                type="text"
-                name="username"
-                value={formData.username}
-                onChange={handleChange}
-                required
-                minLength={3}
-                maxLength={16}
-                autoComplete="username"
-                placeholder="sunilchess"
-                error={formErrors.username}
-              />
-              <p className="mt-1.5 text-xs leading-5 text-[var(--auth-muted)]">3-16 letters or numbers only.</p>
-            </div>
-          ) : null}
+      <form onSubmit={handleSubmit} className="mt-4 space-y-3 sm:mt-5 sm:space-y-4" noValidate>
+        {!isLogin ? (
+          <div>
+            <PremiumInput
+              label="Username"
+              type="text"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
+              required
+              minLength={3}
+              maxLength={16}
+              autoComplete="username"
+              placeholder="sunilchess"
+              error={formErrors.username}
+            />
+            <p className="mt-1.5 text-xs leading-5 text-[var(--auth-muted)]">3-16 letters or numbers only.</p>
+          </div>
+        ) : null}
 
           <PremiumInput
             label="Email"
@@ -483,16 +383,13 @@ export default function Auth({
             />
           ) : null}
 
-          <button
+          <PrimaryAuthButton
             type="submit"
-            disabled={loading}
-            className="group flex h-11 w-full items-center justify-center gap-3 rounded-2xl bg-[#F4B400] px-4 font-black text-[#0B0F19] shadow-[0_18px_46px_var(--auth-glow)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 focus:outline-none focus:ring-2 focus:ring-[#F4B400] focus:ring-offset-2 focus:ring-offset-transparent disabled:cursor-not-allowed disabled:opacity-65 sm:h-12"
+            loading={loading}
+            loadingText={isLogin ? "Signing in..." : "Creating account..."}
           >
-            {loading ? (
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#0B0F19]/25 border-t-[#0B0F19]" aria-hidden="true" />
-            ) : null}
-            {loading ? (isLogin ? "Signing in..." : "Creating account...") : isLogin ? "Sign In" : "Create Account"}
-          </button>
+            {isLogin ? "Sign In" : "Create Account"}
+          </PrimaryAuthButton>
 
           {isLogin ? (
             <button
@@ -504,50 +401,29 @@ export default function Auth({
               Forgot password?
             </button>
           ) : null}
-        </form>
+      </form>
 
-        {error ? (
-          <div role="alert" className="mt-4 rounded-2xl border border-red-400/25 bg-red-500/10 p-3 text-sm font-semibold text-red-300">
-            {error}
-          </div>
-        ) : null}
+      <AuthStatus status={error} tone="error" />
+      <AuthStatus status={success} tone="success" />
 
-        {success ? (
-          <div role="status" className="mt-4 rounded-2xl border border-emerald-400/25 bg-emerald-500/10 p-3 text-sm font-semibold text-emerald-300">
-            {success}
-          </div>
-        ) : null}
-
-        <div className="mt-4 rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] p-2.5 sm:mt-6 sm:p-3">
-          <div className="flex flex-wrap justify-center gap-2 text-xs font-black text-[var(--auth-muted)]">
-            {TRUST_ITEMS.map((item) => (
-              <span key={item} className="rounded-full border border-[var(--auth-border)] px-3 py-1">
-                {item}
-              </span>
-            ))}
-          </div>
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={handleToggleMode}
-              disabled={loading}
-              className="text-sm font-black text-[var(--auth-text)] underline-offset-4 transition hover:text-[#F4B400] hover:underline focus:outline-none focus:ring-2 focus:ring-[#F4B400] disabled:opacity-60"
-            >
-              {isLogin ? "New to ChessPlay? Create Account" : "Already have an account? Sign In"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+      <TrustIndicators>
+        <button
+          type="button"
+          onClick={handleToggleMode}
+          disabled={loading}
+          className="text-sm font-black text-[var(--auth-text)] underline-offset-4 transition hover:text-[#F4B400] hover:underline focus:outline-none focus:ring-2 focus:ring-[#F4B400] disabled:opacity-60"
+        >
+          {isLogin ? "New to ChessPlay? Create Account" : "Already have an account? Sign In"}
+        </button>
+      </TrustIndicators>
+    </PremiumAuthShell>
   );
 
   if (isModal) return formContent;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#0B0F19] p-4 text-white sm:p-6">
-      <div className="w-full max-w-[560px]">
-        {formContent}
-      </div>
-    </main>
+    <PremiumAuthPage>
+      {formContent}
+    </PremiumAuthPage>
   );
 }

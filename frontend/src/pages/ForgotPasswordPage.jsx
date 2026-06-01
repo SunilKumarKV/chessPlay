@@ -1,18 +1,30 @@
 import { useState } from "react";
+import {
+  AuthBrandHeader,
+  AuthStatus,
+  PremiumAuthPage,
+  PremiumAuthShell,
+  PremiumInput,
+  PrimaryAuthButton,
+  TrustIndicators,
+} from "../features/auth/components/PremiumAuthUI";
 import { apiClient } from "../services/apiClient";
 import { validateProductionEmail } from "../utils/emailValidation";
 
 export default function ForgotPasswordPage({ onBack }) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState("");
+  const [statusTone, setStatusTone] = useState("neutral");
   const [loading, setLoading] = useState(false);
 
   const submit = async (event) => {
     event.preventDefault();
     setStatus("");
+    setStatusTone("neutral");
     const emailError = validateProductionEmail(email);
     if (emailError) {
       setStatus(emailError);
+      setStatusTone("error");
       return;
     }
     setLoading(true);
@@ -22,33 +34,61 @@ export default function ForgotPasswordPage({ onBack }) {
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
       setStatus(data.message);
+      setStatusTone("success");
     } catch (error) {
       setStatus(error.message);
+      setStatusTone("error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#0b0f14] px-6 py-10 text-white">
-      <form onSubmit={submit} className="mx-auto max-w-md rounded-2xl border border-white/10 bg-white/5 p-6">
-        <button type="button" onClick={onBack} className="mb-6 rounded-lg border border-white/10 px-4 py-2 text-sm">← Back</button>
-        <h1 className="mb-2 text-2xl font-black">Forgot password</h1>
-        <p className="mb-5 text-sm text-slate-400">Enter your verified email and we’ll send a reset link.</p>
-        <label htmlFor="forgot-password-email" className="sr-only">Email</label>
-        <input
-          id="forgot-password-email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          type="email"
-          required
-          autoComplete="email"
-          className="mb-4 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3"
-          placeholder="you@gmail.com"
-        />
-        <button disabled={loading} className="w-full rounded-lg bg-[#81b64c] px-4 py-3 font-bold text-black">{loading ? "Sending..." : "Send reset link"}</button>
-        {status && <p role="status" className="mt-4 text-sm text-slate-300">{status}</p>}
-      </form>
-    </main>
+    <PremiumAuthPage>
+      <PremiumAuthShell>
+        <form onSubmit={submit} noValidate>
+          <AuthBrandHeader
+            eyebrow="Account recovery"
+            title="Reset your password"
+            subtitle="Enter your verified email and we’ll send a secure reset link."
+          />
+
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              className="mb-5 rounded-xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-4 py-2 text-sm font-black text-[var(--auth-text)] transition hover:-translate-y-0.5 hover:border-[#F4B400] hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400]"
+            >
+              Back
+            </button>
+          ) : null}
+
+          <div className="space-y-4">
+            <PremiumInput
+              label="Email"
+              id="forgot-password-email"
+              name="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (status) setStatus("");
+              }}
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="name@gmail.com"
+              error={statusTone === "error" ? status : ""}
+            />
+
+            <PrimaryAuthButton type="submit" loading={loading} loadingText="Sending reset link...">
+              Send reset link
+            </PrimaryAuthButton>
+          </div>
+
+          <AuthStatus status={statusTone === "error" ? "" : status} tone={statusTone} />
+          <TrustIndicators />
+        </form>
+      </PremiumAuthShell>
+    </PremiumAuthPage>
   );
 }
