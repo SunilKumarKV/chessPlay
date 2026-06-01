@@ -632,8 +632,15 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
         </div>
       </Modal>
 
-      <Modal isOpen={showAuth} onClose={closeAuthModal} title={isLogin ? "Sign in to ChessPlay" : "Create your ChessPlay account"} className="max-w-md">
-        <Suspense fallback={<div className="rounded-lg border border-white/10 bg-white/[0.04] p-6 text-sm font-bold text-slate-200">Loading secure sign in...</div>}>
+      <Modal
+        isOpen={showAuth}
+        onClose={closeAuthModal}
+        aria-label={isLogin ? "Sign in to ChessPlay" : "Create your ChessPlay account"}
+        className="max-h-[96dvh] max-w-[560px] overflow-hidden rounded-[28px] border-[var(--home-border)] bg-transparent p-0 shadow-[0_30px_120px_var(--home-shadow)]"
+        contentClassName="p-0"
+        showHeader={false}
+      >
+        <Suspense fallback={<div className="rounded-[28px] border border-white/10 bg-white/[0.06] p-8 text-sm font-bold text-slate-200 backdrop-blur-2xl">Loading secure sign in...</div>}>
           <Auth onLogin={handleAuthSuccess} isModal initialIsLogin={isLogin} onToggleMode={() => setIsLogin(!isLogin)} onNavigatePath={onNavigatePath} />
         </Suspense>
       </Modal>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FormInput, PasswordInput, PrimaryBtn } from "../../../components/ui";
+import { BrandLogo } from "../../../components/brand/BrandLogo";
 import { GOOGLE_AUTH_ENABLED, GOOGLE_CLIENT_ID } from "../../../config/runtime";
 
 const GOOGLE_CLIENT_ID_ENV_NAME = "VITE_GOOGLE_CLIENT_ID";
@@ -11,6 +11,41 @@ import { trackEvent } from "../../../services/analytics";
 
 let googleInitializedClientId = "";
 let googleCredentialHandler = null;
+
+const REGISTER_BENEFITS = [
+  "Track your progress",
+  "Review your games",
+  "Improve faster with AI",
+];
+
+const TRUST_ITEMS = ["Secure authentication", "Privacy-first", "Free to start"];
+
+function getAuthThemeVars() {
+  const isLight = document.documentElement.dataset.theme === "light";
+  if (isLight) {
+    return {
+      "--auth-card": "rgba(255,255,255,0.9)",
+      "--auth-card-strong": "rgba(255,255,255,0.98)",
+      "--auth-text": "#0B1220",
+      "--auth-muted": "#526072",
+      "--auth-border": "rgba(15,23,42,0.12)",
+      "--auth-input": "rgba(248,250,252,0.92)",
+      "--auth-shadow": "rgba(15,23,42,0.18)",
+      "--auth-glow": "rgba(244,180,0,0.22)",
+    };
+  }
+
+  return {
+    "--auth-card": "rgba(11,15,25,0.84)",
+    "--auth-card-strong": "rgba(17,24,39,0.82)",
+    "--auth-text": "#F8FAFC",
+    "--auth-muted": "#AAB3C2",
+    "--auth-border": "rgba(255,255,255,0.13)",
+    "--auth-input": "rgba(15,23,42,0.86)",
+    "--auth-shadow": "rgba(0,0,0,0.42)",
+    "--auth-glow": "rgba(244,180,0,0.24)",
+  };
+}
 
 function loadGoogleIdentityScript() {
   return new Promise((resolve, reject) => {
@@ -58,6 +93,68 @@ function navigateToForgotPassword(onNavigatePath) {
   }
 }
 
+function PremiumInput({ label, error, className = "", ...props }) {
+  const inputId = props.id || props.name;
+  const describedBy = error ? `${inputId}-error` : undefined;
+
+  return (
+    <div className="space-y-2">
+      <label htmlFor={inputId} className="block text-sm font-bold text-[var(--auth-text)]">
+        {label}
+      </label>
+      <input
+        id={inputId}
+        aria-describedby={describedBy}
+        aria-invalid={Boolean(error)}
+        className={`h-11 w-full rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-input)] px-4 text-[var(--auth-text)] outline-none transition duration-200 placeholder:text-[var(--auth-muted)]/70 focus:border-[#F4B400] focus:shadow-[0_0_0_4px_rgba(244,180,0,0.16)] sm:h-12 ${className}`}
+        {...props}
+      />
+      {error ? (
+        <p id={`${inputId}-error`} role="alert" className="text-sm font-semibold text-red-400">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function PremiumPasswordInput({ label, error, className = "", ...props }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const inputId = props.id || props.name;
+  const describedBy = error ? `${inputId}-error` : undefined;
+
+  return (
+    <div className="space-y-2">
+      <label htmlFor={inputId} className="block text-sm font-bold text-[var(--auth-text)]">
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          id={inputId}
+          type={showPassword ? "text" : "password"}
+          aria-describedby={describedBy}
+          aria-invalid={Boolean(error)}
+          className={`h-11 w-full rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-input)] px-4 pr-20 text-[var(--auth-text)] outline-none transition duration-200 placeholder:text-[var(--auth-muted)]/70 focus:border-[#F4B400] focus:shadow-[0_0_0_4px_rgba(244,180,0,0.16)] sm:h-12 ${className}`}
+          {...props}
+        />
+        <button
+          type="button"
+          onClick={() => setShowPassword((value) => !value)}
+          aria-label={showPassword ? "Hide password" : "Show password"}
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl px-3 py-2 text-xs font-black text-[var(--auth-muted)] transition hover:bg-[#F4B400]/10 hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400]"
+        >
+          {showPassword ? "Hide" : "Show"}
+        </button>
+      </div>
+      {error ? (
+        <p id={`${inputId}-error`} role="alert" className="text-sm font-semibold text-red-400">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export default function Auth({
   onLogin,
   isModal = false,
@@ -93,10 +190,10 @@ export default function Auth({
     setFormData({ username: "", email: "", password: "", confirmPassword: "" });
   }, [initialIsLogin, referralCode]);
 
-  const heading = isLogin ? "Sign in to ChessPlay" : "Create your ChessPlay account";
+  const heading = isLogin ? "Welcome back" : "Create your ChessPlay account";
   const helperText = isLogin
-    ? "Access multiplayer, friends, messages, game history, and supporter features securely."
-    : "Start free with secure account protection for your chess progress.";
+    ? "Continue improving your chess."
+    : "Play chess, analyze mistakes, and improve faster.";
 
   const formErrors = useMemo(() => {
     const errors = {};
@@ -263,158 +360,183 @@ export default function Auth({
   }, [handleGoogleCredential, isLogin]);
 
   const formContent = (
-    <div className="relative mx-auto w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl shadow-black/20 backdrop-blur-2xl sm:p-6">
-      <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[#81b64c]/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-20 -left-16 h-44 w-44 rounded-full bg-amber-300/10 blur-3xl" />
+    <div
+      className="relative mx-auto w-full max-w-[560px] overflow-hidden rounded-[28px] border border-[var(--auth-border)] bg-[var(--auth-card)] p-4 text-[var(--auth-text)] shadow-[0_30px_120px_var(--auth-shadow)] backdrop-blur-2xl sm:p-8"
+      style={getAuthThemeVars()}
+    >
+      <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-[#F4B400]/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-[#4F46E5]/20 blur-3xl" />
 
-      {referralCode && !isLogin && (
-        <div className="relative mb-4 rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-3 text-sm font-semibold text-emerald-100">
-          You were invited to ChessPlay. Referral code <span className="font-mono text-emerald-200">{referralCode}</span> will be connected after registration if it is valid.
+      <div className="relative">
+        <div className="mb-4 flex items-center justify-between gap-4 sm:mb-7">
+          <BrandLogo className="h-9 w-32 text-[var(--auth-text)] sm:h-11 sm:w-40" />
+          <span className="rounded-full border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#F4B400] shadow-sm">
+            Secure access
+          </span>
         </div>
-      )}
 
-      <div className="relative text-center">
-        <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-[#81b64c] text-3xl text-[#07100a] shadow-lg shadow-[#81b64c]/20">
-          ♟
-        </div>
-        <div className="mb-2 inline-flex rounded-full border border-[#81b64c]/25 bg-[#81b64c]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#a8e36f]">
-          Secure access
-        </div>
-        <h2 className="text-2xl font-black text-white sm:text-3xl">{heading}</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-400">{helperText}</p>
-      </div>
+        {referralCode && !isLogin ? (
+          <div className="mb-5 rounded-2xl border border-emerald-400/25 bg-emerald-400/10 p-3 text-sm font-semibold text-emerald-300">
+            Referral code <span className="font-mono">{referralCode}</span> will be connected after registration if valid.
+          </div>
+        ) : null}
 
-      <div className="relative mt-5 grid gap-3">
-        {/* Google client ID env: {GOOGLE_CLIENT_ID_ENV_NAME}; backend endpoint: {GOOGLE_BACKEND_ENDPOINT} */}
+        <div className="mb-4 sm:mb-6">
+          <h2 className="font-['Montserrat'] text-2xl font-black tracking-tight text-[var(--auth-text)] sm:text-4xl">{heading}</h2>
+          <p className="mt-1.5 text-sm leading-6 text-[var(--auth-muted)] sm:text-base sm:leading-7">{helperText}</p>
+        </div>
+
+        {!isLogin ? (
+          <div className="mb-4 grid gap-1.5 rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] p-2.5 sm:mb-6 sm:gap-2 sm:p-3">
+            {REGISTER_BENEFITS.map((benefit) => (
+              <div key={benefit} className="flex items-center gap-3 text-sm font-bold text-[var(--auth-text)]">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#F4B400]/15 text-[#B77900]">✓</span>
+                {benefit}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         {GOOGLE_AUTH_ENABLED ? (
-          <div className="relative min-h-11 w-full overflow-hidden rounded-full bg-white">
-            {!googleReady && (
-              <div className="grid min-h-11 place-items-center px-4 text-sm font-bold text-slate-700">
+        <div className="grid gap-2.5 sm:gap-3">
+          {/* Google client ID env: {GOOGLE_CLIENT_ID_ENV_NAME}; backend endpoint: {GOOGLE_BACKEND_ENDPOINT} */}
+          <div className="relative min-h-11 w-full overflow-hidden rounded-2xl border border-[var(--auth-border)] bg-white sm:min-h-12">
+            {!googleReady ? (
+              <div className="grid min-h-11 place-items-center px-4 text-sm font-bold text-slate-700 sm:min-h-12">
                 Loading Google sign-in...
               </div>
-            )}
+            ) : null}
             <div ref={googleButtonRef} className="w-full" />
-            {loading && <div className="absolute inset-0 cursor-wait rounded-full bg-white/60" />}
+            {loading ? <div className="absolute inset-0 cursor-wait rounded-2xl bg-white/60" /> : null}
           </div>
-        ) : (
-          <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-3 text-center text-sm text-amber-100">
-            Google login is not configured. Use email login.
-          </div>
-        )}
 
-        <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-          <span className="h-px flex-1 bg-white/10" />
-          or use email
-          <span className="h-px flex-1 bg-white/10" />
+          <div className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-[var(--auth-muted)]">
+            <span className="h-px flex-1 bg-[var(--auth-border)]" />
+            or use email
+            <span className="h-px flex-1 bg-[var(--auth-border)]" />
+          </div>
         </div>
-      </div>
+        ) : null}
 
-      <form onSubmit={handleSubmit} className="relative mt-5 space-y-4" noValidate>
-        {!isLogin && (
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3 sm:mt-5 sm:space-y-4" noValidate>
+          {!isLogin ? (
+            <div>
+              <PremiumInput
+                label="Username"
+                type="text"
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+                required
+                minLength={3}
+                maxLength={16}
+                autoComplete="username"
+                placeholder="sunilchess"
+                error={formErrors.username}
+              />
+              <p className="mt-1.5 text-xs leading-5 text-[var(--auth-muted)]">3-16 letters or numbers only.</p>
+            </div>
+          ) : null}
+
+          <PremiumInput
+            label="Email"
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            autoComplete="email"
+            placeholder="name@gmail.com"
+            error={formErrors.email}
+          />
+
           <div>
-            <FormInput
-              label="Username"
-              type="text"
-              name="username"
-              value={formData.username}
+            <PremiumPasswordInput
+              label="Password"
+              name="password"
+              value={formData.password}
               onChange={handleChange}
               required
-              minLength={3}
-              maxLength={16}
-              autoComplete="username"
-              placeholder="sunilchess"
-              error={formErrors.username}
+              minLength={8}
+              autoComplete={isLogin ? "current-password" : "new-password"}
+              placeholder={isLogin ? "Enter your password" : "Create a strong password"}
+              error={formErrors.password}
             />
-            <p className="mt-1 text-xs text-slate-500">3–16 letters or numbers only.</p>
+            {!isLogin ? (
+              <p className="mt-1.5 text-xs leading-5 text-[var(--auth-muted)]">
+                Use at least 8 characters with uppercase, lowercase, number and symbol.
+              </p>
+            ) : null}
           </div>
-        )}
 
-        <FormInput
-          label="Email"
-          type="email"
-          name="email"
-          value={formData.email}
-          onChange={handleChange}
-          required
-          autoComplete="email"
-          placeholder="name@gmail.com"
-          error={formErrors.email}
-        />
+          {!isLogin ? (
+            <PremiumPasswordInput
+              label="Confirm password"
+              name="confirmPassword"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              required
+              minLength={8}
+              autoComplete="new-password"
+              placeholder="Re-enter your password"
+              error={formErrors.confirmPassword}
+            />
+          ) : null}
 
-        <div>
-          <PasswordInput
-            label="Password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            minLength={8}
-            autoComplete={isLogin ? "current-password" : "new-password"}
-            placeholder={isLogin ? "Enter your password" : "Create a strong password"}
-            error={formErrors.password}
-          />
-          {!isLogin && (
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              Use at least 8 characters with uppercase, lowercase, number and symbol.
-            </p>
-          )}
-        </div>
-
-        {!isLogin && (
-          <PasswordInput
-            label="Confirm password"
-            name="confirmPassword"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            required
-            minLength={8}
-            autoComplete="new-password"
-            placeholder="Re-enter your password"
-            error={formErrors.confirmPassword}
-          />
-        )}
-
-        <PrimaryBtn
-          type="submit"
-          disabled={loading}
-          className={`w-full ${loading ? "cursor-not-allowed opacity-60" : ""}`}
-        >
-          {loading ? (isLogin ? "Signing in..." : "Creating account...") : isLogin ? "Sign in" : "Create account"}
-        </PrimaryBtn>
-
-        {isLogin && (
           <button
-            type="button"
-            onClick={() => navigateToForgotPassword(onNavigatePath)}
+            type="submit"
             disabled={loading}
-            className="w-full text-center text-sm font-bold text-[#a8e36f] transition hover:text-[#c5f29c] disabled:opacity-60"
+            className="group flex h-11 w-full items-center justify-center gap-3 rounded-2xl bg-[#F4B400] px-4 font-black text-[#0B0F19] shadow-[0_18px_46px_var(--auth-glow)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 focus:outline-none focus:ring-2 focus:ring-[#F4B400] focus:ring-offset-2 focus:ring-offset-transparent disabled:cursor-not-allowed disabled:opacity-65 sm:h-12"
           >
-            Forgot password?
+            {loading ? (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#0B0F19]/25 border-t-[#0B0F19]" aria-hidden="true" />
+            ) : null}
+            {loading ? (isLogin ? "Signing in..." : "Creating account...") : isLogin ? "Sign In" : "Create Account"}
           </button>
-        )}
-      </form>
 
-      {error && (
-        <div role="alert" className="relative mt-4 rounded-2xl border border-red-400/25 bg-red-500/10 p-3 text-center text-sm text-red-200">
-          {error}
+          {isLogin ? (
+            <button
+              type="button"
+              onClick={() => navigateToForgotPassword(onNavigatePath)}
+              disabled={loading}
+              className="w-full rounded-xl py-1 text-center text-sm font-bold text-[#B77900] transition hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400] disabled:opacity-60"
+            >
+              Forgot password?
+            </button>
+          ) : null}
+        </form>
+
+        {error ? (
+          <div role="alert" className="mt-4 rounded-2xl border border-red-400/25 bg-red-500/10 p-3 text-sm font-semibold text-red-300">
+            {error}
+          </div>
+        ) : null}
+
+        {success ? (
+          <div role="status" className="mt-4 rounded-2xl border border-emerald-400/25 bg-emerald-500/10 p-3 text-sm font-semibold text-emerald-300">
+            {success}
+          </div>
+        ) : null}
+
+        <div className="mt-4 rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] p-2.5 sm:mt-6 sm:p-3">
+          <div className="flex flex-wrap justify-center gap-2 text-xs font-black text-[var(--auth-muted)]">
+            {TRUST_ITEMS.map((item) => (
+              <span key={item} className="rounded-full border border-[var(--auth-border)] px-3 py-1">
+                {item}
+              </span>
+            ))}
+          </div>
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={handleToggleMode}
+              disabled={loading}
+              className="text-sm font-black text-[var(--auth-text)] underline-offset-4 transition hover:text-[#F4B400] hover:underline focus:outline-none focus:ring-2 focus:ring-[#F4B400] disabled:opacity-60"
+            >
+              {isLogin ? "New to ChessPlay? Create Account" : "Already have an account? Sign In"}
+            </button>
+          </div>
         </div>
-      )}
-
-      {success && (
-        <div role="status" className="relative mt-4 rounded-2xl border border-emerald-400/25 bg-emerald-500/10 p-3 text-center text-sm text-emerald-200">
-          {success}
-        </div>
-      )}
-
-      <div className="relative mt-6 text-center">
-        <button
-          type="button"
-          onClick={handleToggleMode}
-          disabled={loading}
-          className="text-sm font-bold text-blue-300 transition-colors hover:text-blue-200 disabled:opacity-60"
-        >
-          {isLogin ? "Need an account? Create one" : "Already have an account? Sign in"}
-        </button>
       </div>
     </div>
   );
@@ -422,12 +544,8 @@ export default function Auth({
   if (isModal) return formContent;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#171512] p-4 text-white sm:p-6">
-      <div className="w-full max-w-md">
-        <div className="mb-6 text-center">
-          <h1 className="mb-2 text-3xl font-bold text-[#f5d78e]">ChessPlay</h1>
-          <p className="text-gray-400">Secure sign-in for your chess arena</p>
-        </div>
+    <main className="flex min-h-screen items-center justify-center bg-[#0B0F19] p-4 text-white sm:p-6">
+      <div className="w-full max-w-[560px]">
         {formContent}
       </div>
     </main>

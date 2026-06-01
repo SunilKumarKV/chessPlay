@@ -73,10 +73,13 @@ function assertSourceChecks() {
   assert(/getCookie\(req, 'authToken'\)/.test(securityUtils), "Token reader must keep authToken cookie backward compatibility");
   assert(/getBearerToken\(req\)/.test(securityUtils), "Token reader must support short-lived bearer fallback for browsers blocking cross-site cookies");
 
-  const server = read("backend/server.js");
-  assert(/JWT_SECRET must be at least 32 characters/.test(server), "JWT secret length check is missing");
-  assert(/FRONTEND_ORIGINS/.test(server), "CORS must use configured frontend origins");
-  assert(/enforceProductionOrigin/.test(server), "Production origin enforcement is missing");
+  const envConfig = readExisting(["backend/src/config/env.ts", "backend/config/env.js"]);
+  assert(/JWT_ACCESS_SECRET\.length < 32/.test(envConfig), "JWT access secret length check is missing");
+  assert(/JWT_REFRESH_SECRET\.length < 32/.test(envConfig), "JWT refresh secret length check is missing");
+  assert(/FRONTEND_ORIGINS/.test(envConfig), "CORS must use configured frontend origins");
+
+  const app = readExisting(["backend/src/app.ts", "backend/server.js"]);
+  assert(/enforceTrustedOriginForStatefulApi/.test(app), "Production origin enforcement is missing");
 
   const games = readExisting(["backend/routes/games.ts", "backend/routes/games.js"]);
   assert(/const targetUserId = req\.query\.userId/.test(games), "Game history cannot target viewed profile");
