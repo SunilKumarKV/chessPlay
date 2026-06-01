@@ -22,7 +22,7 @@ export function useLegalSeo({ title, description, path }) {
     upsertMeta('meta[property="og:description"]', { property: "og:description", content: description });
     upsertMeta('meta[property="og:type"]', { property: "og:type", content: "website" });
     upsertMeta('meta[property="og:url"]', { property: "og:url", content: url });
-    upsertMeta('meta[property="og:image"]', { property: "og:image", content: `${ORIGIN}/chess-icon.svg` });
+    upsertMeta('meta[property="og:image"]', { property: "og:image", content: `${ORIGIN}/og-image.png` });
     upsertMeta('meta[name="twitter:card"]', { name: "twitter:card", content: "summary" });
   }, [description, fullTitle, url]);
 }

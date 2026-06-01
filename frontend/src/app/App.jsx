@@ -46,6 +46,7 @@ const StorePage = lazy(() => import("../pages/growth/StorePage"));
 const ServicesPage = lazy(() => import("../pages/growth/ServicesPage"));
 const OpeningExplorerPage = lazy(() => import("../pages/growth/OpeningExplorerPage"));
 const PaymentStatusPage = lazy(() => import("../pages/billing/PaymentStatusPage"));
+const BrandConceptsPage = lazy(() => import("../pages/BrandConceptsPage"));
 import { getGuestFeatureMessage, isGuestRestrictedFeature, isGuestUser } from "../utils/guestAccess";
 import { trackEvent } from "../services/analytics";
 
@@ -150,6 +151,7 @@ const routeMap = {
   "verify-email": "/verify-email",
   "payment-success": "/payment/success",
   "payment-failed": "/payment/failed",
+  "brand-concepts": "/internal/brand-concepts",
 };
 
 function pageFromPathname(pathname) {
@@ -161,6 +163,7 @@ function pageFromPathname(pathname) {
   if (normalized === "/referrals") return "referrals";
   if (normalized === "/privacy") return "privacy";
   if (normalized === "/admin" || normalized === "/admin/dashboard") return "admin";
+  if (normalized === "/internal/brand-concepts") return "brand-concepts";
   if (normalized.startsWith("/profile/") && normalized.split("/")[2]) return "profile-public";
   if (["/admin/payments", "/admin/supporters"].includes(normalized)) return "admin-supporters";
   if (["/play-ai", "/play/computer"].includes(normalized)) return "ai";
@@ -336,6 +339,14 @@ export default function App() {
       <RouteFrame>
         <PaymentStatusPage status={currentPage === "payment-success" ? "success" : "failed"} onNavigate={guardedNavigate} />
         <DeferredFeedbackButton user={user} />
+      </RouteFrame>
+    );
+  }
+
+  if (currentPage === "brand-concepts") {
+    return (
+      <RouteFrame>
+        <BrandConceptsPage onBack={() => navigateToAppPage("dashboard", setCurrentPage, true)} />
       </RouteFrame>
     );
   }

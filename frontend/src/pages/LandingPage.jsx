@@ -1,7 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Modal } from "../components/ui";
+import { BrandLogo } from "../components/brand/BrandLogo";
 import LegalFooter from "../components/common/LegalFooter";
 import { BACKEND_URL } from "../config/runtime";
+import { SOCIAL_LINKS } from "../config/socialLinks";
 
 const Auth = lazy(() => import("../features/auth/components/Auth"));
 
@@ -280,8 +282,7 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
       <header className="sticky top-0 z-30 border-b border-[var(--home-border)] bg-[var(--home-surface)] shadow-[0_12px_42px_var(--home-shadow)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 md:px-8">
           <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="flex items-center gap-3" aria-label="Go to ChessPlay homepage top">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--home-accent)] text-2xl font-black text-[var(--home-accent-ink)] shadow-[0_12px_30px_var(--home-glow)]">♞</span>
-            <span className="font-['Montserrat'] text-xl font-black">ChessPlay</span>
+            <BrandLogo className="h-11 w-40 text-[var(--home-text)]" />
           </button>
 
           <nav className="hidden items-center gap-5 text-sm font-bold text-[var(--home-muted)] lg:flex" aria-label="Homepage navigation">
@@ -554,12 +555,11 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
         <div className="mx-auto grid max-w-7xl gap-6 text-sm text-[var(--home-muted)] md:grid-cols-[1.2fr_2fr]">
           <div>
             <div className="flex items-center gap-3 text-[var(--home-text)]">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--home-accent)] text-xl font-black text-[var(--home-accent-ink)]">♞</span>
-              <span className="font-['Montserrat'] text-lg font-black">ChessPlay</span>
+              <BrandLogo className="h-11 w-40 text-[var(--home-text)]" />
             </div>
             <p className="mt-3 max-w-sm leading-6">Play chess, review progress, and train smarter at getchessplay.com.</p>
           </div>
-          <div className="grid gap-6 sm:grid-cols-3">
+          <div className={`grid gap-6 sm:grid-cols-2 ${SOCIAL_LINKS.length ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
             <div>
               <h3 className="font-black text-[var(--home-text)]">Product</h3>
               <div className="mt-3 grid gap-2">
@@ -584,6 +584,25 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
                 <a href="/delete-account" onClick={(event) => { event.preventDefault(); onNavigatePath?.("/delete-account"); }} className="transition hover:text-[var(--home-text)]">Delete account</a>
               </div>
             </div>
+            {SOCIAL_LINKS.length ? (
+              <div>
+                <h3 className="font-black text-[var(--home-text)]">Social</h3>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {SOCIAL_LINKS.map((link) => (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      aria-label={link.ariaLabel}
+                      target={link.external ? "_blank" : undefined}
+                      rel={link.external ? "noopener noreferrer" : undefined}
+                      className="rounded-xl border border-[var(--home-border)] bg-[var(--home-card)] px-3 py-2 text-xs font-black text-[var(--home-text)] shadow-[0_10px_24px_var(--home-shadow)] transition duration-200 hover:-translate-y-0.5 hover:border-[var(--home-accent)] hover:text-[var(--home-accent)] hover:shadow-[0_16px_42px_var(--home-glow)] focus:outline-none focus:ring-2 focus:ring-[var(--home-accent)]"
+                    >
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </footer>
