@@ -7,6 +7,8 @@ export const Modal = ({
   title,
   children,
   className = '',
+  contentClassName = 'p-6',
+  showHeader = true,
   ...props
 }) => {
   const modalRef = useRef(null);
@@ -18,20 +20,55 @@ export const Modal = ({
       if (e.key === 'Escape') {
         onClose();
       }
+
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusableElements = Array.from(
+          modalRef.current.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+          ),
+        ).filter((element) => !element.disabled && element.getAttribute('aria-hidden') !== 'true');
+
+        if (!focusableElements.length) {
+          e.preventDefault();
+          modalRef.current.focus();
+          return;
+        }
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (!modalRef.current.contains(document.activeElement)) {
+          e.preventDefault();
+          firstElement.focus();
+        } else if (e.shiftKey && document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        } else if (!e.shiftKey && document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
+        }
+      }
     };
 
     if (isOpen) {
       previousActiveElementRef.current = document.activeElement;
       document.addEventListener('keydown', handleEscape);
       document.body.style.overflow = 'hidden';
-      window.setTimeout(() => {
+      const focusFirstElement = () => {
         if (modalRef.current) {
           const focusTarget = modalRef.current.querySelector(
             'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
           );
-          focusTarget?.focus();
+          if (focusTarget instanceof HTMLElement) {
+            focusTarget.focus();
+          } else {
+            modalRef.current.focus();
+          }
         }
-      }, 0);
+      };
+
+      window.setTimeout(focusFirstElement, 0);
+      window.setTimeout(focusFirstElement, 80);
     }
 
     return () => {
@@ -59,11 +96,12 @@ export const Modal = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
+        tabIndex={-1}
         className={`relative bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto ${className}`}
         {...props}
       >
         {/* Header */}
-        {(title || onClose) && (
+        {showHeader && (title || onClose) && (
           <div className="flex items-center justify-between p-6 border-b border-[#2a2a2a]">
             {title && (
               <h2 id={titleId} className="text-xl font-bold text-[#e0e0e0] font-['Montserrat']">
@@ -82,7 +120,7 @@ export const Modal = ({
         )}
 
         {/* Content */}
-        <div className="p-6">
+        <div className={contentClassName}>
           {children}
         </div>
       </div>

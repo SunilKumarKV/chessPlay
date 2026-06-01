@@ -35,13 +35,26 @@ export function normalizeRoomCode(value: unknown): string {
   return /^[A-Z0-9]{6}$/.test(roomId) ? roomId : '';
 }
 
-function stripHtmlTags(text: string): string {
-  return text.replace(/<[^>]*>/g, '');
+function isSafeNameChar(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return (
+    (code >= 48 && code <= 57) ||
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    char === ' ' ||
+    char === '.' ||
+    char === '-' ||
+    char === '_'
+  );
 }
 
 export function safePlayerName(value: unknown, fallback = 'Player'): string {
-  const name = stripHtmlTags(String(value || fallback)).replace(/[^\w .-]/g, '').trim().slice(0, 30);
-  return name || fallback;
+  let output = '';
+  for (const char of String(value || fallback)) {
+    if (isSafeNameChar(char)) output += char;
+    if (output.length >= 30) break;
+  }
+  return output.trim() || fallback;
 }
 
 export async function createRoom(io: SocketIOServer, socket: Socket, state: SocketState, data: any): Promise<void> {

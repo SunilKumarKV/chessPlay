@@ -3,7 +3,7 @@ import type { MatchmakingEntry, SocketState } from './socketTypes';
 import { acceptDraw, handleMove, resignGame } from './socketGameplay';
 import { handleDisconnect, leaveRoom } from './socketDisconnect';
 import { broadcastQueueUpdate, createMatchRoom, findQueuedOpponent, getRatingRange, removeFromQueue } from './socketMatchmaking';
-import { cleanupSpectator, createRoom, joinRoom, rejoinRoom, spectateRoom } from './socketRooms';
+import { cleanupSpectator, createRoom, joinRoom, rejoinRoom, safePlayerName, spectateRoom } from './socketRooms';
 
 type SafeRegistrar = (eventName: string, handler: (...args: unknown[]) => Promise<void> | void) => void;
 
@@ -21,7 +21,14 @@ function emitServerError(socket: Socket, message: string): void {
 }
 
 function sanitizeChatText(value: unknown): string {
-  return String(value || '').replace(/<[^>]*>/g, '').trim().slice(0, 200);
+  let output = '';
+  for (const char of String(value || '')) {
+    const code = char.charCodeAt(0);
+    if (char === '<' || char === '>' || code < 32 || code === 127) continue;
+    output += char;
+    if (output.length >= 200) break;
+  }
+  return output.trim();
 }
 
 export function registerSocketHandlers(io: SocketIOServer, socket: Socket, state: SocketState, onSafe: SafeRegistrar): void {
@@ -38,7 +45,7 @@ export function registerSocketHandlers(io: SocketIOServer, socket: Socket, state
     const entry: MatchmakingEntry = {
       socketId: socket.id,
       userId,
-      playerName: String(payload.playerName || user.username || 'Player').replace(/[^\w .-]/g, '').trim().slice(0, 30) || 'Player',
+      playerName: safePlayerName(payload.playerName, user.username || 'Player'),
       rating,
       mode,
       timeControlIndex: Number.isInteger(payload.timeControlIndex) ? payload.timeControlIndex : null,
