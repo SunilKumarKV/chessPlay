@@ -4,6 +4,7 @@ import {
   AuthStatus,
   PremiumAuthPage,
   PremiumAuthShell,
+  PremiumInput,
   PremiumPasswordInput,
   PrimaryAuthButton,
   TrustIndicators,
@@ -21,7 +22,9 @@ function validatePassword(password) {
 
 export default function ResetPasswordPage({ onBack }) {
   const params = new URLSearchParams(window.location.search);
-  const token = params.get("token") || "";
+  const initialEmail = params.get("email") || "";
+  const [email, setEmail] = useState(initialEmail);
+  const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState("");
@@ -33,8 +36,13 @@ export default function ResetPasswordPage({ onBack }) {
     setStatus("");
     setStatusTone("neutral");
 
-    if (!token) {
-      setStatus("Reset token is missing. Please request a fresh link.");
+    if (!email.trim()) {
+      setStatus("Email is required.");
+      setStatusTone("error");
+      return;
+    }
+    if (!/^\d{6}$/.test(otp.trim())) {
+      setStatus("Enter the 6-digit reset code.");
       setStatusTone("error");
       return;
     }
@@ -54,7 +62,7 @@ export default function ResetPasswordPage({ onBack }) {
     try {
       const data = await apiClient("/api/auth/reset-password", {
         method: "POST",
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), otp: otp.trim(), password }),
       });
       setStatus(data.message || "Password reset successful.");
       setStatusTone("success");
@@ -87,6 +95,37 @@ export default function ResetPasswordPage({ onBack }) {
           ) : null}
 
           <div className="space-y-4">
+            <PremiumInput
+              label="Email"
+              name="email"
+              value={email}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                if (status) setStatus("");
+              }}
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="name@gmail.com"
+              error={statusTone === "error" && status === "Email is required." ? status : ""}
+            />
+
+            <PremiumInput
+              label="Reset code"
+              name="otp"
+              value={otp}
+              onChange={(event) => {
+                setOtp(event.target.value.replace(/\D/g, "").slice(0, 6));
+                if (status) setStatus("");
+              }}
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              required
+              autoComplete="one-time-code"
+              placeholder="123456"
+              error={statusTone === "error" && status.includes("6-digit") ? status : ""}
+            />
+
             <div>
               <PremiumPasswordInput
                 label="New password"

@@ -1,48 +1,134 @@
 import { useEffect, useState } from "react";
+import {
+  AuthBrandHeader,
+  AuthStatus,
+  PremiumAuthPage,
+  PremiumAuthShell,
+  PremiumInput,
+  PrimaryAuthButton,
+  TrustIndicators,
+} from "../features/auth/components/PremiumAuthUI";
 import { apiClient } from "../services/apiClient";
 
-export default function VerifyEmailPage({ onBack }) {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get("token") || "";
-  const [status, setStatus] = useState("Verifying your email...");
+const RESEND_SECONDS = 60;
+
+export default function VerifyEmailPage({ user, onVerified, onLogout }) {
+  const [otp, setOtp] = useState("");
+  const [status, setStatus] = useState("");
+  const [statusTone, setStatusTone] = useState("neutral");
+  const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
 
   useEffect(() => {
-    async function verifyEmail() {
-      if (!token) {
-        setStatus("Verification token is missing. Please request a fresh link.");
-        return;
-      }
+    if (!resendIn) return undefined;
+    const timer = window.setTimeout(() => setResendIn((value) => Math.max(value - 1, 0)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendIn]);
 
-      try {
-        const data = await apiClient("/api/auth/verify-email", {
-          method: "POST",
-          body: JSON.stringify({ token }),
-        });
-        setStatus(data.message || "Email verified successfully.");
-      } catch (error) {
-        setStatus(error.message);
-      }
+  const verify = async (event) => {
+    event.preventDefault();
+    setStatus("");
+    setStatusTone("neutral");
+
+    if (!/^\d{6}$/.test(otp.trim())) {
+      setStatus("Enter the 6-digit verification code.");
+      setStatusTone("error");
+      return;
     }
 
-    verifyEmail();
-  }, [token]);
+    setLoading(true);
+    try {
+      const data = await apiClient("/api/auth/verify-email", {
+        method: "POST",
+        body: JSON.stringify({ otp: otp.trim() }),
+      });
+      setStatus(data.message || "Email verified successfully.");
+      setStatusTone("success");
+      const session = await apiClient("/api/auth/session", { skipAuthRefresh: true });
+      window.setTimeout(() => onVerified?.(session.user || { ...user, emailVerified: true }), 300);
+    } catch (error) {
+      setStatus(error.message);
+      setStatusTone("error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resend = async () => {
+    if (resendIn || resending) return;
+    setResending(true);
+    setStatus("");
+    setStatusTone("neutral");
+    try {
+      const data = await apiClient("/api/auth/resend-verification", { method: "POST" });
+      setStatus(data.message || "If the account needs verification, a verification code has been sent.");
+      setStatusTone("success");
+      setResendIn(RESEND_SECONDS);
+    } catch (error) {
+      setStatus(error.message);
+      setStatusTone("error");
+      if (error.status === 429) setResendIn(RESEND_SECONDS);
+    } finally {
+      setResending(false);
+    }
+  };
 
   return (
-    <main className="min-h-screen bg-[#0b0f14] px-6 py-10 text-white">
-      <section className="mx-auto max-w-md rounded-2xl border border-white/10 bg-white/5 p-6 text-center shadow-2xl shadow-black/30">
-        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-xl bg-[#81b64c] text-2xl font-black text-black">
-          @
-        </div>
-        <h1 className="mb-2 text-2xl font-black">Email verification</h1>
-        <p className="mb-6 text-sm text-slate-300">{status}</p>
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-lg bg-[#81b64c] px-5 py-3 font-bold text-black"
-        >
-          Continue
-        </button>
-      </section>
-    </main>
+    <PremiumAuthPage>
+      <PremiumAuthShell>
+        <form onSubmit={verify} noValidate>
+          <AuthBrandHeader
+            eyebrow="Verify email"
+            title="Check your inbox"
+            subtitle={`Enter the 6-digit code sent to ${user?.email || "your email"} to unlock ChessPlay.`}
+          />
+
+          <div className="space-y-4">
+            <PremiumInput
+              label="Verification code"
+              name="otp"
+              value={otp}
+              onChange={(event) => {
+                setOtp(event.target.value.replace(/\D/g, "").slice(0, 6));
+                if (status) setStatus("");
+              }}
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              required
+              autoComplete="one-time-code"
+              placeholder="123456"
+              error={statusTone === "error" && status.includes("6-digit") ? status : ""}
+            />
+
+            <PrimaryAuthButton type="submit" loading={loading} loadingText="Verifying...">
+              Verify email
+            </PrimaryAuthButton>
+          </div>
+
+          <AuthStatus status={statusTone === "error" && status.includes("6-digit") ? "" : status} tone={statusTone} />
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={resend}
+              disabled={resending || resendIn > 0}
+              className="rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-4 py-3 text-sm font-black text-[var(--auth-text)] transition hover:-translate-y-0.5 hover:border-[#F4B400] hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {resendIn ? `Resend in ${resendIn}s` : resending ? "Sending..." : "Resend code"}
+            </button>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="rounded-2xl border border-[var(--auth-border)] bg-transparent px-4 py-3 text-sm font-black text-[var(--auth-muted)] transition hover:-translate-y-0.5 hover:border-red-400/50 hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-[#F4B400]"
+            >
+              Log out
+            </button>
+          </div>
+
+          <TrustIndicators />
+        </form>
+      </PremiumAuthShell>
+    </PremiumAuthPage>
   );
 }

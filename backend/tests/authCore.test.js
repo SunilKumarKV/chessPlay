@@ -6,6 +6,8 @@ process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://localhost:5
 const authCore = require('../routes/authCore');
 const publicRoutes = require('../routes/public');
 const repo = require('../src/repositories/userRepository');
+const { hashOtp } = require('../utils/otp');
+const { validateEmailProviderConfig } = require('../utils/email');
 
 function withTemporaryEnv(nextEnv, fn) {
   const previous = {};
@@ -40,6 +42,15 @@ describe('backend authCore route coverage', () => {
   it('registers DELETE /account', () => {
     const routePaths = authCore.stack.filter((layer) => layer.route).map((layer) => layer.route.path);
     assert(routePaths.includes('/account'), 'Missing /account route');
+  });
+
+  it('registers OTP auth routes', () => {
+    const routePaths = authCore.stack.filter((layer) => layer.route).map((layer) => layer.route.path);
+    assert(routePaths.includes('/forgot-password'), 'Missing /forgot-password route');
+    assert(routePaths.includes('/reset-password'), 'Missing /reset-password route');
+    assert(routePaths.includes('/resend-verification'), 'Missing /resend-verification route');
+    assert(routePaths.includes('/verify-email'), 'Missing /verify-email route');
+    assert(routePaths.includes('/google'), 'Missing /google route');
   });
 });
 
@@ -96,7 +107,15 @@ describe('backend userRepository helper behavior', () => {
       user: {
         update(args) {
           called = true;
-          assert.deepStrictEqual(args, { where: { id: 'user-id' }, data: { passwordResetTokenHash: null, passwordResetExpires: null } });
+          assert.deepStrictEqual(args, {
+            where: { id: 'user-id' },
+            data: {
+              passwordResetTokenHash: null,
+              passwordResetExpires: null,
+              passwordResetAttempts: 0,
+              passwordResetSentAt: null,
+            },
+          });
           return { id: 'user-id' };
         },
       },
@@ -105,6 +124,87 @@ describe('backend userRepository helper behavior', () => {
     const result = await repo.clearPasswordResetToken('user-id', client);
     assert(called, 'Expected clearPasswordResetToken to call prisma user.update');
     assert.strictEqual(result.id, 'user-id');
+  });
+
+  it('setPasswordResetToken stores only hash metadata and resets attempts', async () => {
+    let called = false;
+    const expiresAt = new Date(Date.now() + 600000);
+    const client = {
+      user: {
+        update(args) {
+          called = true;
+          assert.strictEqual(args.where.id, 'user-id');
+          assert.strictEqual(args.data.passwordResetTokenHash, 'hashed-otp');
+          assert.strictEqual(args.data.passwordResetExpires, expiresAt);
+          assert.strictEqual(args.data.passwordResetAttempts, 0);
+          assert(args.data.passwordResetSentAt instanceof Date);
+          return { id: 'user-id' };
+        },
+      },
+    };
+
+    const result = await repo.setPasswordResetToken('user-id', 'hashed-otp', expiresAt, client);
+    assert(called, 'Expected setPasswordResetToken to call prisma user.update');
+    assert.strictEqual(result.id, 'user-id');
+  });
+
+  it('markEmailVerified clears OTP metadata', async () => {
+    let called = false;
+    const client = {
+      user: {
+        update(args) {
+          called = true;
+          assert.deepStrictEqual(args, {
+            where: { id: 'user-id' },
+            data: {
+              emailVerified: true,
+              emailVerificationTokenHash: null,
+              emailVerificationExpires: null,
+              emailVerificationAttempts: 0,
+              emailVerificationSentAt: null,
+            },
+          });
+          return { id: 'user-id' };
+        },
+      },
+    };
+
+    const result = await repo.markEmailVerified('user-id', client);
+    assert(called, 'Expected markEmailVerified to call prisma user.update');
+    assert.strictEqual(result.id, 'user-id');
+  });
+});
+
+describe('backend OTP and email safety', () => {
+  it('hashOtp does not store raw OTP values and is purpose scoped', async () => {
+    await withTemporaryEnv({ JWT_ACCESS_SECRET: 'test-access-secret-with-enough-length-12345' }, () => {
+      const resetHash = hashOtp({ userId: 'user-id', otp: '123456', purpose: 'password-reset' });
+      const verifyHash = hashOtp({ userId: 'user-id', otp: '123456', purpose: 'email-verification' });
+      assert.notStrictEqual(resetHash, '123456');
+      assert.notStrictEqual(resetHash, verifyHash);
+      assert.match(resetHash, /^[a-f0-9]{64}$/);
+    });
+  });
+
+  it('validates SMTP config while allowing mock mode', async () => {
+    await withTemporaryEnv({ EMAIL_MOCK_MODE: 'true' }, () => {
+      assert.deepStrictEqual(validateEmailProviderConfig(), { ok: true, mode: 'mock' });
+    });
+
+    await withTemporaryEnv({
+      EMAIL_MOCK_MODE: 'false',
+      SMTP_HOST: '',
+      SMTP_USER: '',
+      SMTP_PASS: '',
+      SMTP_PORT: '',
+      SMTP_FROM: '',
+      MAIL_FROM: '',
+    }, () => {
+      const result = validateEmailProviderConfig();
+      assert.strictEqual(result.ok, false);
+      assert(result.missing.includes('SMTP_HOST'));
+      assert(result.missing.includes('SMTP_PASS'));
+    });
   });
 });
 
