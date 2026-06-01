@@ -173,14 +173,22 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
   const themeVars = useMemo(() => homeThemeVars(themeMode), [themeMode]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (window.location.pathname === "/register" || params.get("ref")) {
-      setIsLogin(false);
-      setShowAuth(true);
-    } else if (window.location.pathname === "/login") {
-      setIsLogin(true);
-      setShowAuth(true);
-    }
+    const syncModalWithUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      if (window.location.pathname === "/register" || params.get("ref")) {
+        setIsLogin(false);
+        setShowAuth(true);
+      } else if (window.location.pathname === "/login") {
+        setIsLogin(true);
+        setShowAuth(true);
+      } else {
+        setShowAuth(false);
+      }
+    };
+
+    syncModalWithUrl();
+    window.addEventListener("popstate", syncModalWithUrl);
+    return () => window.removeEventListener("popstate", syncModalWithUrl);
   }, []);
 
   useEffect(() => {
@@ -216,26 +224,27 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
     };
   }, []);
 
+  const closeAuthModal = () => {
+    setShowAuth(false);
+    window.history.replaceState({}, "", "/");
+  };
+
   const openSignup = () => {
     setMobileMenuOpen(false);
     setLoadingAction("signup");
     window.history.pushState({}, "", "/register");
-    window.setTimeout(() => {
-      setIsLogin(false);
-      setShowAuth(true);
-      setLoadingAction("");
-    }, 100);
+    setIsLogin(false);
+    setShowAuth(true);
+    setLoadingAction("");
   };
 
   const openLogin = () => {
     setMobileMenuOpen(false);
     setLoadingAction("login");
     window.history.pushState({}, "", "/login");
-    window.setTimeout(() => {
-      setIsLogin(true);
-      setShowAuth(true);
-      setLoadingAction("");
-    }, 100);
+    setIsLogin(true);
+    setShowAuth(true);
+    setLoadingAction("");
   };
 
   const playNow = () => {
@@ -623,7 +632,7 @@ export default function LandingPage({ onLogin, onGuestPlay, onNavigatePath }) {
         </div>
       </Modal>
 
-      <Modal isOpen={showAuth} onClose={() => setShowAuth(false)} title={isLogin ? "Sign in to ChessPlay" : "Create your ChessPlay account"} className="max-w-md">
+      <Modal isOpen={showAuth} onClose={closeAuthModal} title={isLogin ? "Sign in to ChessPlay" : "Create your ChessPlay account"} className="max-w-md">
         <Suspense fallback={<div className="rounded-lg border border-white/10 bg-white/[0.04] p-6 text-sm font-bold text-slate-200">Loading secure sign in...</div>}>
           <Auth onLogin={handleAuthSuccess} isModal initialIsLogin={isLogin} onToggleMode={() => setIsLogin(!isLogin)} onNavigatePath={onNavigatePath} />
         </Suspense>

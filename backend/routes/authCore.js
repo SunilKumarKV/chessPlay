@@ -43,6 +43,15 @@ function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
+const GENERIC_DUPLICATE_ACCOUNT_MESSAGE = "Unable to create account. Please verify your details or sign in.";
+
+function validateAuthUsername(username) {
+  const value = String(username || "").trim();
+  if (value.length < 3 || value.length > 16) return "Username must be 3–16 characters.";
+  if (!/^[a-zA-Z0-9]+$/.test(value)) return "Username can use letters and numbers only.";
+  return "";
+}
+
 function frontendBaseUrl() {
   return process.env.FRONTEND_ORIGINS?.split(",")[0] || "http://localhost:5173";
 }
@@ -218,9 +227,17 @@ router.post("/register", authLimiter, async (req, res) => {
     const email = emailValidation.email;
     const passwordError = validateStrongPassword(password);
     if (passwordError) return res.status(400).json({ message: passwordError });
-    if (!username || !/^[a-zA-Z0-9]+$/.test(username)) return res.status(400).json({ message: "Username must be alphanumeric only" });
+    const usernameError = validateAuthUsername(username);
+    if (usernameError) return res.status(400).json({ message: usernameError });
     const existingUser = await findUserByEmailOrUsername(email, username);
-    if (existingUser) return res.status(400).json({ message: existingUser.email === email ? "Email already exists" : "Username already exists" });
+    if (existingUser) {
+      logger.warn("Registration duplicate attempt", {
+        reason: existingUser.email === email ? "email" : "username",
+        email,
+        username,
+      });
+      return res.status(400).json({ message: GENERIC_DUPLICATE_ACCOUNT_MESSAGE });
+    }
     const passwordHash = await bcrypt.hash(String(password), 12);
     const user = await createUser({ username, email, passwordHash });
     await issuePrismaSession(res, user);
@@ -256,9 +273,17 @@ router.post("/mobile/register", authLimiter, async (req, res) => {
     const email = emailValidation.email;
     const passwordError = validateStrongPassword(password);
     if (passwordError) return res.status(400).json({ message: passwordError });
-    if (!username || !/^[a-zA-Z0-9]+$/.test(username)) return res.status(400).json({ message: "Username must be alphanumeric only" });
+    const usernameError = validateAuthUsername(username);
+    if (usernameError) return res.status(400).json({ message: usernameError });
     const existingUser = await findUserByEmailOrUsername(email, username);
-    if (existingUser) return res.status(400).json({ message: existingUser.email === email ? "Email already exists" : "Username already exists" });
+    if (existingUser) {
+      logger.warn("Registration duplicate attempt", {
+        reason: existingUser.email === email ? "email" : "username",
+        email,
+        username,
+      });
+      return res.status(400).json({ message: GENERIC_DUPLICATE_ACCOUNT_MESSAGE });
+    }
     const passwordHash = await bcrypt.hash(String(password), 12);
     const user = await createUser({ username, email, passwordHash });
     const tokens = await issueMobileTokenSet(user);
