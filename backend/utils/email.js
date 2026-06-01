@@ -1,8 +1,14 @@
 const nodemailer = require('nodemailer');
 const logger = require('./safeLogger');
+const { Resend } = require('resend');
 
 function isMockEmailMode() {
   return process.env.EMAIL_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test';
+}
+
+function getEmailProvider() {
+  if (isMockEmailMode()) return 'mock';
+  return (process.env.EMAIL_PROVIDER || 'smtp').toLowerCase();
 }
 
 function smtpConfig() {
@@ -16,9 +22,29 @@ function smtpConfig() {
   };
 }
 
-function validateEmailProviderConfig({ throwOnError = false } = {}) {
-  if (isMockEmailMode()) return { ok: true, mode: 'mock' };
+function resendConfig() {
+  return {
+    apiKey: process.env.RESEND_API_KEY || '',
+    from: process.env.EMAIL_FROM || process.env.SMTP_FROM || process.env.MAIL_FROM || '',
+  };
+}
 
+function validateEmailProviderConfig({ throwOnError = false } = {}) {
+  const provider = getEmailProvider();
+  if (provider === 'mock') return { ok: true, mode: 'mock' };
+
+  if (provider === 'resend') {
+    const cfg = resendConfig();
+    const missing = [];
+    if (!cfg.apiKey) missing.push('RESEND_API_KEY');
+    if (!cfg.from) missing.push('EMAIL_FROM');
+    if (!missing.length) return { ok: true, mode: 'resend' };
+    const message = `Email provider configuration is incomplete: ${missing.join(', ')}`;
+    if (throwOnError) throw new Error(message);
+    return { ok: false, mode: 'resend', missing, message };
+  }
+
+  // default to smtp validation
   const config = smtpConfig();
   const missing = [];
   if (!config.host) missing.push('SMTP_HOST');
@@ -65,6 +91,25 @@ async function sendSecurityEmail({ to, subject, text }) {
   }
 
   try {
+    if (validation.mode === 'resend') {
+      const cfg = resendConfig();
+      const resendClient = new Resend(cfg.apiKey);
+      const info = await resendClient.emails.send({
+        from: cfg.from,
+        to,
+        subject,
+        text,
+      });
+      // info.id is returned by Resend; preserve safe logging
+      logger.info('EMAIL_SEND_SUCCESS', {
+        to,
+        subject,
+        messageId: info?.id || info?.messageId,
+      });
+      return { ok: true, messageId: info?.id || info?.messageId };
+    }
+
+    // default to SMTP
     const transport = createTransport();
     const info = await transport.sendMail({
       from: smtpConfig().from,
