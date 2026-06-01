@@ -262,6 +262,12 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (authChecked && currentPage === "verify-email" && user?.emailVerified) {
+      navigateToAppPage("dashboard", setCurrentPage, true);
+    }
+  }, [authChecked, currentPage, user]);
+
   const handleLogin = (userData) => {
     localStorage.removeItem("guestMode");
     setUser(userData);
@@ -332,25 +338,6 @@ export default function App() {
     return (
       <RouteFrame>
         <ResetPasswordPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-      </RouteFrame>
-    );
-  }
-
-  if (currentPage === "verify-email") {
-    return (
-      <RouteFrame>
-        <VerifyEmailPage
-          user={user}
-          onVerified={(nextUser) => {
-            const verifiedUser = nextUser || { ...user, emailVerified: true };
-            localStorage.setItem("user", JSON.stringify(verifiedUser));
-            setUser(verifiedUser);
-            notifyUserChanged();
-            navigateToAppPage("dashboard", setCurrentPage, true);
-          }}
-          onLogout={handleLogout}
-          onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
-        />
       </RouteFrame>
     );
   }
@@ -724,6 +711,8 @@ export default function App() {
         return <DeleteAccountPage onBack={() => navigateToAppPage("settings", setCurrentPage)} onDeleted={handleLogout} />;
       case "forgot-password":
         return <ForgotPasswordPage onBack={goDashboard} />;
+      case "verify-email":
+        return <Dashboard user={user} onStartGame={handleStartGame} onNavigate={guardedNavigate} onAuthError={handleLogout} />;
       default:
         return (
           <div className="p-8">

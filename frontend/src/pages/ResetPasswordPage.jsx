@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AuthBrandHeader,
   AuthStatus,
@@ -10,6 +10,8 @@ import {
   TrustIndicators,
 } from "../features/auth/components/PremiumAuthUI";
 import { apiClient } from "../services/apiClient";
+
+const RESEND_COOLDOWN_SECONDS = 60;
 
 function validatePassword(password) {
   if (password.length < 8) return "Password must be at least 8 characters.";
@@ -30,6 +32,14 @@ export default function ResetPasswordPage({ onBack }) {
   const [status, setStatus] = useState("");
   const [statusTone, setStatusTone] = useState("neutral");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
+
+  useEffect(() => {
+    if (!resendIn) return undefined;
+    const timer = window.setTimeout(() => setResendIn((value) => Math.max(value - 1, 0)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendIn]);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -74,6 +84,33 @@ export default function ResetPasswordPage({ onBack }) {
     }
   };
 
+  const resend = async () => {
+    if (resendIn || resending) return;
+    if (!email.trim()) {
+      setStatus("Enter your email first.");
+      setStatusTone("error");
+      return;
+    }
+    setResending(true);
+    setStatus("");
+    setStatusTone("neutral");
+    try {
+      const data = await apiClient("/api/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      setStatus(data.message || "If an account exists, a reset code has been sent.");
+      setStatusTone("success");
+      setResendIn(RESEND_COOLDOWN_SECONDS);
+    } catch (error) {
+      setStatus(error.message);
+      setStatusTone("error");
+      if (error.status === 429) setResendIn(RESEND_COOLDOWN_SECONDS);
+    } finally {
+      setResending(false);
+    }
+  };
+
   return (
     <PremiumAuthPage>
       <PremiumAuthShell>
@@ -81,7 +118,7 @@ export default function ResetPasswordPage({ onBack }) {
           <AuthBrandHeader
             eyebrow="Secure reset"
             title="Create a new password"
-            subtitle="Choose a strong password with uppercase, lowercase, number, and symbol."
+            subtitle={email ? "Choose a strong password with uppercase, lowercase, number, and symbol." : "Enter the email where you requested the reset code."}
           />
 
           {onBack ? (
@@ -95,20 +132,27 @@ export default function ResetPasswordPage({ onBack }) {
           ) : null}
 
           <div className="space-y-4">
-            <PremiumInput
-              label="Email"
-              name="email"
-              value={email}
-              onChange={(event) => {
-                setEmail(event.target.value);
-                if (status) setStatus("");
-              }}
-              type="email"
-              required
-              autoComplete="email"
-              placeholder="name@gmail.com"
-              error={statusTone === "error" && status === "Email is required." ? status : ""}
-            />
+            <div>
+              <PremiumInput
+                label="Email"
+                name="email"
+                value={email}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  if (status) setStatus("");
+                }}
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="name@gmail.com"
+                error={statusTone === "error" && status === "Email is required." ? status : ""}
+              />
+              {!email && (
+                <p className="mt-1.5 text-xs leading-5 text-[var(--auth-muted)]">
+                  Enter the email where you requested the reset code.
+                </p>
+              )}
+            </div>
 
             <PremiumInput
               label="Reset code"
@@ -170,6 +214,18 @@ export default function ResetPasswordPage({ onBack }) {
             status={statusTone === "error" && (!status.includes("Password") || password === confirmPassword) ? status : statusTone === "success" ? status : ""}
             tone={statusTone}
           />
+
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={resend}
+              disabled={resending || resendIn > 0}
+              className="w-full rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-4 py-3 text-sm font-black text-[var(--auth-text)] transition hover:-translate-y-0.5 hover:border-[#F4B400] hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {resendIn ? `Resend in ${resendIn}s` : resending ? "Sending..." : "Resend reset code"}
+            </button>
+          </div>
+
           <TrustIndicators />
         </form>
       </PremiumAuthShell>

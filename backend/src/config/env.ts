@@ -18,6 +18,7 @@ export const env = {
   DATABASE_URL: process.env.DATABASE_URL || '',
   JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || '',
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || '',
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '',
   CORS_ALLOWED_ORIGINS: [
     ...parseCsvEnv(process.env.CORS_ALLOWED_ORIGINS),
     ...parseCsvEnv(process.env.FRONTEND_ORIGINS),
