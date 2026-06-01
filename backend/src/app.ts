@@ -44,6 +44,7 @@ const settingsRoutes = require('../routes/settings');
 const profileCoreRoutes = require('../routes/profileCore');
 const profileRoutes = require('../routes/profile');
 const notificationRoutes = require('../routes/notifications');
+const publicRoutes = require('../routes/public');
 
 type HealthState = {
   rooms?: () => number;
@@ -102,7 +103,7 @@ function createCorsOptions(req: Request) {
   const allowedOrigins = configuredOrigins();
   return {
     origin(origin: string | undefined, callback: (error: Error | null, allowed?: boolean) => void) {
-      if (!origin) return callback(null, !isProduction || req.path === '/health' || req.path === '/healthz');
+      if (!origin) return callback(null, !isProduction || req.path === '/health' || req.path === '/healthz' || req.path === '/api/public/stats');
       return callback(null, isAllowedOrigin(origin, allowedOrigins));
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -114,7 +115,7 @@ function enforceTrustedOriginForStatefulApi(req: Request, res: Response, next: N
   if (!isProduction) return next();
   const origin = req.headers.origin;
   if (!origin) {
-    if (req.path === '/health' || req.path === '/healthz') return next();
+    if (req.path === '/health' || req.path === '/healthz' || req.path === '/api/public/stats') return next();
     res.status(403).json({ message: 'Origin is required' });
     return;
   }
@@ -126,6 +127,7 @@ function enforceTrustedOriginForStatefulApi(req: Request, res: Response, next: N
 }
 
 function registerRoutes(app: express.Express): void {
+  app.use('/api/public', publicRoutes);
   app.use('/api/auth', authCoreRoutes);
   if (!isProduction) app.use('/api/auth', authRoutes);
   app.use('/api/games', gameRoutes);
