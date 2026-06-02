@@ -296,13 +296,27 @@ export function ThemeProvider({ children }) {
     localStorage.setItem("theme", themeMode);
     // Update document class for global styling if needed
     document.documentElement.setAttribute("data-theme", themeMode);
+    document.documentElement.setAttribute("data-color-mode", isDark ? "dark" : "light");
     document.documentElement.style.setProperty("--color-primary", theme.primary);
+    document.documentElement.style.setProperty("--color-primary-strong", theme.primaryLight || theme.primary);
+    document.documentElement.style.setProperty("--color-primary-contrast", isDark ? "#07120a" : "#ffffff");
     document.documentElement.style.setProperty("--color-bg-primary", theme.bg.primary);
     document.documentElement.style.setProperty("--color-bg-secondary", theme.bg.secondary);
     document.documentElement.style.setProperty("--color-bg-tertiary", theme.bg.tertiary);
+    document.documentElement.style.setProperty("--color-bg-elevated", isDark ? "rgba(17, 24, 39, 0.82)" : "rgba(255, 255, 255, 0.88)");
+    document.documentElement.style.setProperty("--color-bg-glass", isDark ? "rgba(15, 23, 42, 0.72)" : "rgba(255, 255, 255, 0.72)");
+    document.documentElement.style.setProperty("--color-surface", isDark ? "rgba(255, 255, 255, 0.055)" : "rgba(15, 23, 42, 0.045)");
+    document.documentElement.style.setProperty("--color-surface-strong", isDark ? "rgba(255, 255, 255, 0.095)" : "rgba(15, 23, 42, 0.075)");
     document.documentElement.style.setProperty("--color-text-primary", theme.text.primary);
     document.documentElement.style.setProperty("--color-text-secondary", theme.text.secondary);
+    document.documentElement.style.setProperty("--color-text-tertiary", isDark ? "#a8b1c1" : theme.text.tertiary);
     document.documentElement.style.setProperty("--color-border-primary", theme.border.primary);
+    document.documentElement.style.setProperty("--color-border-strong", theme.border.secondary);
+    document.documentElement.style.setProperty("--color-focus", isDark ? "#f4b400" : "#b77900");
+    document.documentElement.style.setProperty("--color-success", theme.success);
+    document.documentElement.style.setProperty("--color-warning", theme.warning);
+    document.documentElement.style.setProperty("--color-danger", theme.error);
+    document.documentElement.style.setProperty("--color-info", theme.info);
     document.documentElement.style.setProperty(
       "--app-font-family",
       FONT_STACKS[appFont] || FONT_STACKS.inter,
@@ -321,10 +335,18 @@ export function ThemeProvider({ children }) {
     theme.bg.secondary,
     theme.bg.tertiary,
     theme.border.primary,
+    theme.border.secondary,
+    theme.error,
+    theme.info,
     theme.primary,
+    theme.primaryLight,
+    theme.success,
     theme.text.primary,
     theme.text.secondary,
+    theme.text.tertiary,
+    theme.warning,
     themeMode,
+    isDark,
   ]);
 
   useEffect(() => {

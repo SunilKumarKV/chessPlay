@@ -9,6 +9,7 @@ import {
   PrimaryAuthButton,
   TrustIndicators,
 } from "../features/auth/components/PremiumAuthUI";
+import { Button } from "../components/ui";
 import { apiClient } from "../services/apiClient";
 
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -125,13 +126,15 @@ export default function ResetPasswordPage({ onBack }) {
           />
 
           {onBack ? (
-            <button
+            <Button
               type="button"
               onClick={onBack}
-              className="mb-5 rounded-xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-4 py-2 text-sm font-black text-[var(--auth-text)] transition hover:-translate-y-0.5 hover:border-[#F4B400] hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400]"
+              variant="secondary"
+              size="sm"
+              className="mb-5"
             >
               Back
-            </button>
+            </Button>
           ) : null}
 
           <div className="space-y-4">
@@ -151,7 +154,7 @@ export default function ResetPasswordPage({ onBack }) {
                 error={statusTone === "error" && status === "Email is required." ? status : ""}
               />
               {!email && (
-                <p className="mt-1.5 text-xs leading-5 text-[var(--auth-muted)]">
+                <p className="mt-1.5 text-xs leading-5 text-[var(--color-text-tertiary)]">
                   Enter the email where you requested the reset code.
                 </p>
               )}
@@ -188,7 +191,7 @@ export default function ResetPasswordPage({ onBack }) {
                 placeholder="Create a strong password"
                 error={statusTone === "error" && !confirmPassword ? status : ""}
               />
-              <p className="mt-1.5 text-xs leading-5 text-[var(--auth-muted)]">
+              <p className="mt-1.5 text-xs leading-5 text-[var(--color-text-tertiary)]">
                 Use at least 8 characters with uppercase, lowercase, number and symbol.
               </p>
             </div>
@@ -219,14 +222,15 @@ export default function ResetPasswordPage({ onBack }) {
           />
 
           <div className="mt-4">
-            <button
+            <Button
               type="button"
               onClick={resend}
               disabled={resending || resendIn > 0}
-              className="w-full rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-4 py-3 text-sm font-black text-[var(--auth-text)] transition hover:-translate-y-0.5 hover:border-[#F4B400] hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400] disabled:cursor-not-allowed disabled:opacity-60"
+              variant="secondary"
+              className="w-full"
             >
               {resendIn ? `Resend in ${resendIn}s` : resending ? "Sending..." : "Resend reset code"}
-            </button>
+            </Button>
           </div>
 
           <TrustIndicators />

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "../../../hooks/useTheme";
 import PlanBadge from "../../../components/billing/PlanBadge";
+import { Button, Card } from "../../../components/ui";
 
 const QUICK_LINKS = [
   { id: "ai", label: "Play vs AI" },
@@ -56,7 +57,7 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout, active
   const [linksOpen, setLinksOpen] = useState(false);
   const accountRef = useRef(null);
   const linksRef = useRef(null);
-  const { isDark, toggleTheme, theme } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
   const pageTitle = getPageTitle(activePage);
   const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : "U";
 
@@ -108,36 +109,32 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout, active
 
   return (
     <header
-      className="sticky top-0 z-30 flex h-20 flex-shrink-0 items-center justify-between gap-3 border-b px-3 shadow-md transition-colors sm:px-5"
-      style={{
-        backgroundColor: theme.bg.overlay,
-        borderColor: theme.border.secondary,
-        color: theme.text.primary,
-      }}
+      className="sticky top-0 z-[var(--z-nav)] flex h-20 flex-shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border-primary)] bg-[var(--color-bg-glass)] px-3 text-[var(--color-text-primary)] shadow-[var(--shadow-sm)] backdrop-blur-xl transition-colors sm:px-5"
     >
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <button
+        <Button
           type="button"
           onClick={onMenuClick}
           aria-label="Open navigation menu"
-          className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-2xl transition focus:outline-none focus-visible:ring-2 md:hidden"
-          style={{ backgroundColor: theme.hover, color: theme.text.primary }}
+          variant="secondary"
+          size="icon"
+          className="flex-shrink-0 md:hidden"
         >
           ☰
-        </button>
+        </Button>
 
         <button
           type="button"
           onClick={() => navigate("dashboard")}
           aria-label="Go to ChessPlay dashboard"
-          className="flex min-w-0 items-center gap-3 rounded-2xl p-1 text-left md:hidden"
+          className="ds-focus flex min-w-0 items-center gap-3 rounded-[var(--radius-xl)] p-1 text-left md:hidden"
         >
-          <span className="grid h-10 w-10 place-items-center rounded-2xl text-xl font-black" style={{ backgroundColor: `${theme.primary}22`, color: theme.primary }}>
+          <span className="grid h-10 w-10 place-items-center rounded-[var(--radius-xl)] bg-[color-mix(in_srgb,var(--color-primary)_16%,transparent)] text-xl font-black text-[var(--color-primary)]">
             ♟
           </span>
           <span className="hidden min-w-0 sm:block">
             <span className="block truncate text-lg font-black">ChessPlay</span>
-            <span className="block truncate text-xs" style={{ color: theme.text.tertiary }}>
+            <span className="block truncate text-xs text-[var(--color-text-tertiary)]">
               {pageTitle}
             </span>
           </span>
@@ -145,7 +142,7 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout, active
 
         <div className="hidden min-w-0 md:block">
           <h1 className="truncate text-xl font-black tracking-tight">{pageTitle}</h1>
-          <p className="truncate text-xs font-semibold" style={{ color: theme.text.tertiary }}>
+          <p className="truncate text-xs font-semibold text-[var(--color-text-tertiary)]">
             {user ? `Welcome back, ${user.username || "player"}` : "Play chess online, learn, and improve."}
           </p>
         </div>
@@ -158,11 +155,9 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout, active
                 key={link.id}
                 type="button"
                 onClick={() => navigate(link.id)}
-                className="rounded-xl px-3 py-2 text-sm font-bold transition focus:outline-none focus-visible:ring-2"
-                style={{
-                  backgroundColor: active ? `${theme.primary}22` : "transparent",
-                  color: active ? theme.primary : theme.text.secondary,
-                }}
+                className={`ds-focus rounded-[var(--radius-lg)] px-3 py-2 text-sm font-bold transition hover:bg-[var(--color-surface)] ${
+                  active ? "bg-[color-mix(in_srgb,var(--color-primary)_14%,transparent)] text-[var(--color-primary)]" : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                }`}
               >
                 {link.label}
               </button>
@@ -173,66 +168,63 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout, active
 
       <div className="flex items-center gap-2">
         <div className="relative xl:hidden" ref={linksRef}>
-          <button
+          <Button
             type="button"
             onClick={() => setLinksOpen((open) => !open)}
             aria-expanded={linksOpen}
             aria-label="Open quick links"
-            className="rounded-2xl px-3 py-2 text-sm font-black transition"
-            style={{ backgroundColor: theme.hover, color: theme.text.primary }}
+            variant="secondary"
+            size="sm"
           >
             Menu
-          </button>
+          </Button>
           {linksOpen && (
-            <div
-              className="absolute right-0 mt-3 w-64 overflow-hidden rounded-2xl border p-2 shadow-2xl"
-              style={{ backgroundColor: theme.bg.secondary, borderColor: theme.border.secondary }}
-            >
+            <Card variant="glass" className="absolute right-0 mt-3 w-64 overflow-hidden p-2">
               {visibleQuickLinks.map((link) => (
                 <button
                   key={link.id}
                   type="button"
                   onClick={() => navigate(link.id)}
-                  className="block w-full rounded-xl px-3 py-2 text-left text-sm font-bold"
-                  style={{ color: activePage === link.id ? theme.primary : theme.text.secondary }}
+                  className={`ds-focus block min-h-11 w-full rounded-[var(--radius-lg)] px-3 py-2 text-left text-sm font-bold transition hover:bg-[var(--color-surface)] ${
+                    activePage === link.id ? "text-[var(--color-primary)]" : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  }`}
                 >
                   {link.label}
                 </button>
               ))}
-            </div>
+            </Card>
           )}
         </div>
 
-        <button
+        <Button
           type="button"
           onClick={toggleTheme}
           aria-label="Toggle theme"
-          className="grid h-10 w-10 place-items-center rounded-2xl text-lg transition"
-          style={{ backgroundColor: theme.hover, color: theme.text.primary }}
+          variant="secondary"
+          size="icon"
         >
           {isDark ? "☀" : "☾"}
-        </button>
+        </Button>
 
         {user && !isSupporter(user) && (
-          <button
+          <Button
             type="button"
             onClick={() => navigate("monetization")}
-            className="hidden rounded-2xl px-4 py-2 text-sm font-black transition sm:inline-flex"
-            style={{ backgroundColor: `${theme.primary}22`, color: theme.primary, border: `1px solid ${theme.primary}44` }}
+            variant="outline"
+            size="sm"
+            className="hidden sm:inline-flex"
           >
             Support
-          </button>
+          </Button>
         )}
 
         {!user && (
-          <button
+          <Button
             type="button"
             onClick={() => navigate("dashboard")}
-            className="rounded-2xl px-4 py-2 text-sm font-black transition"
-            style={{ backgroundColor: theme.primary, color: isDark ? "#07120a" : "#ffffff" }}
           >
             Sign in
-          </button>
+          </Button>
         )}
 
         {user && (
@@ -242,33 +234,29 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout, active
               onClick={() => setAccountOpen((open) => !open)}
               aria-expanded={accountOpen}
               aria-label="Open account menu"
-              className="flex items-center gap-2 rounded-2xl border px-2 py-2 transition"
-              style={{ backgroundColor: theme.bg.secondary, borderColor: theme.border.secondary }}
+              className="ds-focus flex min-h-11 items-center gap-2 rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface)] px-2 py-2 transition hover:bg-[var(--color-surface-strong)]"
             >
-              <span className="grid h-9 w-9 place-items-center rounded-xl text-sm font-black" style={{ backgroundColor: theme.primary, color: isDark ? "#07120a" : "#ffffff" }}>
+              <span className="grid h-9 w-9 place-items-center rounded-[var(--radius-lg)] bg-[var(--color-primary)] text-sm font-black text-[var(--color-primary-contrast)]">
                 {userInitial}
               </span>
               <span className="hidden max-w-36 truncate text-left md:block">
                 <span className="block truncate text-sm font-black">{user.username || "Player"}</span>
-                <span className="block truncate text-[11px]" style={{ color: theme.text.tertiary }}>
+                <span className="block truncate text-[11px] text-[var(--color-text-tertiary)]">
                   {isSupporter(user) ? "Supporter" : `${user.rating || 1200} rating`}
                 </span>
               </span>
             </button>
 
             {accountOpen && (
-              <div
-                className="absolute right-0 mt-3 w-72 overflow-hidden rounded-2xl border p-3 shadow-2xl"
-                style={{ backgroundColor: theme.bg.secondary, borderColor: theme.border.secondary }}
-              >
-                <div className="mb-3 rounded-2xl p-3" style={{ backgroundColor: theme.bg.tertiary }}>
+              <Card variant="glass" className="absolute right-0 mt-3 w-72 overflow-hidden p-3">
+                <div className="mb-3 rounded-[var(--radius-xl)] bg-[var(--color-surface)] p-3">
                   <div className="flex items-center gap-3">
-                    <span className="grid h-10 w-10 place-items-center rounded-xl text-sm font-black" style={{ backgroundColor: theme.primary, color: isDark ? "#07120a" : "#ffffff" }}>
+                    <span className="grid h-10 w-10 place-items-center rounded-[var(--radius-lg)] bg-[var(--color-primary)] text-sm font-black text-[var(--color-primary-contrast)]">
                       {userInitial}
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-black">{user.username || "Player"}</div>
-                      <div className="truncate text-xs" style={{ color: theme.text.tertiary }}>
+                      <div className="truncate text-xs text-[var(--color-text-tertiary)]">
                         {user.email || `${user.rating || 1200} rating`}
                       </div>
                       <PlanBadge user={user} compact />
@@ -282,23 +270,24 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout, active
                       key={link.id}
                       type="button"
                       onClick={() => navigate(link.id)}
-                      className="block w-full rounded-xl px-3 py-2 text-left text-sm font-bold transition"
-                      style={{ color: activePage === link.id ? theme.primary : theme.text.secondary }}
+                      className={`ds-focus block min-h-11 w-full rounded-[var(--radius-lg)] px-3 py-2 text-left text-sm font-bold transition hover:bg-[var(--color-surface)] ${
+                        activePage === link.id ? "text-[var(--color-primary)]" : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                      }`}
                     >
                       {link.label}
                     </button>
                   ))}
                 </div>
 
-                <button
+                <Button
                   type="button"
                   onClick={onLogout}
-                  className="mt-3 block w-full rounded-xl px-3 py-2 text-left text-sm font-black transition"
-                  style={{ backgroundColor: "rgba(239,68,68,0.12)", color: "#ef4444" }}
+                  className="mt-3 w-full justify-start"
+                  variant="danger"
                 >
                   Logout
-                </button>
-              </div>
+                </Button>
+              </Card>
             )}
           </div>
         )}

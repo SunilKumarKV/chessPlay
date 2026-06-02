@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
-import { useTheme } from "../../../hooks/useTheme";
 import PlanBadge from "../../../components/billing/PlanBadge";
 import { isGuestRestrictedFeature, isGuestUser } from "../../../utils/guestAccess";
+import { Badge, Button, Card } from "../../../components/ui";
 
 const ROUTE_GROUPS = [
   {
@@ -64,7 +64,6 @@ function isVisible(item, user) {
 }
 
 function NavButton({ item, activePage, isCollapsed, onNavigate, user }) {
-  const { theme } = useTheme();
   const active = activePage === item.id;
   const lockedForGuest = isGuestUser(user) && isGuestRestrictedFeature(item.id);
 
@@ -75,36 +74,20 @@ function NavButton({ item, activePage, isCollapsed, onNavigate, user }) {
       aria-current={active ? "page" : undefined}
       aria-label={item.label}
       title={isCollapsed ? item.label : undefined}
-      className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
-        isCollapsed ? "justify-center" : "justify-start"
-      }`}
-      style={{
-        backgroundColor: active ? `${theme.primary}22` : "transparent",
-        color: active ? theme.primary : theme.text.secondary,
-        border: `1px solid ${active ? `${theme.primary}66` : "transparent"}`,
-        boxShadow: active ? `0 8px 24px ${theme.primary}18` : "none",
-      }}
-      onMouseEnter={(event) => {
-        if (!active) {
-          event.currentTarget.style.backgroundColor = theme.hover;
-          event.currentTarget.style.color = theme.text.primary;
-        }
-      }}
-      onMouseLeave={(event) => {
-        if (!active) {
-          event.currentTarget.style.backgroundColor = "transparent";
-          event.currentTarget.style.color = theme.text.secondary;
-        }
-      }}
+      className={`ds-focus group flex min-h-11 w-full items-center gap-3 rounded-[var(--radius-xl)] border px-3 py-2.5 text-left text-sm font-bold transition duration-200 hover:-translate-y-0.5 ${
+        active
+          ? "border-[color-mix(in_srgb,var(--color-primary)_46%,transparent)] bg-[color-mix(in_srgb,var(--color-primary)_14%,transparent)] text-[var(--color-primary)] shadow-[var(--shadow-xs)]"
+          : "border-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]"
+      } ${isCollapsed ? "justify-center" : "justify-start"}`}
     >
-      <span className="grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg text-base" style={{ backgroundColor: active ? `${theme.primary}18` : "rgba(255,255,255,0.04)" }}>
+      <span className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-[var(--radius-lg)] text-base ${active ? "bg-[color-mix(in_srgb,var(--color-primary)_16%,transparent)]" : "bg-[var(--color-surface)]"}`}>
         {item.icon}
       </span>
       {!isCollapsed && (
         <>
           <span className="truncate">{item.label}</span>
           {lockedForGuest && (
-            <span className="ml-auto rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-0.5 text-[10px] font-black text-amber-200">Login</span>
+            <Badge className="ml-auto" tone="warning" size="sm">Login</Badge>
           )}
         </>
       )}
@@ -121,7 +104,6 @@ export default function Sidebar({
   isCollapsed,
   onToggleCollapse,
 }) {
-  const { theme, isDark } = useTheme();
   const supporterState = getSupporterState(user);
   const initial = user?.username ? user.username.charAt(0).toUpperCase() : "C";
 
@@ -161,32 +143,26 @@ export default function Sidebar({
         <button
           type="button"
           aria-label="Close navigation overlay"
-          className="fixed inset-0 z-40 cursor-default bg-black/60 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-[var(--z-overlay)] cursor-default bg-black/60 backdrop-blur-sm lg:hidden"
           onClick={onClose}
         />
       )}
 
       <aside
         aria-label="ChessPlay sidebar navigation"
-        className={`fixed left-0 top-0 z-50 flex h-[100dvh] flex-col border-r shadow-2xl transition-all duration-300 lg:static lg:translate-x-0 ${
+        className={`ds-glass fixed left-0 top-0 z-[var(--z-modal)] flex h-[100dvh] flex-col border-r transition-all duration-300 lg:static lg:z-[var(--z-nav)] lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         } ${isCollapsed ? "lg:w-20" : "w-80 lg:w-72"}`}
-        style={{
-          backgroundColor: theme.bg.secondary,
-          borderColor: theme.border.secondary,
-          color: theme.text.primary,
-        }}
       >
-        <div className="flex h-20 items-center justify-between gap-3 border-b px-4" style={{ borderColor: theme.border.secondary }}>
+        <div className="flex h-20 items-center justify-between gap-3 border-b border-[var(--color-border-primary)] px-4">
           <button
             type="button"
             onClick={() => handleNavigate("dashboard")}
             aria-label="Go to ChessPlay home"
-            className={`flex min-w-0 items-center gap-3 rounded-xl p-1 text-left focus:outline-none focus-visible:ring-2 ${isCollapsed ? "justify-center" : ""}`}
+            className={`ds-focus flex min-w-0 items-center gap-3 rounded-[var(--radius-xl)] p-1 text-left ${isCollapsed ? "justify-center" : ""}`}
           >
             <span
-              className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-2xl text-2xl font-black shadow-lg"
-              style={{ backgroundColor: `${theme.primary}22`, color: theme.primary }}
+              className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-[var(--radius-xl)] bg-[color-mix(in_srgb,var(--color-primary)_16%,transparent)] text-2xl font-black text-[var(--color-primary)] shadow-[var(--shadow-xs)]"
               aria-hidden="true"
             >
               ♟
@@ -194,7 +170,7 @@ export default function Sidebar({
             {!isCollapsed && (
               <span className="min-w-0">
                 <span className="block truncate text-xl font-black tracking-tight">ChessPlay</span>
-                <span className="block truncate text-xs font-semibold" style={{ color: theme.text.tertiary }}>
+                <span className="block truncate text-xs font-semibold text-[var(--color-text-tertiary)]">
                   Play. Improve. Compete.
                 </span>
               </span>
@@ -205,8 +181,7 @@ export default function Sidebar({
             type="button"
             onClick={onClose}
             aria-label="Close navigation"
-            className="rounded-xl px-3 py-2 text-lg font-bold transition lg:hidden"
-            style={{ color: theme.text.secondary }}
+            className="ds-focus rounded-[var(--radius-lg)] px-3 py-2 text-lg font-bold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)] lg:hidden"
           >
             ×
           </button>
@@ -222,13 +197,12 @@ export default function Sidebar({
                 {!isCollapsed ? (
                   <h2
                     id={`sidebar-${group.title}`}
-                    className="px-3 pb-2 text-[11px] font-black uppercase tracking-[0.22em]"
-                    style={{ color: theme.text.tertiary }}
+                    className="px-3 pb-2 text-[11px] font-black uppercase tracking-[0.22em] text-[var(--color-text-tertiary)]"
                   >
                     {group.title}
                   </h2>
                 ) : (
-                  <div className="mx-auto mb-2 h-px w-10" style={{ backgroundColor: theme.border.secondary }} />
+                  <div className="mx-auto mb-2 h-px w-10 bg-[var(--color-border-primary)]" />
                 )}
                 <div className="space-y-1.5">
                   {visibleItems.map((item) => (
@@ -247,64 +221,66 @@ export default function Sidebar({
           })}
         </nav>
 
-        <div className="border-t p-3" style={{ borderColor: theme.border.secondary }}>
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            className={`mb-3 hidden w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold transition lg:flex ${isCollapsed ? "justify-center" : ""}`}
-            style={{ color: theme.text.secondary, backgroundColor: "transparent" }}
-            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <span>{isCollapsed ? "→" : "←"}</span>
-            {!isCollapsed && <span>Collapse</span>}
-          </button>
+        <div className="border-t border-[var(--color-border-primary)] p-3">
+          <div className="mb-3 hidden lg:block">
+            <Button
+              type="button"
+              onClick={onToggleCollapse}
+              variant="ghost"
+              className={`w-full ${isCollapsed ? "justify-center" : ""}`}
+              aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              <span>{isCollapsed ? "→" : "←"}</span>
+              {!isCollapsed && <span>Collapse</span>}
+            </Button>
+          </div>
 
           {user ? (
-            <button
+            <Card
+              as="button"
               type="button"
               onClick={() => handleNavigate("profile")}
-              className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${isCollapsed ? "justify-center" : ""}`}
-              style={{
-                backgroundColor: isDark ? "rgba(255,255,255,0.045)" : "rgba(0,0,0,0.035)",
-                borderColor: theme.border.secondary,
-              }}
+              interactive
+              variant="subtle"
+              className={`flex w-full items-center gap-3 p-3 text-left ${isCollapsed ? "justify-center" : ""}`}
             >
               <span
-                className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl text-sm font-black"
-                style={{ backgroundColor: theme.primary, color: isDark ? "#07120a" : "#ffffff" }}
+                className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-[var(--radius-lg)] bg-[var(--color-primary)] text-sm font-black text-[var(--color-primary-contrast)]"
               >
                 {initial}
               </span>
               {!isCollapsed && (
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-black">{user.username || "Player"}</span>
-                  <span className="block truncate text-xs" style={{ color: theme.text.tertiary }}>
+                  <span className="block truncate text-xs text-[var(--color-text-tertiary)]">
                     {user?.isGuest ? "Guest mode · limited" : `${user.rating || 1200} rating`}
                   </span>
                   <PlanBadge user={user} compact />
                 </span>
               )}
-            </button>
+            </Card>
           ) : (
-            <button
+            <Card
+              as="button"
               type="button"
               onClick={() => handleNavigate("dashboard")}
-              className="w-full rounded-2xl border p-3 text-left text-sm font-bold"
-              style={{ borderColor: theme.border.secondary, color: theme.text.secondary }}
+              interactive
+              variant="dashed"
+              className="w-full p-3 text-left text-sm font-bold text-[var(--color-text-secondary)]"
             >
               Sign in to unlock your dashboard.
-            </button>
+            </Card>
           )}
 
           {!isCollapsed && supporterState !== "supporter" && (
-            <button
+            <Button
               type="button"
               onClick={() => handleNavigate(supporterState === "rejected" ? "billing" : "monetization")}
-              className="mt-3 w-full rounded-2xl px-4 py-3 text-sm font-black transition"
-              style={{ backgroundColor: `${theme.primary}22`, color: theme.primary, border: `1px solid ${theme.primary}55` }}
+              className="mt-3 w-full"
+              variant="outline"
             >
               {supporterState === "pending" ? "Pending verification" : supporterState === "rejected" ? "View billing status" : "Support ChessPlay"}
-            </button>
+            </Button>
           )}
         </div>
       </aside>
