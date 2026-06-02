@@ -25,10 +25,15 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | sh -s -- -b "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
+      - name: Prepare tracked-file scan directory
+        run: |
+          mkdir scan-src
+          git checkout-index -a -f --prefix=scan-src/
+
       - name: Run Gitleaks
         run: |
           gitleaks detect \
-            --source . \
+            --source scan-src \
             --no-git \
             --redact \
             --verbose \
