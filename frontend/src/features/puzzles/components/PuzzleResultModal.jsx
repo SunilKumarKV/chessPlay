@@ -1,36 +1,44 @@
+import { Badge, Button, Card } from "../../../components/ui";
+
 export default function PuzzleResultModal({ result, onClose, onNext }) {
   if (!result?.completed) return null;
   const learning = result.learning || {};
+  const hasRating = Number.isFinite(Number(learning.rating));
+
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#101816] p-6 text-white shadow-2xl">
+      <Card className="w-full max-w-lg" variant="glass">
         <style>{`@keyframes puzzlePop{0%{transform:scale(.96);opacity:.2}100%{transform:scale(1);opacity:1}}`}</style>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#b8f28f]">Puzzle completed</p>
-            <h2 className="mt-2 animate-[puzzlePop_0.28s_ease-out] font-['Montserrat'] text-2xl font-black">What you learned</h2>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--color-success)]">Puzzle completed</p>
+            <h2 className="mt-2 animate-[puzzlePop_0.28s_ease-out] font-[var(--font-display)] text-2xl font-black">
+              Great work. Keep building pattern recognition.
+            </h2>
           </div>
-          <button type="button" onClick={onClose} className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-sm font-black text-slate-300 hover:bg-white/15" aria-label="Close result">×</button>
+          <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close result">×</Button>
         </div>
 
-        <div className="mt-5 space-y-3 text-sm leading-6 text-slate-300">
+        <div className="mt-5 space-y-3 text-sm leading-6 text-[var(--color-text-secondary)]">
           <div className="flex flex-wrap gap-2">
-            <span className="rounded-full bg-[#81b64c]/15 px-3 py-1 font-black text-[#b8f28f]">{learning.themeName || "tactic"}</span>
-            <span className="rounded-full bg-white/10 px-3 py-1 font-bold text-slate-200">{learning.difficulty || "beginner"}</span>
-            <span className="rounded-full bg-white/10 px-3 py-1 font-bold text-slate-200">Rating {learning.rating || 1200}</span>
+            <Badge tone="success">{learning.themeName || "Pattern recognition"}</Badge>
+            {learning.difficulty ? <Badge tone="neutral">{learning.difficulty}</Badge> : null}
+            {hasRating ? <Badge tone="neutral">Rating {Number(learning.rating)}</Badge> : null}
           </div>
-          <p className="rounded-2xl bg-black/20 p-4">{learning.whatYouLearned || "Follow forcing moves and verify the full line."}</p>
-          <div className="rounded-2xl bg-black/20 p-4">
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Best move explanation</div>
-            <p className="mt-2">{learning.explanation || "This puzzle rewards checking candidate moves before committing."}</p>
+          <p className="rounded-[var(--radius-2xl)] bg-[var(--color-surface)] p-4">
+            {learning.whatYouLearned || "You completed the line. Review the idea, then reinforce it with another focused puzzle."}
+          </p>
+          <div className="rounded-[var(--radius-2xl)] bg-[var(--color-surface)] p-4">
+            <div className="text-xs font-black uppercase tracking-[0.14em] text-[var(--color-text-tertiary)]">Training idea</div>
+            <p className="mt-2">{learning.explanation || "Check candidate moves, verify the reply, and look for forcing moves before committing."}</p>
           </div>
         </div>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15">Review board</button>
-          <button type="button" onClick={onNext} className="rounded-xl bg-[#81b64c] px-4 py-3 text-sm font-black text-[#07100a] transition hover:bg-[#93c85f]">Next Puzzle</button>
+          <Button type="button" variant="secondary" onClick={onClose}>Review board</Button>
+          <Button type="button" onClick={onNext}>Next Puzzle</Button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
