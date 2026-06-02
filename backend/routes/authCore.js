@@ -71,6 +71,10 @@ function isExpired(expiresAt) {
   return !expiresAt || new Date(expiresAt).getTime() <= Date.now();
 }
 
+function isEmailOtpEnabled() {
+  return process.env.EMAIL_OTP_ENABLED === "true";
+}
+
 async function sendPasswordResetOtp(user) {
   const otp = generateOtp();
   await setPasswordResetToken(user.id, hashOtp({ userId: user.id, otp, purpose: "password-reset" }), new Date(Date.now() + OTP_EXPIRES_MS));
@@ -274,18 +278,21 @@ router.post("/register", authLimiter, async (req, res) => {
       return res.status(400).json({ message: GENERIC_DUPLICATE_ACCOUNT_MESSAGE });
     }
     const passwordHash = await bcrypt.hash(String(password), 12);
-    const user = await createUser({ username, email, passwordHash });
+    const emailOtpEnabled = isEmailOtpEnabled();
+    const user = await createUser({ username, email, passwordHash, emailVerified: !emailOtpEnabled });
     await issuePrismaSession(res, user);
     let message = "Account created successfully";
-    try {
-      await sendEmailVerificationOtp(user);
-    } catch (error) {
-      logger.error("Email verification OTP delivery failed after registration", {
-        userId: user.id,
-        email: user.email,
-        error: error.message,
-      });
-      message = "Account created, but we could not send the verification code. Please resend the code.";
+    if (emailOtpEnabled) {
+      try {
+        await sendEmailVerificationOtp(user);
+      } catch (error) {
+        logger.error("Email verification OTP delivery failed after registration", {
+          userId: user.id,
+          email: user.email,
+          error: error.message,
+        });
+        message = "Account created, but we could not send the verification code. Please resend the code.";
+      }
     }
     await queueEmailEvent("welcome", { user: user.id, email: user.email, payload: { username: user.username } }).catch(() => {});
     return res.status(201).json({ ...buildAuthResponse(message, user), referralConnected: false });
@@ -396,18 +403,21 @@ router.post("/mobile/register", authLimiter, async (req, res) => {
       return res.status(400).json({ message: GENERIC_DUPLICATE_ACCOUNT_MESSAGE });
     }
     const passwordHash = await bcrypt.hash(String(password), 12);
-    const user = await createUser({ username, email, passwordHash });
+    const emailOtpEnabled = isEmailOtpEnabled();
+    const user = await createUser({ username, email, passwordHash, emailVerified: !emailOtpEnabled });
     const tokens = await issueMobileTokenSet(user);
     let message = "Account created successfully";
-    try {
-      await sendEmailVerificationOtp(user);
-    } catch (error) {
-      logger.error("Email verification OTP delivery failed after mobile registration", {
-        userId: user.id,
-        email: user.email,
-        error: error.message,
-      });
-      message = "Account created, but we could not send the verification code. Please resend the code.";
+    if (emailOtpEnabled) {
+      try {
+        await sendEmailVerificationOtp(user);
+      } catch (error) {
+        logger.error("Email verification OTP delivery failed after mobile registration", {
+          userId: user.id,
+          email: user.email,
+          error: error.message,
+        });
+        message = "Account created, but we could not send the verification code. Please resend the code.";
+      }
     }
     await queueEmailEvent("welcome", { user: user.id, email: user.email, payload: { username: user.username } }).catch(() => {});
     return res.status(201).json({ ...buildMobileAuthResponse(user, tokens, { referralConnected: false }), message });
@@ -584,7 +594,14 @@ router.get("/socket-token", auth, async (req, res) => {
 router.post("/resend-verification", authLimiter, auth, async (req, res) => {
   try {
     const user = await findUserById(req.user.userId);
-    if (!user || user.deletedAt || user.emailVerified) return res.json({ message: GENERIC_VERIFICATION_MESSAGE });
+    if (!user || user.deletedAt) return res.json({ message: GENERIC_VERIFICATION_MESSAGE });
+    if (!isEmailOtpEnabled()) {
+      if (!user.emailVerified) {
+        await markEmailVerified(user.id);
+      }
+      return res.json({ message: GENERIC_VERIFICATION_MESSAGE });
+    }
+    if (user.emailVerified) return res.json({ message: GENERIC_VERIFICATION_MESSAGE });
     if (isCooldownActive(user.emailVerificationSentAt)) {
       return res.status(429).json({ message: "Please wait before requesting another verification code." });
     }
@@ -598,10 +615,16 @@ router.post("/resend-verification", authLimiter, auth, async (req, res) => {
 
 router.post("/verify-email", authLimiter, auth, async (req, res) => {
   try {
-    const otp = String(req.body.otp || req.body.code || "").trim();
-    if (!/^\d{6}$/.test(otp)) return res.status(400).json({ message: "Enter the 6-digit verification code." });
     const user = await findUserById(req.user.userId);
     if (!user || user.deletedAt) return res.status(401).json({ message: "Invalid session" });
+    if (!isEmailOtpEnabled()) {
+      if (!user.emailVerified) {
+        await markEmailVerified(user.id);
+      }
+      return res.json({ message: "Email verified successfully" });
+    }
+    const otp = String(req.body.otp || req.body.code || "").trim();
+    if (!/^\d{6}$/.test(otp)) return res.status(400).json({ message: "Enter the 6-digit verification code." });
     if (user.emailVerified) return res.json({ message: "Email verified successfully" });
     if ((user.emailVerificationAttempts || 0) >= OTP_MAX_ATTEMPTS) {
       return res.status(429).json({ message: "Too many incorrect codes. Request a new verification code." });
@@ -624,6 +647,9 @@ router.post("/verify-email", authLimiter, auth, async (req, res) => {
 
 router.post("/forgot-password", authLimiter, async (req, res) => {
   try {
+    if (!isEmailOtpEnabled()) {
+      return res.json({ message: "Password reset is temporarily unavailable. Please contact support." });
+    }
     const emailValidation = validateProductionEmail(req.body.email);
     if (!emailValidation.ok) return res.json({ message: GENERIC_RESET_MESSAGE });
     const email = emailValidation.email;

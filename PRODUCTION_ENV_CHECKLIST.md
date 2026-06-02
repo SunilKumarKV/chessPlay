@@ -9,6 +9,8 @@ Use this before every production deploy. Auth, deep links, and smoke tests depen
 | `VITE_BACKEND_URL` | `https://chessplay-b5ve.onrender.com` | Baked into build; wrong value breaks all API calls |
 | `VITE_SOCKET_URL` | `https://chessplay-b5ve.onrender.com` | Same as backend unless using a dedicated socket host |
 | `VITE_GOOGLE_CLIENT_ID` | Google OAuth client ID | Optional; email login works without it |
+| `VITE_EMAIL_OTP_ENABLED` | `false` (temporary) → `true` (production) | **Gate email verification OTP until getchessplay.com domain is verified. Set to `false` to allow registration without email OTP; users auto-verified. Set to `true` when domain email works.** |
+| `VITE_CONTACT_EMAIL` | Support contact email | Used in disabled password-reset message; defaults to `support@getchessplay.com` |
 
 **Vercel project settings**
 
@@ -38,11 +40,15 @@ curl -I https://getchessplay.vercel.app/        # must include X-Content-Type-Op
 | `FRONTEND_URL` | `https://getchessplay.vercel.app` | Same as above |
 | `COOKIE_DOMAIN` | *(leave empty)* | **Do not set** when API is on Render and frontend is on Vercel |
 | `PORT` | `10000` or Render default | Render sets `PORT` automatically |
-| `SMTP_HOST` | SMTP host name | Required for all production emails |
-| `SMTP_PORT` | SMTP port number | Required for all production emails |
-| `SMTP_USER` | SMTP username | Required for all production emails |
-| `SMTP_PASS` | SMTP password | Required for all production emails |
-| `SMTP_FROM` | sender address | Required for all production emails; `MAIL_FROM` may also be used |
+| `EMAIL_OTP_ENABLED` | `false` (temporary) → `true` (production) | **Gate email verification OTP until getchessplay.com domain is verified. Set to `false` to allow registration without email OTP; users auto-verified. Set to `true` when domain email works.** |
+| `EMAIL_PROVIDER` | `smtp` or `resend` | Email provider for OTP delivery; `smtp` uses `SMTP_*` vars, `resend` uses `RESEND_API_KEY` and `EMAIL_FROM` |
+| `SMTP_HOST` | SMTP host name | Required when `EMAIL_PROVIDER=smtp` |
+| `SMTP_PORT` | SMTP port number | Required when `EMAIL_PROVIDER=smtp` |
+| `SMTP_USER` | SMTP username | Required when `EMAIL_PROVIDER=smtp` |
+| `SMTP_PASS` | SMTP password | Required when `EMAIL_PROVIDER=smtp` |
+| `SMTP_FROM` | sender address | Required when `EMAIL_PROVIDER=smtp` |
+| `RESEND_API_KEY` | Resend API key | Required when `EMAIL_PROVIDER=resend` |
+| `EMAIL_FROM` | sender email address | Required when `EMAIL_PROVIDER=resend` |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID | Optional; enable Google login with frontend `VITE_ENABLE_GOOGLE_AUTH=true` |
 
 After deploy, verify:

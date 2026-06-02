@@ -11,6 +11,7 @@ import {
 import { apiClient } from "../services/apiClient";
 
 const RESEND_SECONDS = 60;
+const EMAIL_OTP_ENABLED = import.meta.env.VITE_EMAIL_OTP_ENABLED === "true";
 
 export default function VerifyEmailPage({ user, onVerified, onLogout }) {
   const [otp, setOtp] = useState("");
@@ -25,6 +26,15 @@ export default function VerifyEmailPage({ user, onVerified, onLogout }) {
     const timer = window.setTimeout(() => setResendIn((value) => Math.max(value - 1, 0)), 1000);
     return () => window.clearTimeout(timer);
   }, [resendIn]);
+
+  useEffect(() => {
+    if (EMAIL_OTP_ENABLED) return;
+    onVerified?.({ ...user, emailVerified: true });
+  }, [onVerified, user]);
+
+  if (!EMAIL_OTP_ENABLED) {
+    return null;
+  }
 
   const verify = async (event) => {
     event.preventDefault();
