@@ -8,6 +8,13 @@ const KNOWN_EVENTS = new Set([
   "checkout_start",
   "payment_success",
   "feedback_submit",
+  "onboarding_started",
+  "goal_selected",
+  "level_selected",
+  "first_ai_game_started",
+  "first_puzzle_started",
+  "onboarding_dismissed",
+  "onboarding_completed",
 ]);
 
 export function trackEvent(name, properties = {}) {
