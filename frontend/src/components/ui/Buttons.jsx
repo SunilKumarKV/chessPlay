@@ -1,49 +1,68 @@
-import React from 'react';
+const baseButtonClasses =
+  "ds-focus inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-xl)] px-4 py-2.5 text-sm font-black transition-[background,box-shadow,transform,color,border-color] duration-200 ease-[var(--ease-standard)] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60";
 
-// Primary Button - Green background, black text, hover darken 10%
-export const PrimaryBtn = ({ children, className = '', ...props }) => {
-  return (
-    <button
-      className={`bg-[#81b64c] text-[#0e0e0e] hover:bg-[#6fa442] rounded-lg px-4 py-2 font-semibold transition-all active:scale-95 ${className}`}
-      {...props}
-    >
-      {children}
-    </button>
-  );
+const buttonVariants = {
+  primary:
+    "border border-transparent bg-[var(--color-primary)] text-[var(--color-primary-contrast)] shadow-[var(--shadow-glow)] hover:-translate-y-0.5 hover:bg-[var(--color-primary-strong)]",
+  secondary:
+    "border border-[var(--color-border-primary)] bg-[var(--color-surface-strong)] text-[var(--color-text-primary)] shadow-[var(--shadow-xs)] hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface)]",
+  outline:
+    "border border-[var(--color-primary)] bg-transparent text-[var(--color-primary)] hover:-translate-y-0.5 hover:bg-[color-mix(in_srgb,var(--color-primary)_14%,transparent)]",
+  ghost:
+    "border border-transparent bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]",
+  danger:
+    "border border-[color-mix(in_srgb,var(--color-danger)_50%,transparent)] bg-[color-mix(in_srgb,var(--color-danger)_12%,transparent)] text-[var(--color-danger)] hover:-translate-y-0.5 hover:bg-[color-mix(in_srgb,var(--color-danger)_18%,transparent)]",
 };
 
-// Secondary Button - Transparent, green border, green text, hover fill
-export const SecondaryBtn = ({ children, className = '', ...props }) => {
-  return (
-    <button
-      className={`border border-[#81b64c] text-[#81b64c] hover:bg-[#81b64c] hover:text-[#0e0e0e] rounded-lg px-4 py-2 font-semibold transition-all active:scale-95 ${className}`}
-      {...props}
-    >
-      {children}
-    </button>
-  );
+const buttonSizes = {
+  sm: "min-h-10 rounded-[var(--radius-lg)] px-3 py-2 text-xs",
+  md: "min-h-11 px-4 py-2.5 text-sm",
+  lg: "min-h-12 px-5 py-3 text-base",
+  icon: "h-11 w-11 px-0 py-0",
 };
 
-// Danger Button - Red border, red text, hover fill red
-export const DangerBtn = ({ children, className = '', ...props }) => {
-  return (
-    <button
-      className={`border border-red-500 text-red-500 hover:bg-red-500 hover:text-white rounded-lg px-4 py-2 font-semibold transition-all active:scale-95 ${className}`}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-};
+function cx(...classes) {
+  return classes.filter(Boolean).join(" ");
+}
 
-// Ghost Button - No border, muted text, hover show subtle bg
-export const GhostBtn = ({ children, className = '', ...props }) => {
+export function Button({
+  children,
+  className = "",
+  variant = "primary",
+  size = "md",
+  loading = false,
+  loadingText,
+  ...props
+}) {
   return (
     <button
-      className={`text-[#7a7a7a] hover:bg-[#2a2a2a] hover:text-[#e0e0e0] rounded-lg px-4 py-2 font-semibold transition-all active:scale-95 ${className}`}
+      className={cx(baseButtonClasses, buttonVariants[variant] || buttonVariants.primary, buttonSizes[size] || buttonSizes.md, className)}
+      disabled={loading || props.disabled}
       {...props}
     >
-      {children}
+      {loading ? (
+        <span
+          aria-hidden="true"
+          className="h-4 w-4 animate-spin rounded-full border-2 border-current/25 border-t-current"
+        />
+      ) : null}
+      {loading ? loadingText || children : children}
     </button>
   );
-};
+}
+
+export const PrimaryBtn = ({ children, className = "", ...props }) => (
+  <Button className={className} variant="primary" {...props}>{children}</Button>
+);
+
+export const SecondaryBtn = ({ children, className = "", ...props }) => (
+  <Button className={className} variant="outline" {...props}>{children}</Button>
+);
+
+export const DangerBtn = ({ children, className = "", ...props }) => (
+  <Button className={className} variant="danger" {...props}>{children}</Button>
+);
+
+export const GhostBtn = ({ children, className = "", ...props }) => (
+  <Button className={className} variant="ghost" {...props}>{children}</Button>
+);

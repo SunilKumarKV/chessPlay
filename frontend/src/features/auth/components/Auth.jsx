@@ -10,6 +10,7 @@ import {
   PrimaryAuthButton,
   TrustIndicators,
 } from "./PremiumAuthUI";
+import { Badge, Button, Card } from "../../../components/ui";
 import { validateProductionEmail } from "../../../utils/emailValidation";
 import { loginWithEmail, loginWithGoogleCredential, registerWithEmail } from "../services/authApi";
 import { persistAuthSession } from "../services/authStorage";
@@ -281,39 +282,39 @@ export default function Auth({
       <AuthBrandHeader title={heading} subtitle={helperText} headingLevel={isModal ? "h2" : "h1"} />
 
       {referralCode && !isLogin ? (
-        <div className="mb-5 rounded-2xl border border-emerald-400/25 bg-emerald-400/10 p-3 text-sm font-semibold text-emerald-300">
+        <div className="mb-5 rounded-[var(--radius-xl)] border border-[color-mix(in_srgb,var(--color-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-success)_12%,transparent)] p-3 text-sm font-semibold text-[var(--color-success)]">
           Referral code <span className="font-mono">{referralCode}</span> will be connected after registration if valid.
         </div>
       ) : null}
 
       {!isLogin ? (
-        <div className="mb-4 grid gap-1.5 rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] p-2.5 sm:mb-6 sm:gap-2 sm:p-3">
+        <Card variant="subtle" className="mb-4 grid gap-1.5 p-2.5 sm:mb-6 sm:gap-2 sm:p-3">
           {REGISTER_BENEFITS.map((benefit) => (
-            <div key={benefit} className="flex items-center gap-3 text-sm font-bold text-[var(--auth-text)]">
-              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#F4B400]/15 text-[#B77900]">✓</span>
+            <div key={benefit} className="flex items-center gap-3 text-sm font-bold text-[var(--color-text-primary)]">
+              <Badge tone="primary" size="sm">✓</Badge>
               {benefit}
             </div>
           ))}
-        </div>
+        </Card>
       ) : null}
 
       {GOOGLE_AUTH_ENABLED ? (
         <div className="grid gap-2.5 sm:gap-3">
           {/* Google client ID env: {GOOGLE_CLIENT_ID_ENV_NAME}; backend endpoint: {GOOGLE_BACKEND_ENDPOINT} */}
-          <div className="relative min-h-11 w-full overflow-hidden rounded-2xl border border-[var(--auth-border)] bg-white sm:min-h-12">
+          <div className="relative min-h-11 w-full overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-white sm:min-h-12">
             {!googleReady ? (
               <div className="grid min-h-11 place-items-center px-4 text-sm font-bold text-slate-700 sm:min-h-12">
                 Loading Google sign-in...
               </div>
             ) : null}
             <div ref={googleButtonRef} className="w-full" />
-            {loading ? <div className="absolute inset-0 cursor-wait rounded-2xl bg-white/60" /> : null}
+            {loading ? <div className="absolute inset-0 cursor-wait rounded-[var(--radius-xl)] bg-white/60" /> : null}
           </div>
 
-          <div className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-[var(--auth-muted)]">
-            <span className="h-px flex-1 bg-[var(--auth-border)]" />
+          <div className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-[var(--color-text-tertiary)]">
+            <span className="h-px flex-1 bg-[var(--color-border-primary)]" />
             or continue with email
-            <span className="h-px flex-1 bg-[var(--auth-border)]" />
+            <span className="h-px flex-1 bg-[var(--color-border-primary)]" />
           </div>
         </div>
       ) : null}
@@ -334,7 +335,7 @@ export default function Auth({
               placeholder="sunilchess"
               error={formErrors.username}
             />
-            <p className="mt-1.5 text-xs leading-5 text-[var(--auth-muted)]">3-16 letters or numbers only.</p>
+            <p className="mt-1.5 text-xs leading-5 text-[var(--color-text-tertiary)]">3-16 letters or numbers only.</p>
           </div>
         ) : null}
 
@@ -363,7 +364,7 @@ export default function Auth({
               error={formErrors.password}
             />
             {!isLogin ? (
-              <p className="mt-1.5 text-xs leading-5 text-[var(--auth-muted)]">
+              <p className="mt-1.5 text-xs leading-5 text-[var(--color-text-tertiary)]">
                 Use at least 8 characters with uppercase, lowercase, number and symbol.
               </p>
             ) : null}
@@ -392,14 +393,15 @@ export default function Auth({
           </PrimaryAuthButton>
 
           {isLogin ? (
-            <button
+            <Button
               type="button"
               onClick={() => navigateToForgotPassword(onNavigatePath)}
               disabled={loading}
-              className="w-full rounded-xl py-1 text-center text-sm font-bold text-[#B77900] transition hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400] disabled:opacity-60"
+              variant="ghost"
+              className="w-full"
             >
               Forgot password?
-            </button>
+            </Button>
           ) : null}
       </form>
 
@@ -411,7 +413,7 @@ export default function Auth({
           type="button"
           onClick={handleToggleMode}
           disabled={loading}
-          className="text-sm font-black text-[var(--auth-text)] underline-offset-4 transition hover:text-[#F4B400] hover:underline focus:outline-none focus:ring-2 focus:ring-[#F4B400] disabled:opacity-60"
+          className="ds-focus rounded-[var(--radius-md)] text-sm font-black text-[var(--color-text-primary)] underline-offset-4 transition hover:text-[var(--color-primary)] hover:underline disabled:opacity-60"
         >
           {isLogin ? "New to ChessPlay? Create Account" : "Already have an account? Sign In"}
         </button>

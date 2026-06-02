@@ -9,6 +9,7 @@ import {
   PrimaryAuthButton,
   TrustIndicators,
 } from "../features/auth/components/PremiumAuthUI";
+import { Button, Card } from "../components/ui";
 import { apiClient } from "../services/apiClient";
 import { validateProductionEmail } from "../utils/emailValidation";
 
@@ -55,28 +56,30 @@ export default function ForgotPasswordPage({ onBack }) {
             subtitle="Password reset is temporarily unavailable."
           />
           {onBack ? (
-            <button
+            <Button
               type="button"
               onClick={onBack}
-              className="mb-5 rounded-xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-4 py-2 text-sm font-black text-[var(--auth-text)] transition hover:-translate-y-0.5 hover:border-[#F4B400] hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400]"
+              variant="secondary"
+              size="sm"
+              className="mb-5"
             >
               Back
-            </button>
+            </Button>
           ) : null}
           <div className="space-y-4">
-            <div className="rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] p-4 text-center text-sm text-[var(--auth-text)]">
+            <Card variant="subtle" className="p-4 text-center text-sm">
               Password reset features are temporarily unavailable. Please contact{" "}
               <a
                 href={`mailto:${CONTACT_EMAIL}`}
-                className="font-semibold text-[#F4B400] hover:underline"
+                className="font-semibold text-[var(--color-primary)] hover:underline"
               >
                 support
               </a>
               {" "}for assistance.
-            </div>
+            </Card>
             <a
               href="/login"
-              className="block rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-4 py-3 text-center text-sm font-black text-[var(--auth-text)] transition hover:-translate-y-0.5 hover:border-[#F4B400] hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400]"
+              className="ds-focus block min-h-11 rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface-strong)] px-4 py-3 text-center text-sm font-black text-[var(--color-text-primary)] transition hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:text-[var(--color-primary)]"
             >
               Sign in
             </a>
@@ -197,13 +200,15 @@ export default function ForgotPasswordPage({ onBack }) {
           />
 
           {onBack ? (
-            <button
+            <Button
               type="button"
               onClick={onBack}
-              className="mb-5 rounded-xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-4 py-2 text-sm font-black text-[var(--auth-text)] transition hover:-translate-y-0.5 hover:border-[#F4B400] hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400]"
+              variant="secondary"
+              size="sm"
+              className="mb-5"
             >
               Back
-            </button>
+            </Button>
           ) : null}
 
           <div className="space-y-4">
@@ -279,37 +284,38 @@ export default function ForgotPasswordPage({ onBack }) {
 
           {sent && !resetComplete ? (
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <button
+              <Button
                 type="button"
                 onClick={resend}
                 disabled={resending || resendIn > 0}
-                className="rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-4 py-3 text-sm font-black text-[var(--auth-text)] transition hover:-translate-y-0.5 hover:border-[#F4B400] hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400] disabled:cursor-not-allowed disabled:opacity-60"
+                variant="secondary"
               >
                 {resendIn ? `Resend in ${resendIn}s` : resending ? "Sending..." : "Resend reset code"}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => {
                   window.location.href = "/login";
                 }}
-                className="rounded-2xl border border-[var(--auth-border)] bg-transparent px-4 py-3 text-sm font-black text-[var(--auth-muted)] transition hover:-translate-y-0.5 hover:border-red-400/50 hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-[#F4B400]"
+                variant="ghost"
               >
                 Back to sign in
-              </button>
+              </Button>
             </div>
           ) : null}
 
           {resetComplete ? (
             <div className="mt-4">
-              <button
+              <Button
                 type="button"
                 onClick={() => {
                   window.location.href = "/login";
                 }}
-                className="w-full rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-4 py-3 text-sm font-black text-[var(--auth-text)] transition hover:-translate-y-0.5 hover:border-[#F4B400] hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400]"
+                variant="secondary"
+                className="w-full"
               >
                 Sign in
-              </button>
+              </Button>
             </div>
           ) : null}
 

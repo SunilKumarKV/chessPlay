@@ -8,6 +8,7 @@ import {
   PrimaryAuthButton,
   TrustIndicators,
 } from "../features/auth/components/PremiumAuthUI";
+import { Button } from "../components/ui";
 import { apiClient } from "../services/apiClient";
 
 const RESEND_SECONDS = 60;
@@ -119,21 +120,21 @@ export default function VerifyEmailPage({ user, onVerified, onLogout }) {
           <AuthStatus status={statusTone === "error" && status.includes("6-digit") ? "" : status} tone={statusTone} />
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <button
+            <Button
               type="button"
               onClick={resend}
               disabled={resending || resendIn > 0}
-              className="rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-4 py-3 text-sm font-black text-[var(--auth-text)] transition hover:-translate-y-0.5 hover:border-[#F4B400] hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400] disabled:cursor-not-allowed disabled:opacity-60"
+              variant="secondary"
             >
               {resendIn ? `Resend in ${resendIn}s` : resending ? "Sending..." : "Resend code"}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={onLogout}
-              className="rounded-2xl border border-[var(--auth-border)] bg-transparent px-4 py-3 text-sm font-black text-[var(--auth-muted)] transition hover:-translate-y-0.5 hover:border-red-400/50 hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-[#F4B400]"
+              variant="ghost"
             >
               Log out
-            </button>
+            </Button>
           </div>
 
           <TrustIndicators />
