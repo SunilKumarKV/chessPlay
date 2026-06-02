@@ -58,6 +58,10 @@ function getSupporterState(user) {
   return "free";
 }
 
+function ratingLabel(user) {
+  return Number.isFinite(Number(user?.rating)) ? `${Number(user.rating)} rating` : "Unrated";
+}
+
 function isVisible(item, user) {
   if (item.auth && !user) return false;
   return true;
@@ -253,7 +257,7 @@ export default function Sidebar({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-black">{user.username || "Player"}</span>
                   <span className="block truncate text-xs text-[var(--color-text-tertiary)]">
-                    {user?.isGuest ? "Guest mode · limited" : `${user.rating || 1200} rating`}
+                    {user?.isGuest ? "Guest mode · limited" : ratingLabel(user)}
                   </span>
                   <PlanBadge user={user} compact />
                 </span>

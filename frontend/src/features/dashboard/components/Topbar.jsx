@@ -52,6 +52,10 @@ function isSupporter(user) {
   return Boolean(user?.isSupporter || user?.adsDisabled || user?.plan === "supporter");
 }
 
+function ratingLabel(user) {
+  return Number.isFinite(Number(user?.rating)) ? `${Number(user.rating)} rating` : "Unrated";
+}
+
 export default function Topbar({ onMenuClick, user, onNavigate, onLogout, activePage }) {
   const [accountOpen, setAccountOpen] = useState(false);
   const [linksOpen, setLinksOpen] = useState(false);
@@ -242,7 +246,7 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout, active
               <span className="hidden max-w-36 truncate text-left md:block">
                 <span className="block truncate text-sm font-black">{user.username || "Player"}</span>
                 <span className="block truncate text-[11px] text-[var(--color-text-tertiary)]">
-                  {isSupporter(user) ? "Supporter" : `${user.rating || 1200} rating`}
+                  {isSupporter(user) ? "Supporter" : ratingLabel(user)}
                 </span>
               </span>
             </button>
@@ -257,7 +261,7 @@ export default function Topbar({ onMenuClick, user, onNavigate, onLogout, active
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-black">{user.username || "Player"}</div>
                       <div className="truncate text-xs text-[var(--color-text-tertiary)]">
-                        {user.email || `${user.rating || 1200} rating`}
+                        {user.email || ratingLabel(user)}
                       </div>
                       <PlanBadge user={user} compact />
                     </div>

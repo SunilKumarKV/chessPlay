@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Chess } from "chess.js";
-import SupporterBadge from "../components/billing/SupporterBadge";
 import { apiClient } from "../services/apiClient";
 import PuzzleBoard from "../features/puzzles/components/PuzzleBoard";
 import PuzzleControls from "../features/puzzles/components/PuzzleControls";
@@ -11,6 +10,7 @@ import PuzzleStatsCard from "../features/puzzles/components/PuzzleStatsCard";
 import { trackEvent } from "../services/analytics";
 import UpgradeModal from "../components/billing/UpgradeModal";
 import ErrorBanner from "../components/common/ErrorBanner";
+import { Badge, Button, Card, EmptyState as DesignEmptyState, LoadingState } from "../components/ui";
 
 function squareFromCoords(row, col) {
   return `${String.fromCharCode(97 + col)}${8 - row}`;
@@ -32,22 +32,26 @@ function makeGame(fen) {
 function Skeleton() {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]" aria-label="Loading puzzles">
-      <div className="h-[38rem] animate-pulse rounded-[2rem] border border-white/10 bg-white/[0.06]" />
-      <div className="h-[38rem] animate-pulse rounded-[2rem] border border-white/10 bg-white/[0.06]" />
+      <LoadingState label="Loading training board" className="min-h-[34rem]" />
+      <LoadingState label="Loading training context" className="min-h-[18rem]" />
     </div>
   );
 }
 
-function EmptyState({ message, onRefresh }) {
+function PuzzleEmptyState({ message, onRefresh, onAiGame }) {
   return (
-    <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-8 text-center shadow-xl shadow-black/20">
-      <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-[#81b64c]/15 text-2xl" aria-hidden="true">◇</div>
-      <h3 className="font-['Montserrat'] text-xl font-black text-white">No puzzles available</h3>
-      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">{message}</p>
-      <button type="button" onClick={onRefresh} className="mt-5 rounded-xl bg-[#81b64c] px-5 py-3 text-sm font-black text-[#07100a] transition hover:bg-[#93c85f]">
-        Refresh
-      </button>
-    </div>
+    <DesignEmptyState
+      title="No puzzles available"
+      message={message || "Train against AI while new puzzles load."}
+      icon="◇"
+      className="min-h-[320px]"
+      action={(
+        <div className="grid w-full max-w-md gap-3 sm:grid-cols-2">
+          <Button type="button" onClick={onAiGame}>Start AI Game</Button>
+          <Button type="button" variant="secondary" onClick={onRefresh}>Refresh</Button>
+        </div>
+      )}
+    />
   );
 }
 
@@ -74,7 +78,16 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
   const [upgradeFeature, setUpgradeFeature] = useState("");
 
   const completed = Boolean(result?.completed);
-  const remainingLabel = limits?.limit ? `${limits.remaining ?? 0}/${limits.limit} puzzles remaining today` : "Puzzle counter unavailable";
+  const hasLimit = Number.isFinite(Number(limits?.limit));
+  const hasRemaining = Number.isFinite(Number(limits?.remaining));
+  const remainingLabel = hasLimit && hasRemaining
+    ? `${Number(limits.remaining)}/${Number(limits.limit)} puzzles remaining today`
+    : "Puzzle counter unavailable";
+  const hasPuzzleRating = Number.isFinite(Number(puzzle?.rating));
+  const trainingFocus = puzzle?.theme ? `${puzzle.theme} Practice` : "Tactical Practice";
+  const currentGoal = puzzle
+    ? `Find the best move for ${game.turn() === "w" ? "White" : "Black"} and complete the line.`
+    : "Solve 5 focused puzzles today.";
   const progress = useMemo(() => {
     if (!puzzle) return "Move 0/0";
     const current = Math.min(Math.floor((moveIndex + 1) / 2), puzzle.playerMoveCount || 1);
@@ -127,7 +140,7 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
         setLimitModal(error.data || { message: error.message });
         setLimits(error.data?.limits || null);
       } else if (error.status === 404) {
-        setEmptyMessage(error.message || "No active puzzles are available yet.");
+        setEmptyMessage(error.message || "Train against AI while new puzzles load.");
       } else {
         setEmptyMessage(error.message || "Puzzle service is unavailable.");
       }
@@ -187,13 +200,13 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
       setMoveIndex(data.moveIndex ?? moveIndex);
 
       if (data.correct) {
-        setFeedback({ type: "success", message: data.message || "Correct." });
+        setFeedback({ type: "success", message: data.completed ? "Great work. Keep building pattern recognition." : data.message || "Correct. Keep calculating the line." });
         if (data.completed) {
           setResult({ completed: true, learning: data.learning });
           await refreshStats();
         }
       } else {
-        setFeedback({ type: "error", message: data.message || "Try again." });
+        setFeedback({ type: "error", message: data.message || "Review the idea and try another puzzle." });
         setShakeBoard(true);
         window.setTimeout(() => setShakeBoard(false), 360);
       }
@@ -240,52 +253,64 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#07100d] text-white">
+    <main className="min-h-screen bg-[var(--color-bg-primary)] px-4 py-5 text-[var(--color-text-primary)] sm:px-6 lg:px-8">
       <PuzzleLimitModal limit={limitModal} onClose={() => setLimitModal(null)} onUpgrade={() => onNavigate?.("pricing")} />
       <PuzzleResultModal result={result} onClose={() => setResult(null)} onNext={() => loadPuzzle(difficulty, { fresh: true })} />
       <UpgradeModal open={Boolean(upgradeFeature)} feature={upgradeFeature} onClose={() => setUpgradeFeature("")} onNavigate={onNavigate} />
-      <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6 xl:p-8">
-        <header className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#132017] via-[#0b1512] to-[#030706] p-5 shadow-2xl shadow-black/30 md:p-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <section className="rounded-[var(--radius-3xl)] border border-[var(--color-border-primary)] bg-[radial-gradient(circle_at_top_left,color-mix(in_srgb,var(--color-primary)_18%,transparent),transparent_34%),var(--color-bg-elevated)] p-5 shadow-[var(--shadow-xl)] sm:p-7">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-[#81b64c]/30 bg-[#81b64c]/10 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-[#b8f28f]">Trainer</span>
-                <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-bold text-slate-300">Lichess CC0</span>
-                {user?.isSupporter || user?.isPremium ? <SupporterBadge user={user} /> : null}
+                <Badge tone="primary">Training</Badge>
+                <Badge tone="info">Focused puzzles</Badge>
+                {user?.isSupporter || user?.isPremium ? <Badge tone="warning">Premium</Badge> : null}
               </div>
-              <h1 className="mt-4 font-['Montserrat'] text-3xl font-black md:text-5xl">Chess Puzzles</h1>
-              <p className="mt-3 max-w-3xl text-base leading-7 text-slate-300 md:text-lg">
-                Thousands of tactical puzzles available with daily limits by plan, full-line validation, hints, and post-solve learning notes.
+              <h1 className="mt-5 max-w-4xl font-[var(--font-display)] text-4xl font-black leading-tight sm:text-5xl lg:text-6xl">
+                Train Smarter. Improve Faster.
+              </h1>
+              <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--color-text-secondary)] sm:text-lg">
+                Target your weaknesses through focused chess training.
               </p>
-              <p className="mt-3 text-sm text-slate-500">Puzzle data source: Lichess open database (CC0).</p>
+              <p className="mt-3 text-sm font-semibold text-[var(--color-text-tertiary)]">Puzzle data source: Lichess open database (CC0).</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={onBack} className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-bold text-slate-200 transition hover:bg-white/15">Back</button>
-              <button type="button" onClick={() => onNavigate?.("pricing")} className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-4 py-3 text-sm font-black text-amber-100 transition hover:bg-amber-300/15">Upgrade</button>
+              <Button type="button" variant="ghost" onClick={onBack}>Back</Button>
+              <Button type="button" variant="secondary" onClick={() => onNavigate?.("pricing")}>Upgrade</Button>
             </div>
           </div>
-        </header>
+        </section>
+
+        <section className="grid gap-3 md:grid-cols-3" aria-label="Training focus">
+          <TrainingFocusItem label="Current Focus" value={trainingFocus} tone="primary" />
+          <TrainingFocusItem label="Recommended Today" value="Solve 5 puzzles" tone="success" />
+          <TrainingFocusItem label="Estimated Time" value="5 minutes" tone="info" />
+        </section>
 
         <PuzzleDifficultyTabs value={difficulty} limits={limits} onChange={setDifficulty} />
         <ErrorBanner message={feedback?.type === "error" && !puzzle ? feedback.message : ""} onRetry={() => loadPuzzle(difficulty, { fresh: true })} />
 
         {loading ? <Skeleton /> : !puzzle ? (
-          <EmptyState message={emptyMessage} onRefresh={() => loadPuzzle(difficulty)} />
+          <PuzzleEmptyState
+            message={emptyMessage || "Train against AI while new puzzles load."}
+            onRefresh={() => loadPuzzle(difficulty)}
+            onAiGame={() => onNavigate?.("ai")}
+          />
         ) : (
-          <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-            <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-4 shadow-2xl shadow-black/25 md:p-6">
+          <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
+            <Card variant="glass" className="order-1 p-4 sm:p-5 md:p-6">
               <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-[#81b64c]/15 px-3 py-1 text-xs font-black text-[#b8f28f]">{puzzle.theme || "tactic"}</span>
-                    <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-slate-300">{puzzle.difficulty}</span>
-                    <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-slate-300">Rating {puzzle.rating}</span>
-                    {puzzle.isPremium ? <span className="rounded-full bg-amber-300/15 px-3 py-1 text-xs font-black text-amber-100">Premium</span> : null}
+                    <Badge tone="primary">{puzzle.theme || "Tactical Practice"}</Badge>
+                    {puzzle.difficulty ? <Badge tone="neutral">{puzzle.difficulty}</Badge> : null}
+                    {hasPuzzleRating ? <Badge tone="neutral">Rating {Number(puzzle.rating)}</Badge> : null}
+                    {puzzle.isPremium ? <Badge tone="warning">Premium</Badge> : null}
                   </div>
-                  <h2 className="mt-3 font-['Montserrat'] text-2xl font-black text-white">Daily Puzzle</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-400">{progress} · {game.turn() === "w" ? "White" : "Black"} to move</p>
+                  <h2 className="mt-3 font-[var(--font-display)] text-2xl font-black">Puzzle Workspace</h2>
+                  <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">{progress} · {game.turn() === "w" ? "White" : "Black"} to move</p>
                 </div>
-                <div className="rounded-2xl bg-black/20 px-4 py-3 text-sm font-bold text-slate-300">
+                <div className="rounded-[var(--radius-2xl)] bg-[var(--color-surface)] px-4 py-3 text-sm font-bold text-[var(--color-text-secondary)]">
                   {remainingLabel}
                 </div>
               </div>
@@ -308,21 +333,41 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
                 onReset={resetCurrentPuzzle}
                 onNext={() => loadPuzzle(difficulty, { fresh: true })}
               />
-            </div>
+            </Card>
 
-            <aside className="space-y-5">
+            <aside className="order-2 space-y-5">
+              <Card variant="glass">
+                <h2 className="font-[var(--font-display)] text-xl font-black">Training context</h2>
+                <div className="mt-4 space-y-3">
+                  <ContextRow label="Current goal" value={currentGoal} />
+                  <ContextRow label="Progress" value={progress} />
+                  <ContextRow label="Focus" value={trainingFocus} />
+                </div>
+              </Card>
+
+              <Card variant="subtle">
+                <h2 className="font-[var(--font-display)] text-xl font-black">Completion state</h2>
+                <p className="mt-3 text-sm leading-6 text-[var(--color-text-secondary)]">
+                  {feedback?.type === "success"
+                    ? "Great work. Keep building pattern recognition."
+                    : feedback?.type === "error"
+                      ? "Review the idea and try another puzzle."
+                      : "Choose a candidate move, calculate the reply, then commit."}
+                </p>
+              </Card>
+
               <PuzzleStatsCard stats={stats} limits={limits} history={history} />
 
-              <div className="rounded-[2rem] border border-amber-300/20 bg-amber-300/10 p-5 shadow-xl shadow-black/20">
-                <h2 className="font-['Montserrat'] text-xl font-black text-amber-50">Premium training</h2>
-                <p className="mt-2 text-sm leading-6 text-amber-100/85">Free players get a clear daily allowance. Premium plans raise the daily limit, unlock advanced and master puzzles, and provide more hints per puzzle.</p>
+              <Card variant="subtle">
+                <h2 className="font-[var(--font-display)] text-xl font-black">Premium training</h2>
+                <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">Free players get a clear daily allowance. Premium plans raise the daily limit, unlock advanced and master puzzles, and provide more hints per puzzle.</p>
                 {limits?.isPremium ? (
-                  <label className="mt-4 block text-sm font-bold text-amber-50">
+                  <label className="mt-4 block text-sm font-bold text-[var(--color-text-primary)]">
                     Theme filter
                     <select
                       value={themeFilter}
                       onChange={(event) => setThemeFilter(event.target.value)}
-                      className="mt-2 w-full rounded-xl border border-amber-200/30 bg-black/20 px-3 py-3 text-sm font-bold text-amber-50 outline-none"
+                      className="ds-focus mt-2 w-full rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-[var(--color-bg-elevated)] px-3 py-3 text-sm font-bold text-[var(--color-text-primary)] outline-none"
                     >
                       <option value="">All themes</option>
                       <option value="mate">Mate</option>
@@ -333,26 +378,49 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
                     </select>
                   </label>
                 ) : (
-                  <button type="button" onClick={() => setUpgradeFeature("premium puzzle filters")} className="mt-4 w-full rounded-xl border border-amber-200/30 bg-black/20 px-4 py-3 text-sm font-black text-amber-50 transition hover:bg-amber-300/10">
+                  <Button type="button" variant="secondary" className="mt-4 w-full" onClick={() => setUpgradeFeature("premium puzzle filters")}>
                     Unlock theme filters
-                  </button>
+                  </Button>
                 )}
-                <button type="button" onClick={() => onNavigate?.("pricing")} className="mt-4 w-full rounded-xl bg-amber-200 px-4 py-3 text-sm font-black text-[#2a1a00] transition hover:bg-amber-100">View plans</button>
-              </div>
+                <Button type="button" className="mt-4 w-full" onClick={() => onNavigate?.("pricing")}>View plans</Button>
+              </Card>
 
-              <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-xl shadow-black/20">
-                <h2 className="font-['Montserrat'] text-xl font-black text-white">Learning focus</h2>
-                <p className="mt-3 text-sm leading-6 text-slate-400">{puzzle.learning?.whatYouLearned || "Find forcing moves and verify the reply."}</p>
+              <Card variant="subtle">
+                <h2 className="font-[var(--font-display)] text-xl font-black">Learning focus</h2>
+                <p className="mt-3 text-sm leading-6 text-[var(--color-text-secondary)]">{puzzle.learning?.whatYouLearned || "Find forcing moves and verify the reply."}</p>
                 {puzzle.gameUrl ? (
-                  <a href={puzzle.gameUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-black text-slate-200 transition hover:bg-white/15">
+                  <a href={puzzle.gameUrl} target="_blank" rel="noreferrer" className="ds-focus mt-4 inline-flex min-h-11 items-center justify-center rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface-strong)] px-4 py-2.5 text-sm font-black text-[var(--color-text-primary)] shadow-[var(--shadow-xs)] transition hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface)]">
                     Source game
                   </a>
                 ) : null}
-              </div>
+              </Card>
             </aside>
           </section>
         )}
       </div>
+    </main>
+  );
+}
+
+function TrainingFocusItem({ label, value, tone }) {
+  return (
+    <Card variant="glass">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--color-text-tertiary)]">{label}</p>
+          <p className="mt-2 font-[var(--font-display)] text-xl font-black">{value}</p>
+        </div>
+        <Badge tone={tone}>Today</Badge>
+      </div>
+    </Card>
+  );
+}
+
+function ContextRow({ label, value }) {
+  return (
+    <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface)] p-3">
+      <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[var(--color-text-tertiary)]">{label}</p>
+      <p className="mt-1 text-sm font-bold text-[var(--color-text-primary)]">{value}</p>
     </div>
   );
 }
