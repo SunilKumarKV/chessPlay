@@ -1,0 +1,41 @@
+name: Security Report
+description: Private security concern or vulnerability report
+title: "[Security]: "
+labels:
+  - security
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do NOT include secrets, credentials, tokens, or exploit code.
+        Use GitHub Private Vulnerability Reporting whenever possible.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Vulnerability Summary
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+    validations:
+      required: true
+  - type: textarea
+    id: affected
+    attributes:
+      label: Affected Components
+    validations:
+      required: true
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Suggested Mitigation
+  - type: checkboxes
+    id: security_checks
+    attributes:
+      label: Security Confirmation
+      options:
+        - label: No secrets are included
+        - label: No exploit payloads are included
+        - label: This report follows responsible disclosure

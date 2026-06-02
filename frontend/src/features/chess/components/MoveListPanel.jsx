@@ -14,27 +14,27 @@ export default function MoveListPanel({
         {moves.map((move) => (
           <div
             key={`${move.number}-${move.white}-${move.black}`}
-            className={`flex items-center space-x-3 rounded ${rowPadding} ${
+            className={`flex items-center space-x-3 rounded-[var(--radius-lg)] ${rowPadding} ${
               move.isLatest
-                ? "border border-[#81b64c]/30 bg-[#81b64c]/10"
-                : "hover:bg-[#2a2a2a]"
+                ? "border border-[color-mix(in_srgb,var(--color-primary)_36%,transparent)] bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)]"
+                : "hover:bg-[var(--color-surface-strong)]"
             } transition-colors`}
           >
-            <span className={`text-[#7a7a7a] ${numberClass}`}>
+            <span className={`text-[var(--color-text-tertiary)] ${numberClass}`}>
               {move.number}.
             </span>
             <span
               className={`flex-1 ${
                 !move.white || move.white === "-"
-                  ? "text-[#7a7a7a]"
-                  : "text-[#e0e0e0]"
+                  ? "text-[var(--color-text-tertiary)]"
+                  : "text-[var(--color-text-primary)]"
               } ${moveTextClass}`}
             >
               {move.white}
             </span>
             <span
               className={`flex-1 ${
-                !move.black ? "text-[#7a7a7a]" : "text-[#e0e0e0]"
+                !move.black ? "text-[var(--color-text-tertiary)]" : "text-[var(--color-text-primary)]"
               } ${moveTextClass}`}
             >
               {move.black}
@@ -42,7 +42,7 @@ export default function MoveListPanel({
           </div>
         ))}
         {moves.length === 0 && (
-          <div className="py-4 text-center text-sm text-[#7a7a7a]">
+          <div className="py-4 text-center text-sm text-[var(--color-text-tertiary)]">
             {emptyMessage}
           </div>
         )}

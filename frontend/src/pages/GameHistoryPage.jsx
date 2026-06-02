@@ -158,6 +158,10 @@ export default function GameHistory({ onBack, onNavigate }) {
     onNavigate?.("analysis");
   };
 
+  const getGameKey = (game, index) => (
+    game._id || game.id || `${game.startTime || game.endTime || game.createdAt || "game"}-${index}`
+  );
+
   if (selectedGame) {
     return <GameReplay game={selectedGame} onClose={() => setSelectedGame(null)} />;
   }
