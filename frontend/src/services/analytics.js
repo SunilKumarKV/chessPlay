@@ -18,6 +18,9 @@ const KNOWN_EVENTS = new Set([
   "weakness_viewed",
   "weakness_cta_clicked",
   "weakness_dismissed",
+  "training_recommendation_viewed",
+  "training_recommendation_clicked",
+  "training_recommendation_dismissed",
 ]);
 
 export function trackEvent(name, properties = {}) {

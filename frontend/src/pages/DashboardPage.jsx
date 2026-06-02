@@ -28,6 +28,11 @@ const WEAKNESS_STORAGE_KEYS = {
   viewedId: "chessplay_weakness_viewed_id",
 };
 
+const TRAINING_STORAGE_KEYS = {
+  dismissedId: "chessplay_training_recommendation_dismissed_id",
+  viewedId: "chessplay_training_recommendation_viewed_id",
+};
+
 const GOAL_OPTIONS = ["Learn chess", "Improve rating", "Win more games", "Prepare for tournaments"];
 const LEVEL_OPTIONS = ["Beginner", "Intermediate", "Advanced"];
 
@@ -251,6 +256,97 @@ function buildWeakness({ gamesPlayed, wins, losses, draws, recentGames, userId, 
   };
 }
 
+function buildTrainingRecommendation({ weakness, gamesPlayed, puzzleActivity }) {
+  if (!weakness) return null;
+
+  const base = {
+    id: `training-${weakness.id}`,
+    weakness: weakness.weakness,
+    weaknessRule: weakness.reason,
+  };
+
+  if (weakness.weakness === "Missed Tactics") {
+    return {
+      ...base,
+      title: "Tactical Practice",
+      reason: puzzleActivity.started >= 5 && puzzleActivity.accuracy > 0
+        ? `Your tactical accuracy is ${puzzleActivity.accuracy}%, so the fastest gain is cleaner calculation.`
+        : "Your activity points to tactics as the next highest-impact training area.",
+      action: "Solve 5 tactics today.",
+      ctaLabel: "Start Training",
+      ctaRoute: "puzzles",
+      trainingType: "tactics",
+      tone: "warning",
+    };
+  }
+
+  if (weakness.weakness === "Puzzle Consistency") {
+    return {
+      ...base,
+      title: "Practice Consistency",
+      reason: gamesPlayed <= 0
+        ? "ChessPlay needs one real game signal, and a steady first session is better than a long plan."
+        : "Your recent activity rhythm is the limiting factor right now.",
+      action: "Play one 10-minute AI game.",
+      ctaLabel: "Play 10-Min AI Game",
+      ctaRoute: "ai",
+      timeControl: "10+0",
+      trainingType: "ai_game",
+      tone: "info",
+    };
+  }
+
+  if (weakness.weakness === "Opening Inaccuracy") {
+    return {
+      ...base,
+      title: "Opening Practice",
+      reason: "Your current pattern suggests early move quality needs a quick review before more games.",
+      action: "Review your first 10 moves and look for undeveloped pieces, unsafe king moves, and missed threats.",
+      ctaLabel: "Review Openings",
+      ctaRoute: "analysis",
+      trainingType: "openings",
+      tone: "primary",
+    };
+  }
+
+  if (weakness.weakness === "Endgame Struggles") {
+    return {
+      ...base,
+      title: "Conversion Practice",
+      reason: "Non-winning results often come from not converting advantages into simple endgames.",
+      action: "Practice simple endgames and review one recent non-win.",
+      ctaLabel: "Review Games",
+      ctaRoute: "history",
+      trainingType: "endgames",
+      tone: "primary",
+    };
+  }
+
+  if (weakness.weakness === "Hanging Pieces") {
+    return {
+      ...base,
+      title: "Game Stability",
+      reason: "Your loss trend points to material safety and board checks before each move.",
+      action: "Review your last game, then play one safer AI game.",
+      ctaLabel: "Review Last Game",
+      ctaRoute: "history",
+      trainingType: "review_games",
+      tone: "danger",
+    };
+  }
+
+  return {
+    ...base,
+    title: "Tactical Practice",
+    reason: "Tactics are the clearest daily training path from the current signals.",
+    action: "Solve 5 tactics today.",
+    ctaLabel: "Start Training",
+    ctaRoute: "puzzles",
+    trainingType: "tactics",
+    tone: "success",
+  };
+}
+
 function DashboardSkeleton({ theme }) {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6 xl:p-8" aria-label="Loading dashboard">
@@ -395,6 +491,49 @@ function WeaknessDetectionCard({ weakness, onCta, onDismiss }) {
   );
 }
 
+function TrainingRecommendationCard({ recommendation, onCta, onDismiss }) {
+  if (!recommendation) return null;
+
+  return (
+    <Card variant="glass" className="overflow-hidden p-5 sm:p-6" aria-labelledby="chessplay-training-title">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <Badge tone={recommendation.tone || "primary"}>Next best action</Badge>
+          <h2 id="chessplay-training-title" className="mt-3 font-[var(--font-display)] text-2xl font-black tracking-tight text-[var(--color-text-primary)]">
+            Recommended Training
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">
+            Built from your current weakness signal and recent activity.
+          </p>
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={onDismiss} aria-label="Dismiss training recommendation">
+          Dismiss
+        </Button>
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface)] p-4">
+          <h3 className="font-[var(--font-display)] text-xl font-black text-[var(--color-text-primary)]">{recommendation.title}</h3>
+          <p className="mt-2 text-sm font-black text-[var(--color-primary)]">{recommendation.action}</p>
+        </div>
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface)] p-4">
+          <h3 className="text-sm font-black uppercase text-[var(--color-text-tertiary)]">Why this is recommended</h3>
+          <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">{recommendation.reason}</p>
+        </div>
+      </div>
+
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <Button type="button" onClick={onCta}>
+          {recommendation.ctaLabel}
+        </Button>
+        <span className="text-xs font-bold text-[var(--color-text-tertiary)]">
+          Training type: {recommendation.trainingType.replaceAll("_", " ")}
+        </span>
+      </div>
+    </Card>
+  );
+}
+
 function Toast({ toast, onClose }) {
   if (!toast) return null;
   const isError = toast.type === "error";
@@ -433,8 +572,10 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
     return dismissed === "true" || dismissed === "1";
   });
   const [dismissedWeaknessId, setDismissedWeaknessId] = useState(() => safeGetSessionStorage(WEAKNESS_STORAGE_KEYS.dismissedId) || "");
+  const [dismissedTrainingId, setDismissedTrainingId] = useState(() => safeGetSessionStorage(TRAINING_STORAGE_KEYS.dismissedId) || "");
   const onboardingStartedTrackedRef = useRef(false);
   const weaknessViewedRef = useRef("");
+  const trainingViewedRef = useRef("");
 
   const showDebugStatus = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -623,6 +764,11 @@ const trialDaysLeft = trialEndsAt
     [draws, gamesPlayed, losses, puzzleActivity, recentGames, userId, wins],
   );
   const shouldShowWeakness = !isGuest && puzzleSignalsReady && weaknessRecommendation && weaknessRecommendation.id !== dismissedWeaknessId;
+  const trainingRecommendation = useMemo(
+    () => buildTrainingRecommendation({ weakness: weaknessRecommendation, gamesPlayed, puzzleActivity }),
+    [gamesPlayed, puzzleActivity, weaknessRecommendation],
+  );
+  const shouldShowTraining = !isGuest && puzzleSignalsReady && trainingRecommendation && trainingRecommendation.id !== dismissedTrainingId;
 
   useEffect(() => {
     if (!shouldShowOnboarding) return;
@@ -721,6 +867,50 @@ const trialDaysLeft = trialEndsAt
     });
   };
 
+  useEffect(() => {
+    if (!shouldShowTraining || !trainingRecommendation) return;
+    if (trainingViewedRef.current === trainingRecommendation.id) return;
+    if (safeGetSessionStorage(TRAINING_STORAGE_KEYS.viewedId) === trainingRecommendation.id) return;
+    trainingViewedRef.current = trainingRecommendation.id;
+    safeSetSessionStorage(TRAINING_STORAGE_KEYS.viewedId, trainingRecommendation.id);
+    trackEvent("training_recommendation_viewed", {
+      title: trainingRecommendation.title,
+      trainingType: trainingRecommendation.trainingType,
+      weakness: trainingRecommendation.weakness,
+      rule: trainingRecommendation.weaknessRule,
+    });
+  }, [shouldShowTraining, trainingRecommendation]);
+
+  const handleTrainingCta = () => {
+    if (!trainingRecommendation) return;
+    trackEvent("training_recommendation_clicked", {
+      title: trainingRecommendation.title,
+      trainingType: trainingRecommendation.trainingType,
+      weakness: trainingRecommendation.weakness,
+      route: trainingRecommendation.ctaRoute,
+    });
+    if (trainingRecommendation.timeControl) {
+      setSelectedTimeControl(trainingRecommendation.timeControl);
+      localStorage.setItem("selectedTimeControl", trainingRecommendation.timeControl);
+    }
+    if (trainingRecommendation.ctaRoute === "ai") {
+      onStartGame?.("ai", trainingRecommendation.timeControl || selectedTimeControl);
+      return;
+    }
+    onNavigate?.(trainingRecommendation.ctaRoute);
+  };
+
+  const dismissTraining = () => {
+    if (!trainingRecommendation) return;
+    safeSetSessionStorage(TRAINING_STORAGE_KEYS.dismissedId, trainingRecommendation.id);
+    setDismissedTrainingId(trainingRecommendation.id);
+    trackEvent("training_recommendation_dismissed", {
+      title: trainingRecommendation.title,
+      trainingType: trainingRecommendation.trainingType,
+      weakness: trainingRecommendation.weakness,
+    });
+  };
+
   const startAiFromDashboard = () => {
     if (shouldShowOnboarding) {
       startFirstAiGame();
@@ -804,6 +994,14 @@ const trialDaysLeft = trialEndsAt
           weakness={weaknessRecommendation}
           onCta={handleWeaknessCta}
           onDismiss={dismissWeakness}
+        />
+      ) : null}
+
+      {shouldShowTraining ? (
+        <TrainingRecommendationCard
+          recommendation={trainingRecommendation}
+          onCta={handleTrainingCta}
+          onDismiss={dismissTraining}
         />
       ) : null}
 
