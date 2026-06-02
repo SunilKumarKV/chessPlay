@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import GoldButton from "../components/GoldButton";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button, EmptyState as DesignEmptyState, LoadingState } from "../components/ui";
 import { BACKEND_URL } from "../config/runtime";
 import GameReplay from "../features/chess/components/GameReplay";
 import { useTheme } from "../hooks/useTheme";
@@ -11,35 +11,35 @@ export default function GameHistory({ onBack }) {
   const [error, setError] = useState("");
   const [selectedGame, setSelectedGame] = useState(null);
 
-  useEffect(() => {
-    const fetchHistory = async () => {
-      setLoading(true);
-      setError("");
+  const fetchHistory = useCallback(async () => {
+    setLoading(true);
+    setError("");
 
-      try {
-        const response = await fetch(
-          `${BACKEND_URL}/api/games/history?limit=50`,
-          {
-            credentials: "include",
-          },
-        );
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/api/games/history?limit=50`,
+        {
+          credentials: "include",
+        },
+      );
 
-        const data = await response.json();
+      const data = await response.json();
 
-        if (!response.ok) {
-          throw new Error(data.message || "Unable to load history");
-        }
-
-        setGames(data.games || []);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to load history");
       }
-    };
 
-    fetchHistory();
+      setGames(data.games || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
 
   const currentUser = useMemo(() => {
     try {
@@ -68,6 +68,10 @@ export default function GameHistory({ onBack }) {
       ? "Outcome"
       : "Completed";
   };
+
+  const getGameKey = (game, index) => (
+    game._id || game.id || `${game.startTime || game.endTime || game.createdAt || "game"}-${index}`
+  );
 
   if (selectedGame) {
     return (
@@ -119,8 +123,8 @@ export default function GameHistory({ onBack }) {
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-6 py-8">
         {/* History Table */}
-        <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-          <div className="grid grid-cols-[200px_1fr_120px_100px_120px] gap-0 bg-gray-700 px-6 py-4 text-sm font-medium text-gray-300">
+        <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-x-auto">
+          <div className="grid min-w-[660px] grid-cols-[200px_1fr_120px_100px_120px] gap-0 bg-gray-700 px-6 py-4 text-sm font-medium text-gray-300">
             <div>Date</div>
             <div>Opponent</div>
             <div className="text-center">Result</div>
@@ -129,20 +133,27 @@ export default function GameHistory({ onBack }) {
           </div>
 
           {loading ? (
-            <div className="p-12 text-center text-gray-400">
-              Loading game history...
-            </div>
+            <LoadingState label="Loading game history" className="m-6 min-w-[620px]" />
           ) : error ? (
-            <div className="p-12 text-center text-red-400">{error}</div>
+            <DesignEmptyState
+              title="Unable to load history"
+              message={error}
+              icon="!"
+              className="m-6 min-w-[620px]"
+              action={<Button type="button" variant="secondary" onClick={fetchHistory}>Retry</Button>}
+            />
           ) : games.length === 0 ? (
-            <div className="p-12 text-center text-gray-400">
-              No completed games yet.
-            </div>
+            <DesignEmptyState
+              title="No games yet"
+              message="Your completed games will appear here."
+              icon="◇"
+              className="m-6 min-w-[620px]"
+            />
           ) : (
-            games.map((game) => (
+            games.map((game, index) => (
               <div
-                key={game._id}
-                className="grid grid-cols-[200px_1fr_120px_100px_120px] gap-0 px-6 py-4 border-t border-gray-700 hover:bg-gray-700/50 transition-colors"
+                key={getGameKey(game, index)}
+                className="grid min-w-[660px] grid-cols-[200px_1fr_120px_100px_120px] gap-0 px-6 py-4 border-t border-gray-700 hover:bg-gray-700/50 transition-colors"
               >
                 <div className="text-sm text-gray-400">
                   {new Date(

@@ -54,6 +54,9 @@ import { trackEvent } from "../services/analytics";
 const REDUX_PAGES = new Set(["ai", "local", "settings"]);
 const AUTH_INTENT_STORAGE_KEY = "chessplay_auth_redirect";
 const LOGOUT_NAVIGATION_GUARD_KEY = "chessplay_logout_guard_active";
+
+// Auth pages render only when signed out. Guest pages are safe without a user.
+// Every route outside these sets is treated as protected by default.
 const AUTH_PAGES = new Set(["login", "register"]);
 const POST_LOGOUT_BLOCKED_PAGES = new Set([
   "admin",
@@ -245,6 +248,7 @@ function clearClientAuthSession() {
   localStorage.removeItem("token");
   localStorage.removeItem("user");
   localStorage.removeItem("guestMode");
+  sessionStorage.removeItem(AUTH_INTENT_STORAGE_KEY);
   sessionStorage.removeItem("chessplay_access_token");
   sessionStorage.removeItem("chessplay_socket_token");
 }
