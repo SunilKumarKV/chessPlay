@@ -749,7 +749,7 @@ export default function App() {
           />
         );
       case "history":
-        return <GameHistory onBack={goDashboard} />;
+        return <GameHistory onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "leaderboard":
         return <Leaderboard user={user} onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "profile":
