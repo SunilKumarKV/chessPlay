@@ -13,6 +13,8 @@ import { apiClient } from "../services/apiClient";
 import { validateProductionEmail } from "../utils/emailValidation";
 
 const RESEND_COOLDOWN_SECONDS = 60;
+const EMAIL_OTP_ENABLED = import.meta.env.VITE_EMAIL_OTP_ENABLED === "true";
+const CONTACT_EMAIL = import.meta.env.VITE_CONTACT_EMAIL || "support@getchessplay.com";
 
 function validatePassword(password) {
   if (password.length < 8) return "Password must be at least 8 characters.";
@@ -42,6 +44,47 @@ export default function ForgotPasswordPage({ onBack }) {
     const timer = window.setTimeout(() => setResendIn((value) => Math.max(value - 1, 0)), 1000);
     return () => window.clearTimeout(timer);
   }, [resendIn]);
+
+  if (!EMAIL_OTP_ENABLED) {
+    return (
+      <PremiumAuthPage>
+        <PremiumAuthShell>
+          <AuthBrandHeader
+            eyebrow="Account recovery"
+            title="Temporarily unavailable"
+            subtitle="Password reset is temporarily unavailable."
+          />
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              className="mb-5 rounded-xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-4 py-2 text-sm font-black text-[var(--auth-text)] transition hover:-translate-y-0.5 hover:border-[#F4B400] hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400]"
+            >
+              Back
+            </button>
+          ) : null}
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] p-4 text-center text-sm text-[var(--auth-text)]">
+              Password reset features are temporarily unavailable. Please contact{" "}
+              <a
+                href={`mailto:${CONTACT_EMAIL}`}
+                className="font-semibold text-[#F4B400] hover:underline"
+              >
+                support
+              </a>
+              {" "}for assistance.
+            </div>
+            <a
+              href="/login"
+              className="block rounded-2xl border border-[var(--auth-border)] bg-[var(--auth-card-strong)] px-4 py-3 text-center text-sm font-black text-[var(--auth-text)] transition hover:-translate-y-0.5 hover:border-[#F4B400] hover:text-[#F4B400] focus:outline-none focus:ring-2 focus:ring-[#F4B400]"
+            >
+              Sign in
+            </a>
+          </div>
+        </PremiumAuthShell>
+      </PremiumAuthPage>
+    );
+  }
 
   const requestReset = async (event) => {
     event.preventDefault();
