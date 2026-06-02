@@ -53,7 +53,27 @@ import { trackEvent } from "../services/analytics";
 
 const REDUX_PAGES = new Set(["ai", "local", "settings"]);
 const AUTH_INTENT_STORAGE_KEY = "chessplay_auth_redirect";
+const LOGOUT_NAVIGATION_GUARD_KEY = "chessplay_logout_guard_active";
 const AUTH_PAGES = new Set(["login", "register"]);
+const POST_LOGOUT_BLOCKED_PAGES = new Set([
+  "admin",
+  "admin-supporters",
+  "automation",
+  "billing",
+  "community",
+  "dashboard",
+  "history",
+  "leaderboard",
+  "messages",
+  "multi",
+  "multiplayer",
+  "profile",
+  "puzzles",
+  "referral",
+  "referrals",
+  "settings",
+  "tournaments",
+]);
 const PUBLIC_GUEST_PAGES = new Set([
   "ai",
   "analysis",
@@ -229,6 +249,38 @@ function clearClientAuthSession() {
   sessionStorage.removeItem("chessplay_socket_token");
 }
 
+function activateLogoutNavigationGuard() {
+  try {
+    sessionStorage.setItem(LOGOUT_NAVIGATION_GUARD_KEY, "true");
+  } catch {
+    // Back-navigation protection is best effort when sessionStorage is unavailable.
+  }
+}
+
+function clearLogoutNavigationGuard() {
+  try {
+    sessionStorage.removeItem(LOGOUT_NAVIGATION_GUARD_KEY);
+  } catch {
+    // Auth should still proceed if sessionStorage is unavailable.
+  }
+}
+
+function isLogoutNavigationGuardActive() {
+  try {
+    return sessionStorage.getItem(LOGOUT_NAVIGATION_GUARD_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function navigateToPublicHome(setCurrentPage, replace = true) {
+  if (window.location.pathname !== "/") {
+    const method = replace ? "replaceState" : "pushState";
+    window.history[method]({}, "", "/");
+  }
+  setCurrentPage("home");
+}
+
 function isAuthRequiredPage(page) {
   return !PUBLIC_GUEST_PAGES.has(page) && !AUTH_PAGES.has(page) && page !== "verify-email";
 }
@@ -343,6 +395,10 @@ export default function App() {
     if (authChecked && user && currentPage === "home") {
       navigateToAppPage("dashboard", setCurrentPage, true);
     }
+    if (authChecked && !user && isLogoutNavigationGuardActive() && POST_LOGOUT_BLOCKED_PAGES.has(currentPage)) {
+      navigateToPublicHome(setCurrentPage, true);
+      return;
+    }
     if (authChecked && !user && isAuthRequiredPage(currentPage)) {
       storeAuthRedirect(currentPage);
       navigateToAppPage("login", setCurrentPage, true);
@@ -350,6 +406,7 @@ export default function App() {
   }, [authChecked, currentPage, user]);
 
   const handleLogin = (userData) => {
+    clearLogoutNavigationGuard();
     localStorage.removeItem("guestMode");
     setUser(userData);
     navigateToAppPage(userData?.emailVerified === false ? "verify-email" : consumeAuthRedirect(), setCurrentPage, true);
@@ -357,6 +414,7 @@ export default function App() {
   };
 
   const handleGuestPlay = () => {
+    clearLogoutNavigationGuard();
     const guestUser = {
       id: "guest",
       username: "Guest Player",
@@ -387,8 +445,9 @@ export default function App() {
       // Local logout should still complete if the session is already gone.
     }
     clearClientAuthSession();
+    activateLogoutNavigationGuard();
     setUser(null);
-    navigateToAppPage("dashboard", setCurrentPage, true);
+    navigateToPublicHome(setCurrentPage, true);
     notifyUserChanged();
   };
 
