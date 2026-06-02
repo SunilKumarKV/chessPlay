@@ -61,3 +61,5 @@ backend/data/lichess_db_puzzle.csv
 backend/data/lichess_db_puzzle.csv.zst
 
 .pnpm-store/artifacts
+# Local QA screenshots
+artifacts/
