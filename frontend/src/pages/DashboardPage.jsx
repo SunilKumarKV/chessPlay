@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { BACKEND_URL } from "../config/runtime";
 import { apiClient } from "../services/apiClient";
 import { useTheme } from "../hooks/useTheme";
 import PlanBadge from "../components/billing/PlanBadge";
 import UpgradeModal from "../components/billing/UpgradeModal";
+import { Badge, Button, Card, EmptyState as DesignEmptyState } from "../components/ui";
+import { trackEvent } from "../services/analytics";
 
 const timeControls = [
   { id: "1+0", label: "1+0 Bullet" },
@@ -12,6 +14,33 @@ const timeControls = [
   { id: "10+0", label: "10+0 Rapid" },
   { id: "30+0", label: "30+0 Classical" },
 ];
+
+const ONBOARDING_STORAGE_KEYS = {
+  completed: "chessplay_onboarding_completed",
+  dismissed: "chessplay_onboarding_dismissed",
+  started: "chessplay_onboarding_started",
+  goal: "chessplay_goal",
+  level: "chessplay_level",
+};
+
+const GOAL_OPTIONS = ["Learn chess", "Improve rating", "Win more games", "Prepare for tournaments"];
+const LEVEL_OPTIONS = ["Beginner", "Intermediate", "Advanced"];
+
+function safeGetLocalStorage(key) {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeSetLocalStorage(key, value) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Onboarding must never block the dashboard.
+  }
+}
 
 function normalizeList(payload, key) {
   if (Array.isArray(payload)) return payload;
@@ -75,16 +104,82 @@ function DashboardSkeleton({ theme }) {
 
 function EmptyState({ title, message, actionLabel, onAction }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-black/20 p-5 text-center">
-      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-white/10 text-xl" aria-hidden="true">♙</div>
-      <h3 className="font-['Montserrat'] text-base font-black text-white">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-400">{message}</p>
-      {actionLabel && onAction && (
-        <button type="button" onClick={onAction} className="mt-4 rounded-lg bg-[#81b64c] px-4 py-2 text-sm font-black text-[#07100a] transition hover:bg-[#93c85f]">
-          {actionLabel}
-        </button>
-      )}
-    </div>
+    <DesignEmptyState
+      title={title}
+      message={message}
+      action={actionLabel && onAction ? <Button type="button" onClick={onAction}>{actionLabel}</Button> : null}
+    />
+  );
+}
+
+function OnboardingOptionGroup({ label, options, value, onChange }) {
+  return (
+    <fieldset className="space-y-3">
+      <legend className="text-sm font-black text-[var(--color-text-primary)]">{label}</legend>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map((option) => {
+          const selected = value === option;
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onChange(option)}
+              aria-pressed={selected}
+              className={`ds-focus min-h-11 rounded-[var(--radius-xl)] border px-4 py-3 text-left text-sm font-black transition hover:-translate-y-0.5 ${
+                selected
+                  ? "border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_16%,transparent)] text-[var(--color-primary)]"
+                  : "border-[var(--color-border-primary)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-strong)] hover:text-[var(--color-text-primary)]"
+              }`}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+function OnboardingActivationCard({
+  goal,
+  level,
+  onGoalChange,
+  onLevelChange,
+  onStartAi,
+  onStartPuzzle,
+  onDismiss,
+}) {
+  return (
+    <Card variant="glass" className="overflow-hidden p-5 sm:p-6" aria-labelledby="chessplay-onboarding-title">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-2xl">
+          <Badge tone="primary">First improvement step</Badge>
+          <h2 id="chessplay-onboarding-title" className="mt-3 font-[var(--font-display)] text-2xl font-black tracking-tight text-[var(--color-text-primary)]">
+            Welcome to ChessPlay
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)] sm:text-base">
+            Let’s personalize your first improvement step.
+          </p>
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={onDismiss}>
+          Skip for now
+        </Button>
+      </div>
+
+      <div className="mt-6 grid gap-5 lg:grid-cols-2">
+        <OnboardingOptionGroup label="What is your goal?" options={GOAL_OPTIONS} value={goal} onChange={onGoalChange} />
+        <OnboardingOptionGroup label="What is your current level?" options={LEVEL_OPTIONS} value={level} onChange={onLevelChange} />
+      </div>
+
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        <Button type="button" onClick={onStartAi}>
+          Start first AI game
+        </Button>
+        <Button type="button" variant="secondary" onClick={onStartPuzzle}>
+          Solve first puzzle
+        </Button>
+      </div>
+    </Card>
   );
 }
 
@@ -116,7 +211,14 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [entitlements, setEntitlements] = useState(null);
   const [puzzleLimits, setPuzzleLimits] = useState(null);
-  const [onboardingDismissed, setOnboardingDismissed] = useState(() => localStorage.getItem("chessplay_onboarding_dismissed") === "1");
+  const [onboardingGoal, setOnboardingGoal] = useState(() => safeGetLocalStorage(ONBOARDING_STORAGE_KEYS.goal) || "");
+  const [onboardingLevel, setOnboardingLevel] = useState(() => safeGetLocalStorage(ONBOARDING_STORAGE_KEYS.level) || "");
+  const [onboardingCompleted, setOnboardingCompleted] = useState(() => safeGetLocalStorage(ONBOARDING_STORAGE_KEYS.completed) === "true");
+  const [onboardingDismissed, setOnboardingDismissed] = useState(() => {
+    const dismissed = safeGetLocalStorage(ONBOARDING_STORAGE_KEYS.dismissed);
+    return dismissed === "true" || dismissed === "1";
+  });
+  const onboardingStartedTrackedRef = useRef(false);
 
   const showDebugStatus = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -291,6 +393,82 @@ const trialDaysLeft = trialEndsAt
     onStartGame?.(type, selectedTimeControl);
   };
 
+  const shouldShowOnboarding = !isGuest && gamesPlayed === 0 && !onboardingCompleted && !onboardingDismissed;
+
+  useEffect(() => {
+    if (!shouldShowOnboarding) return;
+    if (onboardingStartedTrackedRef.current) return;
+    if (safeGetLocalStorage(ONBOARDING_STORAGE_KEYS.started) === "true") return;
+    onboardingStartedTrackedRef.current = true;
+    safeSetLocalStorage(ONBOARDING_STORAGE_KEYS.started, "true");
+    trackEvent("onboarding_started", { gamesPlayed });
+  }, [gamesPlayed, shouldShowOnboarding]);
+
+  const updateOnboardingGoal = (goal) => {
+    setOnboardingGoal(goal);
+    safeSetLocalStorage(ONBOARDING_STORAGE_KEYS.goal, goal);
+    trackEvent("goal_selected", { goal });
+  };
+
+  const updateOnboardingLevel = (level) => {
+    setOnboardingLevel(level);
+    safeSetLocalStorage(ONBOARDING_STORAGE_KEYS.level, level);
+    trackEvent("level_selected", { level });
+  };
+
+  const completeOnboarding = (source) => {
+    safeSetLocalStorage(ONBOARDING_STORAGE_KEYS.completed, "true");
+    setOnboardingCompleted(true);
+    trackEvent("onboarding_completed", {
+      source,
+      goal: onboardingGoal || undefined,
+      level: onboardingLevel || undefined,
+    });
+  };
+
+  const startFirstAiGame = () => {
+    trackEvent("first_ai_game_started", {
+      goal: onboardingGoal || undefined,
+      level: onboardingLevel || undefined,
+    });
+    completeOnboarding("ai_game");
+    startGame("ai");
+  };
+
+  const startFirstPuzzle = () => {
+    trackEvent("first_puzzle_started", {
+      goal: onboardingGoal || undefined,
+      level: onboardingLevel || undefined,
+    });
+    completeOnboarding("puzzle");
+    onNavigate?.("puzzles");
+  };
+
+  const dismissOnboarding = () => {
+    safeSetLocalStorage(ONBOARDING_STORAGE_KEYS.dismissed, "true");
+    setOnboardingDismissed(true);
+    trackEvent("onboarding_dismissed", {
+      goal: onboardingGoal || undefined,
+      level: onboardingLevel || undefined,
+    });
+  };
+
+  const startAiFromDashboard = () => {
+    if (shouldShowOnboarding) {
+      startFirstAiGame();
+      return;
+    }
+    startGame("ai");
+  };
+
+  const startPuzzleFromDashboard = () => {
+    if (shouldShowOnboarding) {
+      startFirstPuzzle();
+      return;
+    }
+    onNavigate?.("puzzles");
+  };
+
   const copyInvite = async () => {
     try {
       await navigator.clipboard.writeText(`${window.location.origin} — join me on ChessPlay`);
@@ -341,31 +519,16 @@ const trialDaysLeft = trialEndsAt
         </div>
       ) : null}
 
-      {!onboardingDismissed && !isGuest && gamesPlayed < 2 ? (
-        <section className="rounded-2xl border border-[#81b64c]/25 bg-[#81b64c]/10 p-5 text-white">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#b8f28f]">Welcome checklist</p>
-              <h2 className="mt-2 font-['Montserrat'] text-2xl font-black">Set up your ChessPlay rhythm</h2>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                {[
-                  ["Play vs AI", () => startGame("ai")],
-                  ["Try puzzles", () => onNavigate?.("puzzles")],
-                  ["Complete profile", () => onNavigate?.("profile")],
-                  ["Invite friend", () => onNavigate?.("referrals")],
-                  ["View pricing", () => onNavigate?.("pricing")],
-                ].map(([label, action]) => (
-                  <button key={label} type="button" onClick={action} className="rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-black text-white transition hover:bg-white/10">
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button type="button" onClick={() => { localStorage.setItem("chessplay_onboarding_dismissed", "1"); setOnboardingDismissed(true); }} className="rounded-xl border border-white/10 px-3 py-2 text-sm font-bold text-slate-200">
-              Dismiss
-            </button>
-          </div>
-        </section>
+      {shouldShowOnboarding ? (
+        <OnboardingActivationCard
+          goal={onboardingGoal}
+          level={onboardingLevel}
+          onGoalChange={updateOnboardingGoal}
+          onLevelChange={updateOnboardingLevel}
+          onStartAi={startFirstAiGame}
+          onStartPuzzle={startFirstPuzzle}
+          onDismiss={dismissOnboarding}
+        />
       ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -405,7 +568,7 @@ const trialDaysLeft = trialEndsAt
               ) : null}
             </div>
             <div className="grid gap-3">
-              <button type="button" onClick={() => startGame("ai")} className="rounded-xl bg-[#81b64c] px-5 py-4 text-left font-['Montserrat'] text-lg font-black text-[#07100a] shadow-lg shadow-[#81b64c]/20 transition-all hover:-translate-y-1 hover:bg-[#93c85f]" aria-label="Play against AI">
+              <button type="button" onClick={startAiFromDashboard} className="rounded-xl bg-[#81b64c] px-5 py-4 text-left font-['Montserrat'] text-lg font-black text-[#07100a] shadow-lg shadow-[#81b64c]/20 transition-all hover:-translate-y-1 hover:bg-[#93c85f]" aria-label="Play against AI">
                 Play vs AI
                 <span className="block text-xs font-semibold opacity-80">Stockfish · {selectedTimeControl}</span>
               </button>
@@ -432,7 +595,7 @@ const trialDaysLeft = trialEndsAt
             <button type="button" onClick={() => requireLoginForGuest("game history") || onNavigate?.("history")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Game History</button>
             <button type="button" onClick={() => requireLoginForGuest("invites") || copyInvite()} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">{inviteCopied ? "Copied" : "Invite"}</button>
             <button type="button" onClick={() => requireLoginForGuest("leaderboard") || onNavigate?.("leaderboard")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Leaderboard</button>
-            <button type="button" onClick={() => requireLoginForGuest("saved puzzle progress") || onNavigate?.("puzzles")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Puzzles</button>
+            <button type="button" onClick={() => requireLoginForGuest("saved puzzle progress") || startPuzzleFromDashboard()} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Puzzles</button>
             {isAdmin && (
               <button type="button" onClick={() => onNavigate?.("admin")} className="col-span-2 rounded-lg border border-[#81b64c]/40 bg-[#81b64c]/15 px-3 py-3 text-left text-sm font-black text-[#dcf8c6] transition hover:bg-[#81b64c]/20">Open Admin Panel</button>
             )}
@@ -462,9 +625,9 @@ const trialDaysLeft = trialEndsAt
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {[
-                { title: "Play vs AI", meta: "Practice instantly", action: () => startGame("ai"), accent: "#81b64c" },
+                { title: "Play vs AI", meta: "Practice instantly", action: startAiFromDashboard, accent: "#81b64c" },
                 { title: "Play Online", meta: isGuest ? "Login required" : "Live rooms", action: () => startGame("multi"), accent: "#38bdf8" },
-                { title: "Puzzles", meta: "Train tactics", action: () => onNavigate?.("puzzles"), accent: "#a78bfa" },
+                { title: "Puzzles", meta: "Train tactics", action: startPuzzleFromDashboard, accent: "#a78bfa" },
                 { title: "Game History", meta: "Recent results", action: () => requireLoginForGuest("game history") || onNavigate?.("history"), accent: "#f59e0b" },
               ].map((item) => (
                 <button key={item.title} type="button" onClick={item.action} className="group rounded-xl border border-white/10 bg-black/20 p-4 text-left transition-all hover:-translate-y-1 hover:bg-white/10">
@@ -485,7 +648,7 @@ const trialDaysLeft = trialEndsAt
               <button type="button" onClick={() => requireLoginForGuest("game history") || onNavigate?.("history")} className="rounded-lg border border-white/10 px-4 py-2 text-sm font-bold text-slate-200 transition hover:bg-white/10">View all</button>
             </div>
             {recentGames.length === 0 ? (
-              <EmptyState title="No games yet" message="Start your first match to build your game history and rating profile." actionLabel="Play vs AI" onAction={() => startGame("ai")} />
+              <EmptyState title="No games yet" message="Play your first AI game to start detecting strengths, weaknesses, and improvement patterns." actionLabel="Play your first AI game" onAction={startAiFromDashboard} />
             ) : (
               <div className="overflow-hidden rounded-xl border border-white/10">
                 <div className="hidden grid-cols-[1fr_120px_120px_100px] gap-3 bg-black/30 px-4 py-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-500 md:grid">
@@ -545,8 +708,15 @@ const trialDaysLeft = trialEndsAt
                 </div>
               ))}
               {recentGames.length === 0 && (
-                <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-slate-400">No recent activity yet. Play a game to see updates here.</div>
+                <EmptyState title="No history" message="Your completed games will appear here." actionLabel="Play your first AI game" onAction={startAiFromDashboard} />
               )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/10 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+            <h2 className="font-['Montserrat'] text-xl font-black text-white">Puzzle Training</h2>
+            <div className="mt-4">
+              <EmptyState title="No puzzles yet" message="Solve your first puzzle to start building tactical pattern recognition." actionLabel="Solve your first puzzle" onAction={startPuzzleFromDashboard} />
             </div>
           </div>
         </aside>

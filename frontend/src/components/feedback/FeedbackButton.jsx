@@ -37,7 +37,7 @@ export default function FeedbackButton({ user }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="ds-focus fixed bottom-4 right-4 z-[var(--z-content)] rounded-full border border-[var(--color-border-primary)] bg-[var(--color-bg-glass)] px-4 py-3 text-sm font-black text-[var(--color-text-primary)] shadow-[var(--shadow-md)] backdrop-blur transition hover:bg-[var(--color-surface-strong)]"
+        className="ds-focus fixed bottom-4 right-4 z-[var(--z-content)] hidden rounded-full border border-[var(--color-border-primary)] bg-[var(--color-bg-glass)] px-4 py-3 text-sm font-black text-[var(--color-text-primary)] shadow-[var(--shadow-md)] backdrop-blur transition hover:bg-[var(--color-surface-strong)] sm:inline-flex"
       >
         Feedback
       </button>
