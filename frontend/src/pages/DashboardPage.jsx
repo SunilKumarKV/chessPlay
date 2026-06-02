@@ -5,6 +5,17 @@ import { useTheme } from "../hooks/useTheme";
 import PlanBadge from "../components/billing/PlanBadge";
 import UpgradeModal from "../components/billing/UpgradeModal";
 import { Badge, Button, Card, EmptyState as DesignEmptyState } from "../components/ui";
+import { buildTrainingRecommendation } from "../features/dashboard/rules/trainingRules";
+import { buildWeakness, getPuzzleActivity } from "../features/dashboard/rules/weaknessRules";
+import {
+  ONBOARDING_STORAGE_KEYS,
+  TRAINING_STORAGE_KEYS,
+  WEAKNESS_STORAGE_KEYS,
+  safeGetLocalStorage,
+  safeGetSessionStorage,
+  safeSetLocalStorage,
+  safeSetSessionStorage,
+} from "../features/dashboard/storage/dashboardStorage";
 import { trackEvent } from "../services/analytics";
 
 const timeControls = [
@@ -15,58 +26,8 @@ const timeControls = [
   { id: "30+0", label: "30+0 Classical" },
 ];
 
-const ONBOARDING_STORAGE_KEYS = {
-  completed: "chessplay_onboarding_completed",
-  dismissed: "chessplay_onboarding_dismissed",
-  started: "chessplay_onboarding_started",
-  goal: "chessplay_goal",
-  level: "chessplay_level",
-};
-
-const WEAKNESS_STORAGE_KEYS = {
-  dismissedId: "chessplay_weakness_dismissed_id",
-  viewedId: "chessplay_weakness_viewed_id",
-};
-
-const TRAINING_STORAGE_KEYS = {
-  dismissedId: "chessplay_training_recommendation_dismissed_id",
-  viewedId: "chessplay_training_recommendation_viewed_id",
-};
-
 const GOAL_OPTIONS = ["Learn chess", "Improve rating", "Win more games", "Prepare for tournaments"];
 const LEVEL_OPTIONS = ["Beginner", "Intermediate", "Advanced"];
-
-function safeGetLocalStorage(key) {
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function safeSetLocalStorage(key, value) {
-  try {
-    window.localStorage.setItem(key, value);
-  } catch {
-    // Onboarding must never block the dashboard.
-  }
-}
-
-function safeGetSessionStorage(key) {
-  try {
-    return window.sessionStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function safeSetSessionStorage(key, value) {
-  try {
-    window.sessionStorage.setItem(key, value);
-  } catch {
-    // Session-only UI state must never block the dashboard.
-  }
-}
 
 function normalizeList(payload, key) {
   if (Array.isArray(payload)) return payload;
@@ -107,244 +68,6 @@ function getOpponent(game, userId) {
   const whiteName = white?.username || "White";
   if (whiteId && whiteId === userId) return blackName;
   return whiteName;
-}
-
-function getGameDateValue(game) {
-  const value = game?.completedAt || game?.finishedAt || game?.endedAt || game?.createdAt || game?.updatedAt;
-  const time = value ? new Date(value).getTime() : 0;
-  return Number.isFinite(time) ? time : 0;
-}
-
-function daysSince(value) {
-  const time = Number(value || 0);
-  if (!time) return null;
-  return Math.max(0, Math.floor((Date.now() - time) / 86400000));
-}
-
-function getPuzzleActivity(puzzleStats, puzzleLimits, safeStats) {
-  const stats = puzzleStats?.stats || puzzleStats || {};
-  const limits = puzzleStats?.limits || puzzleLimits || {};
-  const limit = Number(limits.limit || 0);
-  const remaining = Number(limits.remaining || 0);
-  const usedToday = Number.isFinite(Number(limits.used))
-    ? Number(limits.used)
-    : Math.max(limit - remaining, 0);
-  const started = Number(stats.started ?? stats.attempts ?? safeStats?.puzzlesAttempted ?? 0);
-  const solved = Number(stats.solved ?? safeStats?.puzzlesSolved ?? 0);
-  const failed = Number(stats.failed ?? 0);
-  const accuracy = Number(stats.accuracy ?? (started ? Math.round((solved / started) * 100) : 0));
-
-  return {
-    started: Number.isFinite(started) ? started : 0,
-    solved: Number.isFinite(solved) ? solved : 0,
-    failed: Number.isFinite(failed) ? failed : 0,
-    accuracy: Number.isFinite(accuracy) ? accuracy : 0,
-    usedToday: Number.isFinite(usedToday) ? usedToday : 0,
-  };
-}
-
-function buildWeakness({ gamesPlayed, wins, losses, draws, recentGames, userId, puzzleActivity }) {
-  const sortedGames = [...recentGames].sort((a, b) => getGameDateValue(b) - getGameDateValue(a));
-  const latestGameAge = daysSince(getGameDateValue(sortedGames[0]));
-  const recentResults = sortedGames.slice(0, 5).map((game) => getGameResult(game, userId));
-  const recentLosses = recentResults.filter((result) => result === "Loss").length;
-  const recentLossStreak = recentResults[0] === "Loss" && recentResults[1] === "Loss";
-  const winRate = Math.round((wins / Math.max(gamesPlayed, 1)) * 100);
-
-  if (gamesPlayed <= 0) {
-    return {
-      id: "puzzle-consistency-new-user",
-      weakness: "Puzzle Consistency",
-      tone: "info",
-      explanation: "There is not enough game history yet, so your first signal is training consistency.",
-      suggestion: "Solve 5 tactical puzzles today, then play one AI game so ChessPlay can compare practice with real positions.",
-      ctaLabel: "Start Training",
-      ctaRoute: "puzzles",
-      reason: "no_games",
-    };
-  }
-
-  if (puzzleActivity.started === 0 && puzzleActivity.usedToday === 0) {
-    return {
-      id: "missed-tactics-no-puzzles",
-      weakness: "Missed Tactics",
-      tone: "warning",
-      explanation: "You have game activity, but no puzzle practice yet. Tactical misses are the safest first weakness to train.",
-      suggestion: "Solve 5 tactical puzzles today before your next game.",
-      ctaLabel: "Start Training",
-      ctaRoute: "puzzles",
-      reason: "no_puzzle_activity",
-    };
-  }
-
-  if (puzzleActivity.started >= 5 && puzzleActivity.accuracy > 0 && puzzleActivity.accuracy < 55) {
-    return {
-      id: "missed-tactics-low-accuracy",
-      weakness: "Missed Tactics",
-      tone: "warning",
-      explanation: `Your puzzle accuracy is ${puzzleActivity.accuracy}%, which points to missed forcing moves and tactical patterns.`,
-      suggestion: "Slow down on puzzles: identify checks, captures, and threats before moving.",
-      ctaLabel: "Start Training",
-      ctaRoute: "puzzles",
-      reason: "low_puzzle_accuracy",
-    };
-  }
-
-  if (gamesPlayed >= 3 && (losses >= wins + 1 || winRate < 40 || recentLossStreak)) {
-    return {
-      id: "hanging-pieces-loss-trend",
-      weakness: "Hanging Pieces",
-      tone: "danger",
-      explanation: recentLosses >= 2
-        ? `You lost ${recentLosses} of your recent games. The most common beginner-to-intermediate cause is leaving pieces undefended.`
-        : "Your win/loss trend suggests material safety is costing points.",
-      suggestion: "Before every move, ask: what piece is attacked, and what changed after my opponent moved?",
-      ctaLabel: "Play Safer AI Game",
-      ctaRoute: "ai",
-      reason: "loss_trend",
-    };
-  }
-
-  if (latestGameAge !== null && latestGameAge >= 3) {
-    return {
-      id: "puzzle-consistency-inactive",
-      weakness: "Puzzle Consistency",
-      tone: "info",
-      explanation: `You have not played in ${latestGameAge} days, so consistency is currently the clearest improvement lever.`,
-      suggestion: "Restart with a short puzzle set, then play one AI game to rebuild rhythm.",
-      ctaLabel: "Start Training",
-      ctaRoute: "puzzles",
-      reason: "inactive",
-    };
-  }
-
-  if (gamesPlayed >= 5 && draws + losses >= Math.ceil(gamesPlayed * 0.45)) {
-    return {
-      id: "endgame-struggles-conversion",
-      weakness: "Endgame Struggles",
-      tone: "primary",
-      explanation: "Your record shows several non-winning results, which often means advantages are not being converted cleanly.",
-      suggestion: "Practice king activity, pawn promotion races, and trading down only when the ending is favorable.",
-      ctaLabel: "Review Games",
-      ctaRoute: "history",
-      reason: "conversion",
-    };
-  }
-
-  if (gamesPlayed >= 3 && puzzleActivity.usedToday === 0) {
-    return {
-      id: "opening-inaccuracy-no-warmup",
-      weakness: "Opening Inaccuracy",
-      tone: "primary",
-      explanation: "You are playing games without a tactical warmup. Early inaccuracies often come from rushed development and missed threats.",
-      suggestion: "Warm up with a small puzzle set, then play one focused AI game from the opening.",
-      ctaLabel: "Start Training",
-      ctaRoute: "puzzles",
-      reason: "no_warmup",
-    };
-  }
-
-  return {
-    id: "missed-tactics-default",
-    weakness: "Missed Tactics",
-    tone: "success",
-    explanation: "Your current profile is balanced, so tactics remain the highest-impact daily practice target.",
-    suggestion: "Solve 5 tactical puzzles today and review any failed attempts.",
-    ctaLabel: "Start Training",
-    ctaRoute: "puzzles",
-    reason: "default",
-  };
-}
-
-function buildTrainingRecommendation({ weakness, gamesPlayed, puzzleActivity }) {
-  if (!weakness) return null;
-
-  const base = {
-    id: `training-${weakness.id}`,
-    weakness: weakness.weakness,
-    weaknessRule: weakness.reason,
-  };
-
-  if (weakness.weakness === "Missed Tactics") {
-    return {
-      ...base,
-      title: "Tactical Practice",
-      reason: puzzleActivity.started >= 5 && puzzleActivity.accuracy > 0
-        ? `Your tactical accuracy is ${puzzleActivity.accuracy}%, so the fastest gain is cleaner calculation.`
-        : "Your activity points to tactics as the next highest-impact training area.",
-      action: "Solve 5 tactics today.",
-      ctaLabel: "Start Training",
-      ctaRoute: "puzzles",
-      trainingType: "tactics",
-      tone: "warning",
-    };
-  }
-
-  if (weakness.weakness === "Puzzle Consistency") {
-    return {
-      ...base,
-      title: "Practice Consistency",
-      reason: gamesPlayed <= 0
-        ? "ChessPlay needs one real game signal, and a steady first session is better than a long plan."
-        : "Your recent activity rhythm is the limiting factor right now.",
-      action: "Play one 10-minute AI game.",
-      ctaLabel: "Play 10-Min AI Game",
-      ctaRoute: "ai",
-      timeControl: "10+0",
-      trainingType: "ai_game",
-      tone: "info",
-    };
-  }
-
-  if (weakness.weakness === "Opening Inaccuracy") {
-    return {
-      ...base,
-      title: "Opening Practice",
-      reason: "Your current pattern suggests early move quality needs a quick review before more games.",
-      action: "Review your first 10 moves and look for undeveloped pieces, unsafe king moves, and missed threats.",
-      ctaLabel: "Review Openings",
-      ctaRoute: "analysis",
-      trainingType: "openings",
-      tone: "primary",
-    };
-  }
-
-  if (weakness.weakness === "Endgame Struggles") {
-    return {
-      ...base,
-      title: "Conversion Practice",
-      reason: "Non-winning results often come from not converting advantages into simple endgames.",
-      action: "Practice simple endgames and review one recent non-win.",
-      ctaLabel: "Review Games",
-      ctaRoute: "history",
-      trainingType: "endgames",
-      tone: "primary",
-    };
-  }
-
-  if (weakness.weakness === "Hanging Pieces") {
-    return {
-      ...base,
-      title: "Game Stability",
-      reason: "Your loss trend points to material safety and board checks before each move.",
-      action: "Review your last game, then play one safer AI game.",
-      ctaLabel: "Review Last Game",
-      ctaRoute: "history",
-      trainingType: "review_games",
-      tone: "danger",
-    };
-  }
-
-  return {
-    ...base,
-    title: "Tactical Practice",
-    reason: "Tactics are the clearest daily training path from the current signals.",
-    action: "Solve 5 tactics today.",
-    ctaLabel: "Start Training",
-    ctaRoute: "puzzles",
-    trainingType: "tactics",
-    tone: "success",
-  };
 }
 
 function DashboardSkeleton({ theme }) {
@@ -1175,12 +898,15 @@ const trialDaysLeft = trialEndsAt
           <div className="rounded-2xl border border-white/10 bg-white/10 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
             <h2 className="font-['Montserrat'] text-xl font-black text-white">Recent Activity</h2>
             <div className="mt-4 space-y-3">
-              {recentGames.slice(0, 3).map((game) => (
-                <div key={`activity-${game._id || game.id || game.createdAt}`} className="rounded-xl border border-white/10 bg-black/20 p-3">
+              {recentGames.slice(0, 3).map((game, index) => {
+                const activityKey = game._id || game.id || `${game.createdAt || game.startTime || game.endTime || "game"}-${index}`;
+                return (
+                <div key={`activity-${activityKey}`} className="rounded-xl border border-white/10 bg-black/20 p-3">
                   <div className="text-sm font-bold text-white">{getGameResult(game, userId)} against {getOpponent(game, userId)}</div>
-                  <div className="mt-1 text-xs text-slate-500">{formatDate(game.createdAt)}</div>
+                  <div className="mt-1 text-xs text-slate-500">{formatDate(game.createdAt || game.startTime || game.endTime)}</div>
                 </div>
-              ))}
+                );
+              })}
               {recentGames.length === 0 && (
                 <EmptyState title="No history" message="Your completed games will appear here." actionLabel="Play your first AI game" onAction={startAiFromDashboard} />
               )}

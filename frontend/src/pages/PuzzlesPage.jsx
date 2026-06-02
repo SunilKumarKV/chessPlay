@@ -126,6 +126,8 @@ export default function PuzzlesPage({ user, onBack, onNavigate }) {
       if (error.status === 402 || error.status === 429) {
         setLimitModal(error.data || { message: error.message });
         setLimits(error.data?.limits || null);
+      } else if (error.status === 404) {
+        setEmptyMessage(error.message || "No active puzzles are available yet.");
       } else {
         setEmptyMessage(error.message || "Puzzle service is unavailable.");
       }
