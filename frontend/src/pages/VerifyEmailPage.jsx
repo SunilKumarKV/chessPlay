@@ -21,6 +21,7 @@ export default function VerifyEmailPage({ user, onVerified, onLogout }) {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendIn, setResendIn] = useState(0);
+  const [backendRequiresOtp, setBackendRequiresOtp] = useState(false);
 
   useEffect(() => {
     if (!resendIn) return undefined;
@@ -30,10 +31,35 @@ export default function VerifyEmailPage({ user, onVerified, onLogout }) {
 
   useEffect(() => {
     if (EMAIL_OTP_ENABLED) return;
-    onVerified?.({ ...user, emailVerified: true });
+    let cancelled = false;
+
+    async function syncVerificationState() {
+      try {
+        const session = await apiClient("/api/auth/session", { skipAuthRefresh: true });
+        if (cancelled) return;
+        if (session.user?.emailVerified !== false) {
+          onVerified?.(session.user || { ...user, emailVerified: true });
+          return;
+        }
+        setBackendRequiresOtp(true);
+        setStatus("Email verification is required for this account. Request a fresh code to continue.");
+        setStatusTone("error");
+      } catch {
+        if (!cancelled) {
+          setBackendRequiresOtp(true);
+          setStatus("We could not confirm your verification state. Please try again or log out.");
+          setStatusTone("error");
+        }
+      }
+    }
+
+    syncVerificationState();
+    return () => {
+      cancelled = true;
+    };
   }, [onVerified, user]);
 
-  if (!EMAIL_OTP_ENABLED) {
+  if (!EMAIL_OTP_ENABLED && !backendRequiresOtp) {
     return null;
   }
 

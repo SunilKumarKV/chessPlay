@@ -52,6 +52,44 @@ import { getGuestFeatureMessage, isGuestRestrictedFeature, isGuestUser } from ".
 import { trackEvent } from "../services/analytics";
 
 const REDUX_PAGES = new Set(["ai", "local", "settings"]);
+const AUTH_INTENT_STORAGE_KEY = "chessplay_auth_redirect";
+const AUTH_PAGES = new Set(["login", "register"]);
+const PUBLIC_GUEST_PAGES = new Set([
+  "ai",
+  "analysis",
+  "chess-ai",
+  "chess-analysis",
+  "chess-puzzles",
+  "coaching",
+  "contact",
+  "cookie-policy",
+  "delete-account",
+  "forgot-password",
+  "hire-me",
+  "home",
+  "leaderboard",
+  "local",
+  "monetization",
+  "opening-explorer",
+  "openings",
+  "payment-failed",
+  "payment-success",
+  "play-chess-online",
+  "pricing",
+  "privacy",
+  "privacy-policy",
+  "profile-public",
+  "puzzles",
+  "referral",
+  "referrals",
+  "refund-policy",
+  "register",
+  "reset-password",
+  "services",
+  "store",
+  "support",
+  "terms",
+]);
 
 function getStoredUser() {
   const storedUser = localStorage.getItem("user");
@@ -159,7 +197,7 @@ const routeMap = {
 
 function pageFromPathname(pathname) {
   const normalized = pathname.replace(/\/$/, "") || "/";
-  if (normalized === "/") return "dashboard";
+  if (normalized === "/") return "home";
   if (normalized === "/privacy-policy") return "privacy-policy";
   if (normalized === "/payment/success") return "payment-success";
   if (normalized === "/payment/failed") return "payment-failed";
@@ -181,6 +219,38 @@ function profileUsernameFromPathname(pathname) {
   const parts = pathname.replace(/\/$/, "").split("/");
   if (parts[1] === "profile" && parts[2]) return decodeURIComponent(parts[2]);
   return null;
+}
+
+function clearClientAuthSession() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  localStorage.removeItem("guestMode");
+  sessionStorage.removeItem("chessplay_access_token");
+  sessionStorage.removeItem("chessplay_socket_token");
+}
+
+function isAuthRequiredPage(page) {
+  return !PUBLIC_GUEST_PAGES.has(page) && !AUTH_PAGES.has(page) && page !== "verify-email";
+}
+
+function storeAuthRedirect(page) {
+  if (!routeMap[page] || !isAuthRequiredPage(page)) return;
+  try {
+    sessionStorage.setItem(AUTH_INTENT_STORAGE_KEY, page);
+  } catch {
+    // Losing redirect intent should not block authentication.
+  }
+}
+
+function consumeAuthRedirect() {
+  try {
+    const page = sessionStorage.getItem(AUTH_INTENT_STORAGE_KEY);
+    sessionStorage.removeItem(AUTH_INTENT_STORAGE_KEY);
+    if (page && routeMap[page] && isAuthRequiredPage(page)) return page;
+  } catch {
+    // Fall back to dashboard if sessionStorage is unavailable.
+  }
+  return "dashboard";
 }
 
 function navigateToAppPage(page, setCurrentPage, replace = false) {
@@ -233,12 +303,13 @@ export default function App() {
         if (nextUser) {
           localStorage.setItem("user", JSON.stringify(nextUser));
         } else {
-          localStorage.removeItem("user");
+          clearClientAuthSession();
         }
         setUser(nextUser);
         notifyUserChanged();
       } catch {
-        if (!cancelled && !localStorage.getItem("user")) {
+        if (!cancelled) {
+          clearClientAuthSession();
           setUser(null);
           notifyUserChanged();
         }
@@ -264,14 +335,24 @@ export default function App() {
 
   useEffect(() => {
     if (authChecked && currentPage === "verify-email" && user?.emailVerified) {
+      navigateToAppPage(consumeAuthRedirect(), setCurrentPage, true);
+    }
+    if (authChecked && user && AUTH_PAGES.has(currentPage)) {
+      navigateToAppPage(user?.emailVerified === false ? "verify-email" : consumeAuthRedirect(), setCurrentPage, true);
+    }
+    if (authChecked && user && currentPage === "home") {
       navigateToAppPage("dashboard", setCurrentPage, true);
+    }
+    if (authChecked && !user && isAuthRequiredPage(currentPage)) {
+      storeAuthRedirect(currentPage);
+      navigateToAppPage("login", setCurrentPage, true);
     }
   }, [authChecked, currentPage, user]);
 
   const handleLogin = (userData) => {
     localStorage.removeItem("guestMode");
     setUser(userData);
-    navigateToAppPage(userData?.emailVerified === false ? "verify-email" : "dashboard", setCurrentPage, true);
+    navigateToAppPage(userData?.emailVerified === false ? "verify-email" : consumeAuthRedirect(), setCurrentPage, true);
     notifyUserChanged();
   };
 
@@ -305,17 +386,17 @@ export default function App() {
     } catch {
       // Local logout should still complete if the session is already gone.
     }
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("guestMode");
-    sessionStorage.removeItem("chessplay_access_token");
-    sessionStorage.removeItem("chessplay_socket_token");
+    clearClientAuthSession();
     setUser(null);
     navigateToAppPage("dashboard", setCurrentPage, true);
     notifyUserChanged();
   };
 
   if (!authChecked) {
+    return <AppSplash />;
+  }
+
+  if (user && (AUTH_PAGES.has(currentPage) || currentPage === "home")) {
     return <AppSplash />;
   }
 
