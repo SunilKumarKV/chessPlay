@@ -23,6 +23,11 @@ const ONBOARDING_STORAGE_KEYS = {
   level: "chessplay_level",
 };
 
+const WEAKNESS_STORAGE_KEYS = {
+  dismissedId: "chessplay_weakness_dismissed_id",
+  viewedId: "chessplay_weakness_viewed_id",
+};
+
 const GOAL_OPTIONS = ["Learn chess", "Improve rating", "Win more games", "Prepare for tournaments"];
 const LEVEL_OPTIONS = ["Beginner", "Intermediate", "Advanced"];
 
@@ -39,6 +44,22 @@ function safeSetLocalStorage(key, value) {
     window.localStorage.setItem(key, value);
   } catch {
     // Onboarding must never block the dashboard.
+  }
+}
+
+function safeGetSessionStorage(key) {
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeSetSessionStorage(key, value) {
+  try {
+    window.sessionStorage.setItem(key, value);
+  } catch {
+    // Session-only UI state must never block the dashboard.
   }
 }
 
@@ -81,6 +102,153 @@ function getOpponent(game, userId) {
   const whiteName = white?.username || "White";
   if (whiteId && whiteId === userId) return blackName;
   return whiteName;
+}
+
+function getGameDateValue(game) {
+  const value = game?.completedAt || game?.finishedAt || game?.endedAt || game?.createdAt || game?.updatedAt;
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function daysSince(value) {
+  const time = Number(value || 0);
+  if (!time) return null;
+  return Math.max(0, Math.floor((Date.now() - time) / 86400000));
+}
+
+function getPuzzleActivity(puzzleStats, puzzleLimits, safeStats) {
+  const stats = puzzleStats?.stats || puzzleStats || {};
+  const limits = puzzleStats?.limits || puzzleLimits || {};
+  const limit = Number(limits.limit || 0);
+  const remaining = Number(limits.remaining || 0);
+  const usedToday = Number.isFinite(Number(limits.used))
+    ? Number(limits.used)
+    : Math.max(limit - remaining, 0);
+  const started = Number(stats.started ?? stats.attempts ?? safeStats?.puzzlesAttempted ?? 0);
+  const solved = Number(stats.solved ?? safeStats?.puzzlesSolved ?? 0);
+  const failed = Number(stats.failed ?? 0);
+  const accuracy = Number(stats.accuracy ?? (started ? Math.round((solved / started) * 100) : 0));
+
+  return {
+    started: Number.isFinite(started) ? started : 0,
+    solved: Number.isFinite(solved) ? solved : 0,
+    failed: Number.isFinite(failed) ? failed : 0,
+    accuracy: Number.isFinite(accuracy) ? accuracy : 0,
+    usedToday: Number.isFinite(usedToday) ? usedToday : 0,
+  };
+}
+
+function buildWeakness({ gamesPlayed, wins, losses, draws, recentGames, userId, puzzleActivity }) {
+  const sortedGames = [...recentGames].sort((a, b) => getGameDateValue(b) - getGameDateValue(a));
+  const latestGameAge = daysSince(getGameDateValue(sortedGames[0]));
+  const recentResults = sortedGames.slice(0, 5).map((game) => getGameResult(game, userId));
+  const recentLosses = recentResults.filter((result) => result === "Loss").length;
+  const recentLossStreak = recentResults[0] === "Loss" && recentResults[1] === "Loss";
+  const winRate = Math.round((wins / Math.max(gamesPlayed, 1)) * 100);
+
+  if (gamesPlayed <= 0) {
+    return {
+      id: "puzzle-consistency-new-user",
+      weakness: "Puzzle Consistency",
+      tone: "info",
+      explanation: "There is not enough game history yet, so your first signal is training consistency.",
+      suggestion: "Solve 5 tactical puzzles today, then play one AI game so ChessPlay can compare practice with real positions.",
+      ctaLabel: "Start Training",
+      ctaRoute: "puzzles",
+      reason: "no_games",
+    };
+  }
+
+  if (puzzleActivity.started === 0 && puzzleActivity.usedToday === 0) {
+    return {
+      id: "missed-tactics-no-puzzles",
+      weakness: "Missed Tactics",
+      tone: "warning",
+      explanation: "You have game activity, but no puzzle practice yet. Tactical misses are the safest first weakness to train.",
+      suggestion: "Solve 5 tactical puzzles today before your next game.",
+      ctaLabel: "Start Training",
+      ctaRoute: "puzzles",
+      reason: "no_puzzle_activity",
+    };
+  }
+
+  if (puzzleActivity.started >= 5 && puzzleActivity.accuracy > 0 && puzzleActivity.accuracy < 55) {
+    return {
+      id: "missed-tactics-low-accuracy",
+      weakness: "Missed Tactics",
+      tone: "warning",
+      explanation: `Your puzzle accuracy is ${puzzleActivity.accuracy}%, which points to missed forcing moves and tactical patterns.`,
+      suggestion: "Slow down on puzzles: identify checks, captures, and threats before moving.",
+      ctaLabel: "Start Training",
+      ctaRoute: "puzzles",
+      reason: "low_puzzle_accuracy",
+    };
+  }
+
+  if (gamesPlayed >= 3 && (losses >= wins + 1 || winRate < 40 || recentLossStreak)) {
+    return {
+      id: "hanging-pieces-loss-trend",
+      weakness: "Hanging Pieces",
+      tone: "danger",
+      explanation: recentLosses >= 2
+        ? `You lost ${recentLosses} of your recent games. The most common beginner-to-intermediate cause is leaving pieces undefended.`
+        : "Your win/loss trend suggests material safety is costing points.",
+      suggestion: "Before every move, ask: what piece is attacked, and what changed after my opponent moved?",
+      ctaLabel: "Play Safer AI Game",
+      ctaRoute: "ai",
+      reason: "loss_trend",
+    };
+  }
+
+  if (latestGameAge !== null && latestGameAge >= 3) {
+    return {
+      id: "puzzle-consistency-inactive",
+      weakness: "Puzzle Consistency",
+      tone: "info",
+      explanation: `You have not played in ${latestGameAge} days, so consistency is currently the clearest improvement lever.`,
+      suggestion: "Restart with a short puzzle set, then play one AI game to rebuild rhythm.",
+      ctaLabel: "Start Training",
+      ctaRoute: "puzzles",
+      reason: "inactive",
+    };
+  }
+
+  if (gamesPlayed >= 5 && draws + losses >= Math.ceil(gamesPlayed * 0.45)) {
+    return {
+      id: "endgame-struggles-conversion",
+      weakness: "Endgame Struggles",
+      tone: "primary",
+      explanation: "Your record shows several non-winning results, which often means advantages are not being converted cleanly.",
+      suggestion: "Practice king activity, pawn promotion races, and trading down only when the ending is favorable.",
+      ctaLabel: "Review Games",
+      ctaRoute: "history",
+      reason: "conversion",
+    };
+  }
+
+  if (gamesPlayed >= 3 && puzzleActivity.usedToday === 0) {
+    return {
+      id: "opening-inaccuracy-no-warmup",
+      weakness: "Opening Inaccuracy",
+      tone: "primary",
+      explanation: "You are playing games without a tactical warmup. Early inaccuracies often come from rushed development and missed threats.",
+      suggestion: "Warm up with a small puzzle set, then play one focused AI game from the opening.",
+      ctaLabel: "Start Training",
+      ctaRoute: "puzzles",
+      reason: "no_warmup",
+    };
+  }
+
+  return {
+    id: "missed-tactics-default",
+    weakness: "Missed Tactics",
+    tone: "success",
+    explanation: "Your current profile is balanced, so tactics remain the highest-impact daily practice target.",
+    suggestion: "Solve 5 tactical puzzles today and review any failed attempts.",
+    ctaLabel: "Start Training",
+    ctaRoute: "puzzles",
+    reason: "default",
+  };
 }
 
 function DashboardSkeleton({ theme }) {
@@ -183,6 +351,50 @@ function OnboardingActivationCard({
   );
 }
 
+function WeaknessDetectionCard({ weakness, onCta, onDismiss }) {
+  if (!weakness) return null;
+
+  return (
+    <Card variant="glass" className="overflow-hidden p-5 sm:p-6" aria-labelledby="chessplay-weakness-title">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <Badge tone={weakness.tone || "primary"}>Rule-based recommendation</Badge>
+          <h2 id="chessplay-weakness-title" className="mt-3 font-[var(--font-display)] text-2xl font-black tracking-tight text-[var(--color-text-primary)]">
+            Your Biggest Weakness
+          </h2>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <span className="rounded-[var(--radius-xl)] bg-[color-mix(in_srgb,var(--color-primary)_14%,transparent)] px-4 py-2 font-[var(--font-display)] text-xl font-black text-[var(--color-text-primary)]">
+              {weakness.weakness}
+            </span>
+            <span className="text-sm font-bold text-[var(--color-text-tertiary)]">Detected from games, puzzle activity, and recent activity.</span>
+          </div>
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={onDismiss} aria-label="Dismiss weakness recommendation">
+          Dismiss
+        </Button>
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface)] p-4">
+          <h3 className="text-sm font-black uppercase text-[var(--color-text-tertiary)]">Why this matters</h3>
+          <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">{weakness.explanation}</p>
+        </div>
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface)] p-4">
+          <h3 className="text-sm font-black uppercase text-[var(--color-text-tertiary)]">What to practice next</h3>
+          <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">{weakness.suggestion}</p>
+        </div>
+      </div>
+
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <Button type="button" onClick={onCta}>
+          {weakness.ctaLabel}
+        </Button>
+        <span className="text-xs font-bold text-[var(--color-text-tertiary)]">MVP rule: {weakness.reason.replaceAll("_", " ")}</span>
+      </div>
+    </Card>
+  );
+}
+
 function Toast({ toast, onClose }) {
   if (!toast) return null;
   const isError = toast.type === "error";
@@ -211,6 +423,8 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [entitlements, setEntitlements] = useState(null);
   const [puzzleLimits, setPuzzleLimits] = useState(null);
+  const [puzzleStats, setPuzzleStats] = useState(null);
+  const [puzzleSignalsReady, setPuzzleSignalsReady] = useState(false);
   const [onboardingGoal, setOnboardingGoal] = useState(() => safeGetLocalStorage(ONBOARDING_STORAGE_KEYS.goal) || "");
   const [onboardingLevel, setOnboardingLevel] = useState(() => safeGetLocalStorage(ONBOARDING_STORAGE_KEYS.level) || "");
   const [onboardingCompleted, setOnboardingCompleted] = useState(() => safeGetLocalStorage(ONBOARDING_STORAGE_KEYS.completed) === "true");
@@ -218,7 +432,9 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
     const dismissed = safeGetLocalStorage(ONBOARDING_STORAGE_KEYS.dismissed);
     return dismissed === "true" || dismissed === "1";
   });
+  const [dismissedWeaknessId, setDismissedWeaknessId] = useState(() => safeGetSessionStorage(WEAKNESS_STORAGE_KEYS.dismissedId) || "");
   const onboardingStartedTrackedRef = useRef(false);
+  const weaknessViewedRef = useRef("");
 
   const showDebugStatus = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -313,13 +529,17 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
   useEffect(() => {
     if (!user || isGuest) return undefined;
     let active = true;
+    setPuzzleSignalsReady(false);
     Promise.allSettled([
       apiClient("/api/me/entitlements"),
       apiClient("/api/puzzles/limits/me", { skipAuthRefresh: true }),
-    ]).then(([entitlementResult, limitsResult]) => {
+      apiClient("/api/puzzles/stats/me", { skipAuthRefresh: true }),
+    ]).then(([entitlementResult, limitsResult, puzzleStatsResult]) => {
       if (!active) return;
       if (entitlementResult.status === "fulfilled") setEntitlements(entitlementResult.value);
       if (limitsResult.status === "fulfilled") setPuzzleLimits(limitsResult.value.limits || null);
+      if (puzzleStatsResult.status === "fulfilled") setPuzzleStats(puzzleStatsResult.value || null);
+      setPuzzleSignalsReady(true);
     });
     return () => { active = false; };
   }, [isGuest, user]);
@@ -333,7 +553,7 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
     return () => controller.abort();
   }, [showDebugStatus]);
 
-  const safeStats = stats || user || {};
+  const safeStats = useMemo(() => stats || user || {}, [stats, user]);
   const displayName = safeStats.username || user?.username || "Player";
   const rating = safeStats.rating || user?.rating || 1200;
   const gamesPlayed = safeStats.gamesPlayed || 0;
@@ -394,6 +614,15 @@ const trialDaysLeft = trialEndsAt
   };
 
   const shouldShowOnboarding = !isGuest && gamesPlayed === 0 && !onboardingCompleted && !onboardingDismissed;
+  const puzzleActivity = useMemo(
+    () => getPuzzleActivity(puzzleStats, puzzleLimits, safeStats),
+    [puzzleLimits, puzzleStats, safeStats],
+  );
+  const weaknessRecommendation = useMemo(
+    () => buildWeakness({ gamesPlayed, wins, losses, draws, recentGames, userId, puzzleActivity }),
+    [draws, gamesPlayed, losses, puzzleActivity, recentGames, userId, wins],
+  );
+  const shouldShowWeakness = !isGuest && puzzleSignalsReady && weaknessRecommendation && weaknessRecommendation.id !== dismissedWeaknessId;
 
   useEffect(() => {
     if (!shouldShowOnboarding) return;
@@ -450,6 +679,45 @@ const trialDaysLeft = trialEndsAt
     trackEvent("onboarding_dismissed", {
       goal: onboardingGoal || undefined,
       level: onboardingLevel || undefined,
+    });
+  };
+
+  useEffect(() => {
+    if (!shouldShowWeakness || !weaknessRecommendation) return;
+    if (weaknessViewedRef.current === weaknessRecommendation.id) return;
+    if (safeGetSessionStorage(WEAKNESS_STORAGE_KEYS.viewedId) === weaknessRecommendation.id) return;
+    weaknessViewedRef.current = weaknessRecommendation.id;
+    safeSetSessionStorage(WEAKNESS_STORAGE_KEYS.viewedId, weaknessRecommendation.id);
+    trackEvent("weakness_viewed", {
+      weakness: weaknessRecommendation.weakness,
+      rule: weaknessRecommendation.reason,
+      gamesPlayed,
+      puzzleStarted: puzzleActivity.started,
+      puzzleUsedToday: puzzleActivity.usedToday,
+    });
+  }, [gamesPlayed, puzzleActivity.started, puzzleActivity.usedToday, shouldShowWeakness, weaknessRecommendation]);
+
+  const handleWeaknessCta = () => {
+    if (!weaknessRecommendation) return;
+    trackEvent("weakness_cta_clicked", {
+      weakness: weaknessRecommendation.weakness,
+      rule: weaknessRecommendation.reason,
+      route: weaknessRecommendation.ctaRoute,
+    });
+    if (weaknessRecommendation.ctaRoute === "ai") {
+      startGame("ai");
+      return;
+    }
+    onNavigate?.(weaknessRecommendation.ctaRoute);
+  };
+
+  const dismissWeakness = () => {
+    if (!weaknessRecommendation) return;
+    safeSetSessionStorage(WEAKNESS_STORAGE_KEYS.dismissedId, weaknessRecommendation.id);
+    setDismissedWeaknessId(weaknessRecommendation.id);
+    trackEvent("weakness_dismissed", {
+      weakness: weaknessRecommendation.weakness,
+      rule: weaknessRecommendation.reason,
     });
   };
 
@@ -528,6 +796,14 @@ const trialDaysLeft = trialEndsAt
           onStartAi={startFirstAiGame}
           onStartPuzzle={startFirstPuzzle}
           onDismiss={dismissOnboarding}
+        />
+      ) : null}
+
+      {shouldShowWeakness ? (
+        <WeaknessDetectionCard
+          weakness={weaknessRecommendation}
+          onCta={handleWeaknessCta}
+          onDismiss={dismissWeakness}
         />
       ) : null}
 

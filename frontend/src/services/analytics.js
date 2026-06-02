@@ -15,6 +15,9 @@ const KNOWN_EVENTS = new Set([
   "first_puzzle_started",
   "onboarding_dismissed",
   "onboarding_completed",
+  "weakness_viewed",
+  "weakness_cta_clicked",
+  "weakness_dismissed",
 ]);
 
 export function trackEvent(name, properties = {}) {
