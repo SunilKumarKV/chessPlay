@@ -84,10 +84,6 @@ function getMoveCount(game) {
   return 0;
 }
 
-function getGameKey(game, index) {
-  return game?._id || game?.id || `${game?.startTime || game?.createdAt || game?.endTime || "game"}-${index}`;
-}
-
 function buildSummary(games, userId) {
   const counts = games.reduce((acc, game) => {
     const result = getResultLabel(game, userId);
