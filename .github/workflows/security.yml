@@ -10,8 +10,48 @@ on:
 permissions:
   contents: read
   actions: read
+  security-events: write
 
 jobs:
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Gitleaks
+        run: |
+          GITLEAKS_VERSION="8.29.1"
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o gitleaks.tar.gz
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf gitleaks.tar.gz -C "$HOME/.local/bin" gitleaks
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/gitleaks" version
+
+      - name: Prepare tracked-file scan directory
+        run: |
+          mkdir scan-src
+          git checkout-index -a -f --prefix=scan-src/
+
+      - name: Run Gitleaks
+        run: |
+          gitleaks detect \
+            --source scan-src \
+            --no-git \
+            --redact \
+            --verbose \
+            --report-format json \
+            --report-path gitleaks-report.json
+
+      - name: Upload Gitleaks report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+          if-no-files-found: ignore
+
   dependency-audit:
     name: Dependency audit
     runs-on: ubuntu-latest
@@ -35,3 +75,39 @@ jobs:
 
       - name: Audit dependencies
         run: pnpm audit --audit-level moderate
+
+  build-and-test:
+    name: Lint, typecheck, test, and build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter backend prisma:generate
+
+      - name: Lint frontend
+        run: pnpm lint
+
+      - name: Typecheck backend
+        run: pnpm --filter backend typecheck
+
+      - name: Test backend
+        run: pnpm --filter backend test
+
+      - name: Build project
+        run: pnpm build

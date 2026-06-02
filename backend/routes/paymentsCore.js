@@ -125,7 +125,18 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
   try {
     if (!verifyRazorpayWebhook(req)) return res.status(401).json({ message: 'Invalid webhook signature.' });
     const eventId = clean(req.headers['x-razorpay-event-id'] || `webhook_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`, 120);
-    await prisma.documentRecord.create({ collection: 'payment_webhooks', data: { provider: 'razorpay', eventId, receivedAt: new Date().toISOString(), status: 'received' } });
+    const recordId = `payment_webhook:${eventId}`;
+    await prisma.documentRecord.upsert({
+      where: { id: recordId },
+      create: {
+        id: recordId,
+        collection: 'payment_webhooks',
+        data: { provider: 'razorpay', eventId, receivedAt: new Date().toISOString(), status: 'received' },
+      },
+      update: {
+        data: { provider: 'razorpay', eventId, receivedAt: new Date().toISOString(), status: 'duplicate_ignored' },
+      },
+    });
     res.json({ received: true });
   } catch {
     res.status(400).json({ message: 'Webhook processing failed.' });
