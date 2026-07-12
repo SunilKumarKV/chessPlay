@@ -1,36 +1,51 @@
+# Dependabot configuration for ChessPlay monorepo
 version: 2
 updates:
+  # Root dependencies update
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "08:00"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "security"
 
+  # Frontend package updates
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "08:00"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "frontend"
+      - "security"
 
+  # Backend package updates
   - package-ecosystem: "npm"
     directory: "/backend"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "08:00"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "backend"
+      - "security"
 
+  # GitHub Actions updates
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "08:00"
     labels:
       - "dependencies"
       - "github-actions"

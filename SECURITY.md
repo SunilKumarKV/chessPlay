@@ -1,182 +1,104 @@
-# ChessPlay Security Policy
+# ChessPlay Security Policy & Responsible Disclosure
 
-ChessPlay is a startup production repository. Security, privacy, repository integrity, and release safety must be reviewed before any production release.
+## Purpose
+This document establishes the platform's security boundaries, vulnerability disclosure workflow, secret management policies, and mandatory pre-release security validation checks to safeguard user data and project integrity.
+
+## Navigation
+[README](README.md) • [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) • [CONTRIBUTING.md](CONTRIBUTING.md) • [docs/security.md](docs/security.md)
+
+---
 
 ## Supported Versions
+Only the latest release versions are actively supported with security updates and patches.
 
 | Version | Status |
 | --- | --- |
-| v1.4.0-beta | Active development / pre-release |
-| v1.3.x | Maintenance only |
+| `v1.4.0-beta` | Active Development / Pre-release |
+| `v1.3.x` | Maintenance & Security Patches Only |
+| `< v1.3.0` | Unsupported (End of Life) |
 
-## Responsible Disclosure
+---
 
-Please report security vulnerabilities privately through GitHub Private Vulnerability Reporting / Security Advisories.
+## Reporting a Vulnerability
+We take the security of ChessPlay seriously. If you find a vulnerability, do not open a public issue or discuss it in community chat rooms.
 
-Do not open public issues, pull requests, or discussion threads that contain:
+### Private Submission
+1. **GitHub Advisory**: Submit via [GitHub Private Vulnerability Reporting](https://github.com/SunilKumarKV/chessPlay/security/advisories/new).
+2. **Direct Contact**: If private vulnerability reporting is unavailable, email the maintainer team directly at `security@chessplay.xyz`.
+3. **Response SLA**: The maintainer team will acknowledge your report within **24 hours** and provide a patch timeline within **7 days**.
 
-- Exploit details
-- Proof-of-concept attack steps
-- Production URLs with sensitive behavior
-- Secret values
-- User data
-- Internal deployment details
+---
 
-If private vulnerability reporting is unavailable, contact the repository owner privately and request that it be enabled before sharing details.
+## Mandated Secret Management
 
-## Release Security Gate
+### Critical Secrets List
+The following variables must **never** be committed to the repository in plain text:
+- Database strings (`DATABASE_URL`, `DIRECT_URL`, `MONGODB_URI`)
+- Cryptographic keys (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`)
+- Payment credentials (`RAZORPAY_KEY_SECRET`, `STRIPE_SECRET_KEY`, `PAYPAL_CLIENT_SECRET`)
+- Notification keys (`SMTP_PASS`, `TELEGRAM_BOT_TOKEN`)
+- Deployment tokens (`VERCEL_TOKEN`, `GITHUB_TOKEN`)
 
-No production release is approved until all required reviews are complete.
+---
 
-Required release review order:
+## Required Security Verification Suite
 
-1. Security Checker review
-2. Founder / CEO review
-3. Product Manager review
-4. Final production release approval
-
-A release must be blocked if any of the following are true:
-
-- A private security advisory is open and untriaged
-- A Critical or High severity vulnerability is unresolved
-- Secrets are found in the repository or Git history
-- Authentication, database, payment, deployment, or GitHub Actions risks are unresolved
-- Branch protection and required checks are not verified
-- Production environment variables are not verified
-
-## Secret Handling
-
-Never commit real secrets or private configuration values. The following must remain private:
-
-```txt
-.env
-.env.*
-backend/.env
-frontend/.env
-DATABASE_URL
-DIRECT_URL
-MONGO_URI
-MONGODB_URI
-JWT_ACCESS_SECRET
-JWT_REFRESH_SECRET
-JWT_SECRET
-SMTP_PASS
-TELEGRAM_BOT_TOKEN
-CLOUDINARY_API_SECRET
-STRIPE_SECRET_KEY
-STRIPE_WEBHOOK_SECRET
-PAYPAL_CLIENT_SECRET
-PAYPAL_WEBHOOK_SECRET
-RAZORPAY_KEY_SECRET
-RAZORPAY_WEBHOOK_SECRET
-PAYMENT_SIGNING_SECRET
-ADMIN_EMAILS
-GITHUB_TOKEN
-VERCEL_TOKEN
-```
-
-Use only placeholder values in `.env.example` files.
-
-## GitHub Secrets and Deployment Variables
-
-Store CI/CD and deployment secrets only in GitHub Secrets or hosting provider environment settings.
-
-Recommended GitHub / hosting secrets:
-
-```txt
-DATABASE_URL
-DIRECT_URL
-JWT_ACCESS_SECRET
-JWT_REFRESH_SECRET
-REDIS_URL
-VITE_API_URL
-VITE_BACKEND_URL
-VITE_SOCKET_URL
-RAZORPAY_KEY_ID
-RAZORPAY_KEY_SECRET
-RAZORPAY_WEBHOOK_SECRET
-SENTRY_DSN
-```
-
-Do not hardcode secrets in:
-
-- Source code
-- README files
-- Workflow files
-- Frontend bundles
-- Public screenshots
-- Support/debug logs
-
-## Required Security Checks Before Merge
-
-Run these checks before merging security-sensitive changes:
+Before merging any code changes or releasing a version, execute the following audit suite:
 
 ```bash
-git status
-git branch
-git log --oneline -10
-
+# 1. Run local credential scanning
 gitleaks detect --source . --verbose
-pnpm audit
-pnpm outdated
 
-find . -name ".env*" -type f
-grep -R "DATABASE_URL\|JWT_SECRET\|API_KEY\|SECRET\|TOKEN\|PASSWORD\|RAZORPAY\|STRIPE\|GOOGLE_CLIENT_SECRET" . --exclude-dir=node_modules --exclude-dir=.git
+# 2. Audit Node package dependencies
+pnpm audit
+
+# 3. Check for raw unencrypted secret strings in files
+grep -R "DATABASE_URL\|JWT_SECRET\|API_KEY\|SECRET\|TOKEN" . --exclude-dir={node_modules,.git,.github,dist}
 ```
 
-## GitHub Repository Protection Requirements
+---
 
-The `main` branch must be protected with:
+## Examples
 
-- Pull requests required before merge
-- Direct push blocked
-- Required status checks enabled
-- At least one reviewer required
-- Force push disabled
-- Branch deletion disabled
-- CodeQL enabled
-- Dependabot enabled
-- Secret scanning enabled where available
-- GitHub Actions permissions restricted to least privilege
+### 1. Secure Node.js Express Cookie Config
+Always configure session cookies using maximum browser protections in production:
+```typescript
+res.cookie('refreshToken', token, {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production', // Only send over HTTPS
+  sameSite: 'strict',
+  maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+});
+```
 
-## Production Deployment Safety
+### 2. Environment Configuration Example
+In your local environment, use the `.env` file (which is git-ignored) and never commit the actual file:
+```bash
+# Safe .env.example (Committed)
+DATABASE_URL="postgresql://user:password@localhost:5432/chessplay"
 
-Before production deployment, verify:
+# Dangerous .env (Git-ignored)
+DATABASE_URL="postgresql://admin:super-secret-production-password@12.34.56.78:5432/live_db"
+```
 
-- Environment variables are configured only in hosting providers
-- No `.env` file is committed
-- No production database URL is exposed
-- JWT secrets are strong and unique
-- CORS origins are limited to approved production domains
-- Cookies are `httpOnly`, secure in production, and scoped safely
-- Payment webhook secrets are configured privately
-- Logs do not expose tokens, passwords, cookies, emails beyond necessary operational metadata, or payment details
+---
 
-## Security Advisory Handling
+## Notes
+- > [!IMPORTANT]
+  > ChessPlay blocks force pushes to the `main` branch. All releases require double sign-off by the Security Team and Project Lead.
+- > [!CAUTION]
+  > Exposed keys or production databases will trigger immediate revocation of the compromised tokens and automated service shutdown.
 
-When a private advisory is submitted:
+---
 
-1. Do not discuss the vulnerability publicly.
-2. Do not merge unrelated risky PRs until triage is complete.
-3. Assign severity: Critical, High, Medium, or Low.
-4. Identify affected files, routes, services, and production impact.
-5. Patch in a private branch if needed.
-6. Re-run security checks.
-7. Request Security Checker review.
-8. Submit to Founder / CEO and PM for final release approval.
+## Best Practices
+- **Least Privilege**: Grant repository tokens minimum read/write access.
+- **Dependency Isolation**: Use Dependabot to automatically track and patch vulnerability alerts (CVEs).
+- **Log Obfuscation**: Wrap user emails and passwords in logging sanitizers to avoid writing PII to files.
 
-## Public Repository Safety
+---
 
-If this repository is ever made public again, do not expose:
-
-- Backend source code
-- Auth implementation details
-- Admin dashboard logic
-- Payment or premium backend logic
-- Referral earning backend logic
-- Database models, migration internals, or credentials
-- Production API keys, tokens, or secrets
-
-## Current Policy
-
-ChessPlay is treated as a private startup production repository. Security review is mandatory before release.
+## References
+- [Official security checklist](docs/security.md)
+- [GitHub Security Advisories](https://github.com/SunilKumarKV/chessPlay/security/advisories)
+- [CodeQL Config File](.github/workflows/codeql.yml)

@@ -1,36 +1,39 @@
 ---
-name: Feature request
-about: Suggest a feature or product improvement
-title: "feature: "
-labels: enhancement
+name: "💡 Feature Request"
+about: Propose a new feature, capability, or user-interface improvement for ChessPlay
+title: "feat: [Short summary of feature]"
+labels: ["enhancement", "proposal"]
 assignees: ""
 ---
 
-## Problem
+## Problem Statement
+Is your feature request related to a problem? Please describe it. (e.g. *"It's hard to track my score improvement trend because the dashboard only shows the last 10 games."*)
 
-What problem are we solving?
+---
 
 ## Proposed Solution
+Provide a detailed description of the feature you want added. Describe how it should work, what components are affected, and what user actions trigger it.
 
-Describe the feature.
+---
 
-## User Impact
+## Technical Feasibility & Subsystems
+- **Affected Subsystems**:
+  - [ ] Frontend Client Components
+  - [ ] Express API Backend Routing
+  - [ ] PostgreSQL Schema / Migrations
+  - [ ] Socket.IO Events
+  - [ ] Local Stockfish AI Spawning
+- **Proposed Architecture Design**:
+  [Include any thoughts on how to implement this without breaking standard APIs]
 
-Who benefits and how?
+---
 
-## Risks
+## User Value & Impact
+Explain who benefits from this feature (e.g., Free vs Pro users) and how it improves their chess play training experience.
 
-- Security impact:
-- Performance impact:
-- Database impact:
-- Deployment impact:
+---
 
-## Priority
-
-- [ ] Low
-- [ ] Medium
-- [ ] High
-
-## Founder / PM Review
-
-Required before implementation planning.
+## Risks & Security Check
+- **Performance Impact**: Does this feature increase bundle size or trigger heavy database queries?
+- **Security Impact**: Does this add any inputs that require sanitization to block XSS or CSRF injections?
+- **Backward Compatibility**: Does this change any public endpoints or database schemas in a breaking way?

@@ -1,139 +1,129 @@
 # Contributing to ChessPlay
 
-Thank you for helping improve ChessPlay.
+## Purpose
+This document provides developer guidelines for local environment setup, branching strategies, coding conventions, testing requirements, and submission procedures for contributing code and documentation to ChessPlay.
 
-ChessPlay is treated as a production startup repository. Every contribution must protect users, repository integrity, secrets, deployment safety, and production stability.
+## Navigation
+[README](README.md) • [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) • [STYLE_GUIDE.md](STYLE_GUIDE.md) • [SECURITY.md](SECURITY.md) • [SUPPORT.md](SUPPORT.md)
 
-## Contribution Rules
+---
 
-Before opening a pull request:
+## Welcome to ChessPlay Contributions!
+We are excited that you want to help make ChessPlay the best open-source real-time chess platform. As an active maintainer, reviewer, or developer, you are expected to follow these guidelines to keep the codebase secure, readable, and highly maintainable.
 
-1. Create a dedicated branch.
-2. Keep the change focused and small.
-3. Do not commit `.env` files or real secrets.
-4. Do not expose production URLs, database URLs, JWT secrets, payment keys, API keys, or OAuth secrets.
-5. Do not weaken authentication, authorization, CORS, cookies, headers, GitHub Actions, or deployment settings.
-6. Do not add dependencies without checking security and maintenance status.
-7. Do not change production deployment configuration unless the change is explicitly required and reviewed.
+---
+
+## Development Workflow
+
+### 1. Branch Naming Conventions
+Always create a new branch for your work. Never push commits directly to the `main` branch.
+- **Features**: `feature/slug-name` (e.g., `feature/matchmaking-queues`)
+- **Bug Fixes**: `bugfix/slug-name` (e.g., `bugfix/socket-leak-fix`)
+- **Documentation**: `docs/slug-name` (e.g., `docs/api-overhaul`)
+- **Refactoring**: `refactor/slug-name` (e.g., `refactor/jwt-verification-cleanup`)
+- **Performance**: `perf/slug-name` (e.g., `perf/lighthouse-audit-fixes`)
+
+### 2. Commit Message Rules
+We strictly enforce the **Conventional Commits** specification. Commit messages must be formatted as:
+```text
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+Supported types:
+- `feat`: A new feature
+- `fix`: A bug fix
+- `docs`: Documentation changes
+- `style`: Changes that do not affect the meaning of the code (formatting, white-space)
+- `refactor`: A code change that neither fixes a bug nor adds a feature
+- `perf`: A code change that improves performance
+- `test`: Adding missing tests or correcting existing tests
+- `chore`: Changes to the build process or auxiliary tools
+
+---
 
 ## Required Local Checks
 
-Run the following checks before requesting review:
+Before requesting reviews on a Pull Request, you must run the local verification suite:
 
+### Security Auditing & Secret Scanning
 ```bash
-git status
-git branch
-git log --oneline -10
-
+# Detect accidental credentials in the repository
 gitleaks detect --source . --verbose
+
+# Run package audits
 pnpm audit
+
+# List outdated packages
 pnpm outdated
-
-find . -name ".env*" -type f
-grep -R "DATABASE_URL\|JWT_SECRET\|API_KEY\|SECRET\|TOKEN\|PASSWORD\|RAZORPAY\|STRIPE\|GOOGLE_CLIENT_SECRET" . --exclude-dir=node_modules --exclude-dir=.git
 ```
 
-Also run the project validation commands that apply to your change:
-
+### Static Analysis and Build
+Ensure both the React frontend and Express backend type-check and compile successfully:
 ```bash
+# Install dependencies
 pnpm install --frozen-lockfile
-pnpm -C backend typecheck
-pnpm -C backend build
-pnpm -C frontend lint
-pnpm -C frontend build
+
+# Generate Prisma Client
+pnpm --filter backend prisma:generate
+
+# Build both applications
+pnpm build
 ```
 
-## Security-Sensitive Areas
-
-Extra review is required for changes touching:
-
-- `.env.example`
-- `.gitignore`
-- `package.json`
-- `pnpm-lock.yaml`
-- `vercel.json`
-- GitHub Actions workflows
-- Prisma schema or migrations
-- Backend auth/session files
-- Backend config files
-- Socket.IO files
-- Payment files
-- Deployment docs
-- Logging and error handling
-- Admin routes and permissions
+---
 
 ## Pull Request Requirements
 
-A pull request must include:
+When submitting a Pull Request (PR):
+1. **Scope**: Keep PRs focused on a single issue. Avoid massive "catch-all" changes.
+2. **Template**: Fill out the [PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) completely.
+3. **Tests**: Include automated unit or integration tests for any new logic.
+4. **Secrets**: Verify that NO production endpoints, database credentials, or API keys are written in code or test configs.
 
-- Clear summary of the change
-- Risk level
-- Security checklist completion
-- Validation commands run
-- Screenshots or smoke-test notes when UI behavior changes
-- Rollback notes for deployment or database changes
+---
 
-## Branch and Merge Rules
+## Examples
 
-The `main` branch must remain protected.
-
-Required expectations:
-
-- Pull request required before merge
-- Direct push blocked
-- Required status checks enabled
-- At least one reviewer required
-- Force push disabled
-- Branch deletion disabled
-- Code owners reviewed for sensitive files
-
-## Dependency Rules
-
-Before adding or upgrading a dependency:
-
-1. Check whether it is actively maintained.
-2. Check known vulnerabilities.
-3. Prefer small, trusted packages.
-4. Avoid packages that request unnecessary permissions.
-5. Re-run `pnpm audit` after dependency changes.
-
-## Secret Handling
-
-Never include real secret values in code, tests, markdown, screenshots, logs, GitHub comments, or issue reports.
-
-Use placeholder values only, for example:
-
-```txt
-DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
-JWT_ACCESS_SECRET="replace-with-strong-secret"
-RAZORPAY_KEY_SECRET="replace-with-secret"
+### 1. Standard Branch Creation
+```bash
+git checkout main
+git pull origin main
+git checkout -b feature/board-theme-customizer
 ```
 
-If a secret is committed by mistake:
+### 2. Conventional Commit Example
+```text
+feat(frontend): add dark-mode wood board theme
 
-1. Stop the release.
-2. Remove the secret from code.
-3. Rotate the exposed secret.
-4. Purge it from Git history if needed.
-5. Re-run secret scanning.
-6. Request security review before merge or deployment.
+Introduces wood-patterned board texture option for the game viewer interface,
+controlled via user settings storage.
 
-## Production Safety
+Closes #142
+```
 
-Do not approve production release if:
+---
 
-- Secrets are exposed
-- Authentication can be bypassed
-- Database credentials are leaked
-- Payment secrets are leaked
-- GitHub Actions are unsafe
-- Branch protection is missing
-- CORS allows untrusted origins
-- Production logs expose sensitive data
-- Dependency vulnerabilities are unresolved
+## Notes
+- > [!IMPORTANT]
+  > ChessPlay is treated as a high-security repository. Direct push to `main` is completely blocked.
+- > [!WARNING]
+  > Committing private API keys, database credentials, or real `.env` variables to public commits will result in immediate PR closure and token revocation. Use sample configs instead.
 
-## Reporting Security Issues
+---
 
-Do not open public issues for vulnerabilities.
+## Best Practices
+- **Write Focused Commits**: Commit early and often with small, atomic logical changes.
+- **Maintain Test Integrity**: Ensure you run unit and E2E tests before checking in code changes.
+- **Document Code**: Write clear JSDoc and TypeScript annotations for new routes, services, and hooks.
+- **Review Peers**: Take part in reviewing other contributors' PRs to understand new updates and share knowledge.
 
-Use GitHub Private Vulnerability Reporting or a private security advisory. If that is unavailable, contact the repository owner privately and request a secure reporting path.
+---
+
+## References
+- [Style Guide](STYLE_GUIDE.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Monorepo Package Configuration](package.json)
+- [Playwright Config](playwright.config.ts)

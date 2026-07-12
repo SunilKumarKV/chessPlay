@@ -1,48 +1,51 @@
-## Summary
+## Purpose & Description
+Provide a clear summary of the changes made, the problem solved, and any design or architectural decisions.
 
-- 
+Fixes # [Insert Issue Number here]
 
-## Change Type
+---
 
-- [ ] Bug fix
-- [ ] Feature
-- [ ] Refactor
-- [ ] Security fix
-- [ ] Documentation
-- [ ] Deployment / CI
+## Type of Change
+- [ ] 🐛 Bug Fix (non-breaking change resolving an issue)
+- [ ] 🚀 New Feature (non-breaking change adding capability)
+- [ ] 🛠️ Refactor (non-breaking code cleanup)
+- [ ] 🔒 Security Patch (fixes vulnerabilities or hardens routes)
+- [ ] 📝 Documentation Update (modifies markdown or guides)
+- [ ] ⚙️ CI/CD / Build Pipeline Update
 
-## Risk Level
+---
 
-- [ ] Low
-- [ ] Medium
-- [ ] High
+## Security Audit Checklist
+- [ ] **No Credentials**: No database URLs, JWT keys, payment secrets, or API keys are committed.
+- [ ] **No `.env` Files**: Checked that no local environment variables are tracked by git.
+- [ ] **Data Sanitation**: User inputs are sanitized to protect against SQLi, XSS, or CSRF.
+- [ ] **Safe Log Output**: Ensured server log outputs do not write cookies, tokens, or PII.
 
-## Security Checklist
+---
 
-- [ ] No secrets, tokens, credentials, or `.env` files added
-- [ ] No production URLs, database URLs, JWT secrets, payment keys, or API keys exposed
-- [ ] Auth/session behavior reviewed if touched
-- [ ] CORS/security headers reviewed if touched
-- [ ] GitHub Actions/deployment changes reviewed if touched
-- [ ] Database/Prisma migration risk reviewed if touched
-- [ ] Logs do not expose sensitive user, auth, payment, or infrastructure data
+## Quality Gate Validation
+Before marking this PR as ready for review, verify the following checks have run and passed:
 
-## Validation
+```bash
+# Verify monorepo dependencies compile cleanly
+pnpm install --frozen-lockfile
+pnpm build
 
-- [ ] `pnpm install --frozen-lockfile`
-- [ ] `pnpm audit --audit-level high`
-- [ ] `pnpm -C backend typecheck`
-- [ ] `pnpm -C backend build`
-- [ ] `pnpm -C frontend lint`
-- [ ] `pnpm -C frontend build`
+# Run formatting and syntax checks
+pnpm --filter frontend lint
+pnpm --filter backend typecheck
 
-## Release Review
+# Execute local test suite
+pnpm test:frontend
+pnpm test:backend
 
-- [ ] Security Checker review completed
-- [ ] Founder / CEO review completed
-- [ ] PM review completed
-- [ ] Production release approval completed
+# Scan repository for accidental secret leaks
+gitleaks detect --source . --verbose
+```
 
-## Notes
+---
 
-Add screenshots, test notes, rollback notes, or deployment notes here.
+## Screenshots / Visual Checks
+*If your change modifies UI layout, components, or transitions, attach before/after screenshots or animations below:*
+- **Before**: [Link or Image]
+- **After**: [Link or Image]

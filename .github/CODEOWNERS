@@ -1,26 +1,28 @@
-# ChessPlay CODEOWNERS
-# Sensitive production areas must route back to the repository owner.
+# https://help.github.com/articles/about-code-owners/
+# ChessPlay Code Ownership Assignments
+# Sensitive areas require reviews from repository maintainers before merge.
 
+# Global default owner for the entire monorepo
 * @SunilKumarKV
 
-# GitHub security, workflows, and repository governance
-.github/ @SunilKumarKV
-.github/workflows/ @SunilKumarKV
-.github/CODEOWNERS @SunilKumarKV
-SECURITY.md @SunilKumarKV
-RELEASE_CHECKLIST.md @SunilKumarKV
+# GitHub configuration, templates, and workflows
+/.github/ @SunilKumarKV
+/.github/workflows/ @SunilKumarKV
+/CODEOWNERS @SunilKumarKV
 
-# Backend, auth, payments, database, and deployment
-backend/ @SunilKumarKV
-backend/src/config/ @SunilKumarKV
-backend/middleware/ @SunilKumarKV
-backend/routes/ @SunilKumarKV
-backend/prisma/ @SunilKumarKV
-prisma/ @SunilKumarKV
-render.yaml @SunilKumarKV
-vercel.json @SunilKumarKV
+# Security and release guidelines
+/SECURITY.md @SunilKumarKV
+/RELEASE_CHECKLIST.md @SunilKumarKV
 
-# Frontend production config
-frontend/ @SunilKumarKV
-package.json @SunilKumarKV
-pnpm-lock.yaml @SunilKumarKV
+# Backend database schemas, migrations, and keys
+/backend/prisma/ @SunilKumarKV
+/backend/src/config/ @SunilKumarKV
+/backend/src/middleware/auth.ts @SunilKumarKV
+/backend/src/services/payments/ @SunilKumarKV
+
+# Deployment & infrastructure orchestrations
+/render.yaml @SunilKumarKV
+/vercel.json @SunilKumarKV
+/package.json @SunilKumarKV
+/pnpm-lock.yaml @SunilKumarKV
+/pnpm-workspace.yaml @SunilKumarKV

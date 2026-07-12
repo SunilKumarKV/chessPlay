@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Report a security vulnerability
+  - name: "🔒 Report a Security Vulnerability"
     url: https://github.com/SunilKumarKV/chessPlay/security/advisories/new
-    about: Please report sensitive vulnerabilities privately through GitHub Security Advisories.
-  - name: ChessPlay public showcase
-    url: https://github.com/SunilKumarKV/chessplay-showcase
-    about: Use this public repository only for product showcase and non-sensitive presentation updates.
-  - name: ChessPlay public documentation
-    url: https://github.com/SunilKumarKV/chessplay-docs
-    about: Use this public repository only for non-sensitive public documentation updates.
+    about: Please report sensitive security vulnerabilities privately through GitHub Security Advisories rather than public issues.
+  - name: "💬 Ask a General Question"
+    url: https://github.com/SunilKumarKV/chessPlay/discussions
+    about: Use GitHub Discussions for questions about coding, system setup, or custom styling.
+  - name: "♟️ ChessPlay Homepage"
+    url: https://demo.chessplay.xyz
+    about: Learn more about the project and play online.

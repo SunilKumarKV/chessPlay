@@ -1,51 +1,56 @@
 ---
-name: Bug report
-about: Report a reproducible ChessPlay bug
-title: "bug: "
-labels: bug
+name: "🐛 Bug Report"
+about: Submit a reproducible error report to help us improve ChessPlay
+title: "bug: [Short description of the bug]"
+labels: ["bug", "triage"]
 assignees: ""
 ---
 
 ## Summary
+Provide a clear and concise description of what the bug is, including the expected behavior versus the actual behavior observed.
 
-Describe the bug clearly.
+---
 
-## Steps To Reproduce
+## Steps to Reproduce
+1. Go to '...'
+2. Click on '....'
+3. Scroll down to '....'
+4. See error '...'
 
-1.
-2.
-3.
+---
 
-## Expected Result
+## Expected Behavior
+A clear and concise description of what you expected to happen.
 
-What should happen?
+---
 
-## Actual Result
+## Environment Information
+- **App Version**: [e.g. v1.4.0-beta]
+- **Deployment Tier**: [e.g. Local Host, Staging, Production]
+- **Browser/OS**: [e.g. Chrome 122 / macOS Sonoma]
+- **Node.js / pnpm Versions**: [e.g. Node 20.10.0 / pnpm 10.15.0]
 
-What happened instead?
+---
 
-## Area
+## Context and Diagnostics
+- **Affected Area**:
+  - [ ] Frontend Client UI
+  - [] Backend Router API
+  - [ ] Socket.IO / Real-Time Matching
+  - [ ] Database / Postgres Schema
+  - [ ] Stockfish AI Subprocess
+  - [ ] Razorpay Payment flow
+- **Browser Console Errors**:
+  ```text
+  [Paste any Javascript stack traces here]
+  ```
+- **Backend Server Logs**:
+  ```text
+  [Paste backend CLI error outputs here]
+  ```
 
-- [ ] Frontend
-- [ ] Backend
-- [ ] Auth/session
-- [ ] Multiplayer / Socket.IO
-- [ ] AI / Stockfish
-- [ ] Database / Prisma
-- [ ] Deployment
-- [ ] Other
+---
 
-## Environment
-
-- Browser / device:
-- Environment: local / staging / production
-
-## Screenshots / Logs
-
-Do not include secrets, tokens, cookies, database URLs, or private user data.
-
-## Release Impact
-
-- [ ] Blocks release
-- [ ] Does not block release
-- [ ] Needs review
+## Security Compliance Verification
+- [ ] I have verified that no production database connection strings, JWT passwords, or client cookies are contained in the logs attached above.
+- [ ] I understand that posting credentials or secret keys publicly will result in this issue being immediately closed and the exposed keys revoked.
