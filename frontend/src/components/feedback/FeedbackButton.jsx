@@ -37,12 +37,12 @@ export default function FeedbackButton({ user }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-4 left-4 z-[90] rounded-full border border-white/10 bg-[#101816]/95 px-4 py-3 text-sm font-black text-white shadow-2xl backdrop-blur transition hover:bg-[#17231f]"
+        className="ds-focus fixed bottom-4 right-4 z-[var(--z-content)] hidden rounded-full border border-[var(--color-border-primary)] bg-[var(--color-bg-glass)] px-4 py-3 text-sm font-black text-[var(--color-text-primary)] shadow-[var(--shadow-md)] backdrop-blur transition hover:bg-[var(--color-surface-strong)] sm:inline-flex"
       >
         Feedback
       </button>
       {open ? (
-        <div className="fixed inset-0 z-[100] grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[var(--z-modal)] grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#101816] p-6 text-white shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>

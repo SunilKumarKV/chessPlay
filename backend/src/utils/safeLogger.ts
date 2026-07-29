@@ -4,6 +4,7 @@ const SECRET_PATTERNS = [
   /(accessToken|refreshToken|authToken|jwt|token|password|secret|key|credential|signature)=([^&\s]+)/gi,
   /((?:postgresql|postgres|mysql|redis):\/\/)([^@\s]+)@/gi,
   /(RAZORPAY_KEY_SECRET|RAZORPAY_WEBHOOK_SECRET|JWT_SECRET|JWT_ACCESS_SECRET|JWT_REFRESH_SECRET)[=:][^\s,]+/gi,
+  /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,
 ];
 
 function redact(value) {

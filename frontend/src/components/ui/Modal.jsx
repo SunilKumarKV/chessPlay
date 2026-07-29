@@ -1,76 +1,134 @@
-import React, { useEffect } from 'react';
+import { useEffect, useId, useRef } from "react";
+import { Button } from "./Buttons";
 
-// Modal - Backdrop blur, dark modal bg, close X button
+function cx(...classes) {
+  return classes.filter(Boolean).join(" ");
+}
+
 export const Modal = ({
   isOpen,
   onClose,
   title,
   children,
-  className = '',
+  className = "",
+  contentClassName = "p-5 sm:p-6",
+  showHeader = true,
   ...props
 }) => {
+  const modalRef = useRef(null);
+  const previousActiveElementRef = useRef(null);
+  const titleId = useId();
+
   useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-        onClose();
+    if (!isOpen) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        onClose?.();
+        return;
+      }
+
+      if (event.key !== "Tab" || !modalRef.current) return;
+
+      const focusableElements = Array.from(
+        modalRef.current.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.disabled && element.getAttribute("aria-hidden") !== "true");
+
+      if (!focusableElements.length) {
+        event.preventDefault();
+        modalRef.current.focus();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (!modalRef.current.contains(document.activeElement)) {
+        event.preventDefault();
+        firstElement.focus();
+      } else if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
       }
     };
 
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
-    }
+    previousActiveElementRef.current = document.activeElement;
+    document.addEventListener("keydown", handleKeyDown);
+    document.body.style.overflow = "hidden";
+
+    window.setTimeout(() => {
+      const focusTarget = modalRef.current?.querySelector(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusTarget instanceof HTMLElement) focusTarget.focus();
+      else modalRef.current?.focus();
+    }, 0);
 
     return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "";
+      if (previousActiveElementRef.current instanceof HTMLElement) {
+        previousActiveElementRef.current.focus();
+      }
     };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+    <div className="fixed inset-0 z-[var(--z-modal)] flex items-end justify-center p-3 sm:items-center sm:p-6">
+      <button
+        type="button"
+        aria-label="Close modal backdrop"
+        className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-md"
         onClick={onClose}
       />
 
-      {/* Modal */}
       <div
-        className={`relative bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto ${className}`}
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        tabIndex={-1}
+        className={cx(
+          "ds-glass relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-[var(--radius-3xl)] text-[var(--color-text-primary)]",
+          className,
+        )}
         {...props}
       >
-        {/* Header */}
-        {(title || onClose) && (
-          <div className="flex items-center justify-between p-6 border-b border-[#2a2a2a]">
-            {title && (
-              <h2 className="text-xl font-bold text-[#e0e0e0] font-['Montserrat']">
+        {showHeader && (title || onClose) ? (
+          <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border-primary)] p-5 sm:p-6">
+            {title ? (
+              <h2 id={titleId} className="font-[var(--font-display)] text-xl font-black tracking-tight">
                 {title}
               </h2>
-            )}
-            {onClose && (
-              <button
+            ) : null}
+            {onClose ? (
+              <Button
+                type="button"
                 onClick={onClose}
-                className="text-[#7a7a7a] hover:text-[#e0e0e0] transition-colors text-xl"
+                variant="ghost"
+                size="icon"
+                aria-label="Close modal"
+                className="shrink-0"
               >
-                ✕
-              </button>
-            )}
+                ×
+              </Button>
+            ) : null}
           </div>
-        )}
+        ) : null}
 
-        {/* Content */}
-        <div className="p-6">
-          {children}
-        </div>
+        <div className={contentClassName}>{children}</div>
       </div>
     </div>
   );
 };
 
-// Game Over Modal
 export const GameOverModal = ({
   isOpen,
   onClose,
@@ -82,100 +140,46 @@ export const GameOverModal = ({
   onRematch,
   ...props
 }) => {
-  const getResultMessage = () => {
-    switch (result) {
-      case 'win': return 'Victory!';
-      case 'loss': return 'Defeat';
-      case 'draw': return 'Draw';
-      default: return 'Game Over';
-    }
-  };
-
-  const getResultColor = () => {
-    switch (result) {
-      case 'win': return 'text-green-500';
-      case 'loss': return 'text-red-500';
-      case 'draw': return 'text-yellow-500';
-      default: return 'text-[#e0e0e0]';
-    }
-  };
+  const resultMessage = result === "win" ? "Victory!" : result === "loss" ? "Defeat" : result === "draw" ? "Draw" : "Game Over";
+  const resultTone = result === "win" ? "text-[var(--color-success)]" : result === "loss" ? "text-[var(--color-danger)]" : result === "draw" ? "text-[var(--color-warning)]" : "text-[var(--color-text-primary)]";
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={getResultMessage()} {...props}>
-      <div className="text-center space-y-4">
-        <div className={`text-4xl ${getResultColor()}`}>
-          {result === 'win' ? '🏆' : result === 'loss' ? '😔' : '🤝'}
-        </div>
-
+    <Modal isOpen={isOpen} onClose={onClose} title={resultMessage} {...props}>
+      <div className="space-y-5 text-center">
+        <div className={cx("text-4xl", resultTone)}>{result === "win" ? "🏆" : result === "loss" ? "×" : "="}</div>
         <div>
-          <p className="text-[#e0e0e0] font-['Inter']">
-            You {result === 'win' ? 'defeated' : result === 'loss' ? 'lost to' : 'drew with'} {opponent}
+          <p className="font-semibold text-[var(--color-text-primary)]">
+            You {result === "win" ? "defeated" : result === "loss" ? "lost to" : "drew with"} {opponent}
           </p>
-          {newRating && (
-            <p className="text-sm text-[#7a7a7a] font-['Inter'] mt-2">
+          {newRating ? (
+            <p className="mt-2 text-sm text-[var(--color-text-tertiary)]">
               New rating: {newRating}
-              {ratingChange && (
-                <span className={`ml-2 ${ratingChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  ({ratingChange > 0 ? '+' : ''}{ratingChange})
+              {ratingChange ? (
+                <span className={ratingChange > 0 ? "ml-2 text-[var(--color-success)]" : "ml-2 text-[var(--color-danger)]"}>
+                  ({ratingChange > 0 ? "+" : ""}{ratingChange})
                 </span>
-              )}
+              ) : null}
             </p>
-          )}
+          ) : null}
         </div>
-
-        <div className="flex space-x-3 justify-center">
-          <button
-            onClick={onNewGame}
-            className="bg-[#81b64c] text-[#0e0e0e] hover:bg-[#6fa442] rounded-lg px-4 py-2 font-semibold transition-all"
-          >
-            New Game
-          </button>
-          {onRematch && (
-            <button
-              onClick={onRematch}
-              className="border border-[#81b64c] text-[#81b64c] hover:bg-[#81b64c] hover:text-[#0e0e0e] rounded-lg px-4 py-2 font-semibold transition-all"
-            >
-              Rematch
-            </button>
-          )}
+        <div className="flex flex-col justify-center gap-3 sm:flex-row">
+          <Button onClick={onNewGame}>New Game</Button>
+          {onRematch ? <Button onClick={onRematch} variant="outline">Rematch</Button> : null}
         </div>
       </div>
     </Modal>
   );
 };
 
-// Draw Offer Modal
-export const DrawOfferModal = ({
-  isOpen,
-  onClose,
-  opponent,
-  onAccept,
-  onDecline,
-  ...props
-}) => {
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Draw Offer" {...props}>
-      <div className="text-center space-y-4">
-        <div className="text-4xl">🤝</div>
-        <p className="text-[#e0e0e0] font-['Inter']">
-          {opponent} offers a draw. Do you accept?
-        </p>
-
-        <div className="flex space-x-3 justify-center">
-          <button
-            onClick={onAccept}
-            className="bg-[#81b64c] text-[#0e0e0e] hover:bg-[#6fa442] rounded-lg px-4 py-2 font-semibold transition-all"
-          >
-            Accept Draw
-          </button>
-          <button
-            onClick={onDecline}
-            className="border border-red-500 text-red-500 hover:bg-red-500 hover:text-white rounded-lg px-4 py-2 font-semibold transition-all"
-          >
-            Decline
-          </button>
-        </div>
+export const DrawOfferModal = ({ isOpen, onClose, opponent, onAccept, onDecline, ...props }) => (
+  <Modal isOpen={isOpen} onClose={onClose} title="Draw Offer" {...props}>
+    <div className="space-y-5 text-center">
+      <div className="text-4xl" aria-hidden="true">=</div>
+      <p className="font-semibold text-[var(--color-text-primary)]">{opponent} offers a draw. Do you accept?</p>
+      <div className="flex flex-col justify-center gap-3 sm:flex-row">
+        <Button onClick={onAccept}>Accept Draw</Button>
+        <Button onClick={onDecline} variant="danger">Decline</Button>
       </div>
-    </Modal>
-  );
-};
+    </div>
+  </Modal>
+);

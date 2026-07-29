@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 96" role="img" aria-label="ChessPlay logo">
+  <defs>
+    <linearGradient id="knightGrowthFill" x1="24" x2="96" y1="86" y2="14" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#F4B400"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="88" height="88" rx="24" fill="#0B0F19"/>
+  <path d="M26 71h40c-1-9-8-15-18-19 12-3 19-12 17-25L52 16 33 26l10 9-14 12c-8 6-10 15-3 24Z" fill="url(#knightGrowthFill)"/>
+  <path d="M34 39h13l-6 6c-5 4-7 10-3 16h-7c-6-8-5-16 3-22Z" fill="#F8FAFC" opacity=".92"/>
+  <path d="M57 64l18-18v10h8v14H69v-8L59 73Z" fill="#F8FAFC"/>
+  <circle cx="51" cy="31" r="2.2" fill="#0B0F19"/>
+  <text x="112" y="58" fill="#0B0F19" font-family="Montserrat, Inter, Arial, sans-serif" font-size="34" font-weight="900" letter-spacing="0">ChessPlay</text>
+  <path d="M114 71h176" stroke="#F4B400" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+  <path d="M283 61l16 10-16 10" fill="none" stroke="#F4B400" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

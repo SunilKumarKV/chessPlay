@@ -15,9 +15,9 @@ concurrency:
 
 jobs:
   validate:
-    name: Install, generate, lint, and build
+    name: Install, audit, generate, typecheck, lint, and build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     env:
       NODE_ENV: test
@@ -35,21 +35,40 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+<<<<<<< HEAD
+=======
+        with:
+          version: 10.15.0
+>>>>>>> origin/main
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Audit dependencies
+        run: pnpm audit --audit-level high
+
       - name: Generate backend Prisma client
-        run: pnpm --filter chessplay-backend exec prisma generate
+        run: pnpm --filter backend exec prisma generate --schema=prisma/schema.prisma
+
+      - name: Typecheck backend if script exists
+        shell: bash
+        run: |
+          if node -e "process.exit(require('./backend/package.json').scripts?.typecheck ? 0 : 1)"; then
+            pnpm -C backend typecheck
+          else
+            echo "backend typecheck script not found; skipping"
+          fi
 
       - name: Lint frontend if script exists
         shell: bash

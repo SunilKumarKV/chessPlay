@@ -1,16 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FormInput, PasswordInput, PrimaryBtn } from "../../../components/ui";
-import { GOOGLE_CLIENT_ID } from "../../../config/runtime";
-
-const GOOGLE_CLIENT_ID_ENV_NAME = "VITE_GOOGLE_CLIENT_ID";
-const GOOGLE_BACKEND_ENDPOINT = "/api/auth/google";
+import { GOOGLE_AUTH_ENABLED, GOOGLE_CLIENT_ID } from "../../../config/runtime";
+import {
+  AuthBrandHeader,
+  PremiumAuthPage,
+  AuthStatus,
+  PremiumAuthShell,
+  PremiumInput,
+  PremiumPasswordInput,
+  PrimaryAuthButton,
+  TrustIndicators,
+} from "./PremiumAuthUI";
+import { Badge, Button, Card } from "../../../components/ui";
 import { validateProductionEmail } from "../../../utils/emailValidation";
 import { loginWithEmail, loginWithGoogleCredential, registerWithEmail } from "../services/authApi";
 import { persistAuthSession } from "../services/authStorage";
 import { trackEvent } from "../../../services/analytics";
 
+const GOOGLE_CLIENT_ID_ENV_NAME = "VITE_GOOGLE_CLIENT_ID";
+const GOOGLE_BACKEND_ENDPOINT = "/api/auth/google";
 let googleInitializedClientId = "";
 let googleCredentialHandler = null;
+
+const REGISTER_BENEFITS = [
+  "Track your progress",
+  "Review your games",
+  "Improve faster with AI",
+];
 
 function loadGoogleIdentityScript() {
   return new Promise((resolve, reject) => {
@@ -93,10 +108,10 @@ export default function Auth({
     setFormData({ username: "", email: "", password: "", confirmPassword: "" });
   }, [initialIsLogin, referralCode]);
 
-  const heading = isLogin ? "Sign in to ChessPlay" : "Create your ChessPlay account";
+  const heading = isLogin ? "Welcome back" : "Create your ChessPlay account";
   const helperText = isLogin
-    ? "Access multiplayer, friends, messages, game history, and supporter features securely."
-    : "Start free with secure account protection for your chess progress.";
+    ? "Continue improving your chess."
+    : "Play chess, analyze mistakes, and improve faster.";
 
   const formErrors = useMemo(() => {
     const errors = {};
@@ -211,7 +226,7 @@ export default function Auth({
   useEffect(() => {
     googleCredentialHandler = handleGoogleCredential;
 
-    if (!GOOGLE_CLIENT_ID || !googleButtonRef.current) {
+    if (!GOOGLE_AUTH_ENABLED || !GOOGLE_CLIENT_ID || !googleButtonRef.current) {
       setGoogleReady(false);
       return () => {
         googleCredentialHandler = null;
@@ -241,7 +256,7 @@ export default function Auth({
           theme: "outline",
           size: "large",
           type: "standard",
-          text: isLogin ? "signin_with" : "signup_with",
+          text: isLogin ? "continue_with" : "signup_with",
           shape: "pill",
           width: Math.min(googleButtonRef.current.offsetWidth || 360, 390),
         });
@@ -263,56 +278,51 @@ export default function Auth({
   }, [handleGoogleCredential, isLogin]);
 
   const formContent = (
-    <div className="relative mx-auto w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl shadow-black/20 backdrop-blur-2xl sm:p-6">
-      <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[#81b64c]/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-20 -left-16 h-44 w-44 rounded-full bg-amber-300/10 blur-3xl" />
+    <PremiumAuthShell>
+      <AuthBrandHeader title={heading} subtitle={helperText} headingLevel={isModal ? "h2" : "h1"} />
 
-      {referralCode && !isLogin && (
-        <div className="relative mb-4 rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-3 text-sm font-semibold text-emerald-100">
-          You were invited to ChessPlay. Referral code <span className="font-mono text-emerald-200">{referralCode}</span> will be connected after registration if it is valid.
+      {referralCode && !isLogin ? (
+        <div className="mb-5 rounded-[var(--radius-xl)] border border-[color-mix(in_srgb,var(--color-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-success)_12%,transparent)] p-3 text-sm font-semibold text-[var(--color-success)]">
+          Referral code <span className="font-mono">{referralCode}</span> will be connected after registration if valid.
         </div>
-      )}
+      ) : null}
 
-      <div className="relative text-center">
-        <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-[#81b64c] text-3xl text-[#07100a] shadow-lg shadow-[#81b64c]/20">
-          ♟
-        </div>
-        <div className="mb-2 inline-flex rounded-full border border-[#81b64c]/25 bg-[#81b64c]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#a8e36f]">
-          Secure access
-        </div>
-        <h2 className="text-2xl font-black text-white sm:text-3xl">{heading}</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-400">{helperText}</p>
-      </div>
+      {!isLogin ? (
+        <Card variant="subtle" className="mb-4 grid gap-1.5 p-2.5 sm:mb-6 sm:gap-2 sm:p-3">
+          {REGISTER_BENEFITS.map((benefit) => (
+            <div key={benefit} className="flex items-center gap-3 text-sm font-bold text-[var(--color-text-primary)]">
+              <Badge tone="primary" size="sm">✓</Badge>
+              {benefit}
+            </div>
+          ))}
+        </Card>
+      ) : null}
 
-      <div className="relative mt-5 grid gap-3">
-        {/* Google client ID env: {GOOGLE_CLIENT_ID_ENV_NAME}; backend endpoint: {GOOGLE_BACKEND_ENDPOINT} */}
-        {GOOGLE_CLIENT_ID ? (
-          <div className="relative min-h-11 w-full overflow-hidden rounded-full bg-white">
-            {!googleReady && (
-              <div className="grid min-h-11 place-items-center px-4 text-sm font-bold text-slate-700">
+      {GOOGLE_AUTH_ENABLED ? (
+        <div className="grid gap-2.5 sm:gap-3">
+          {/* Google client ID env: {GOOGLE_CLIENT_ID_ENV_NAME}; backend endpoint: {GOOGLE_BACKEND_ENDPOINT} */}
+          <div className="relative min-h-11 w-full overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-white sm:min-h-12">
+            {!googleReady ? (
+              <div className="grid min-h-11 place-items-center px-4 text-sm font-bold text-slate-700 sm:min-h-12">
                 Loading Google sign-in...
               </div>
-            )}
+            ) : null}
             <div ref={googleButtonRef} className="w-full" />
-            {loading && <div className="absolute inset-0 cursor-wait rounded-full bg-white/60" />}
+            {loading ? <div className="absolute inset-0 cursor-wait rounded-[var(--radius-xl)] bg-white/60" /> : null}
           </div>
-        ) : (
-          <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-3 text-center text-sm text-amber-100">
-            Google login is not configured. Use email login.
-          </div>
-        )}
 
-        <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-          <span className="h-px flex-1 bg-white/10" />
-          or use email
-          <span className="h-px flex-1 bg-white/10" />
+          <div className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-[var(--color-text-tertiary)]">
+            <span className="h-px flex-1 bg-[var(--color-border-primary)]" />
+            or continue with email
+            <span className="h-px flex-1 bg-[var(--color-border-primary)]" />
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      <form onSubmit={handleSubmit} className="relative mt-5 space-y-4" noValidate>
-        {!isLogin && (
+      <form onSubmit={handleSubmit} className="mt-4 space-y-3 sm:mt-5 sm:space-y-4" noValidate>
+        {!isLogin ? (
           <div>
-            <FormInput
+            <PremiumInput
               label="Username"
               type="text"
               name="username"
@@ -325,111 +335,97 @@ export default function Auth({
               placeholder="sunilchess"
               error={formErrors.username}
             />
-            <p className="mt-1 text-xs text-slate-500">3–16 letters or numbers only.</p>
+            <p className="mt-1.5 text-xs leading-5 text-[var(--color-text-tertiary)]">3-16 letters or numbers only.</p>
           </div>
-        )}
+        ) : null}
 
-        <FormInput
-          label="Email"
-          type="email"
-          name="email"
-          value={formData.email}
-          onChange={handleChange}
-          required
-          autoComplete="email"
-          placeholder="name@gmail.com"
-          error={formErrors.email}
-        />
-
-        <div>
-          <PasswordInput
-            label="Password"
-            name="password"
-            value={formData.password}
+          <PremiumInput
+            label="Email"
+            type="email"
+            name="email"
+            value={formData.email}
             onChange={handleChange}
             required
-            minLength={8}
-            autoComplete={isLogin ? "current-password" : "new-password"}
-            placeholder={isLogin ? "Enter your password" : "Create a strong password"}
-            error={formErrors.password}
+            autoComplete="email"
+            placeholder="name@gmail.com"
+            error={formErrors.email}
           />
-          {!isLogin && (
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              Use at least 8 characters with uppercase, lowercase, number and symbol.
-            </p>
-          )}
-        </div>
 
-        {!isLogin && (
-          <PasswordInput
-            label="Confirm password"
-            name="confirmPassword"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            required
-            minLength={8}
-            autoComplete="new-password"
-            placeholder="Re-enter your password"
-            error={formErrors.confirmPassword}
-          />
-        )}
+          <div>
+            <PremiumPasswordInput
+              label="Password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+              minLength={8}
+              autoComplete={isLogin ? "current-password" : "new-password"}
+              placeholder={isLogin ? "Enter your password" : "Create a strong password"}
+              error={formErrors.password}
+            />
+            {!isLogin ? (
+              <p className="mt-1.5 text-xs leading-5 text-[var(--color-text-tertiary)]">
+                Use at least 8 characters with uppercase, lowercase, number and symbol.
+              </p>
+            ) : null}
+          </div>
 
-        <PrimaryBtn
-          type="submit"
-          disabled={loading}
-          className={`w-full ${loading ? "cursor-not-allowed opacity-60" : ""}`}
-        >
-          {loading ? (isLogin ? "Signing in..." : "Creating account...") : isLogin ? "Sign in" : "Create account"}
-        </PrimaryBtn>
+          {!isLogin ? (
+            <PremiumPasswordInput
+              label="Confirm password"
+              name="confirmPassword"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              required
+              minLength={8}
+              autoComplete="new-password"
+              placeholder="Re-enter your password"
+              error={formErrors.confirmPassword}
+            />
+          ) : null}
 
-        {isLogin && (
-          <button
-            type="button"
-            onClick={() => navigateToForgotPassword(onNavigatePath)}
-            disabled={loading}
-            className="w-full text-center text-sm font-bold text-[#a8e36f] transition hover:text-[#c5f29c] disabled:opacity-60"
+          <PrimaryAuthButton
+            type="submit"
+            loading={loading}
+            loadingText={isLogin ? "Signing in..." : "Creating account..."}
           >
-            Forgot password?
-          </button>
-        )}
+            {isLogin ? "Sign In" : "Create Account"}
+          </PrimaryAuthButton>
+
+          {isLogin ? (
+            <Button
+              type="button"
+              onClick={() => navigateToForgotPassword(onNavigatePath)}
+              disabled={loading}
+              variant="ghost"
+              className="w-full"
+            >
+              Forgot password?
+            </Button>
+          ) : null}
       </form>
 
-      {error && (
-        <div role="alert" className="relative mt-4 rounded-2xl border border-red-400/25 bg-red-500/10 p-3 text-center text-sm text-red-200">
-          {error}
-        </div>
-      )}
+      <AuthStatus status={error} tone="error" />
+      <AuthStatus status={success} tone="success" />
 
-      {success && (
-        <div role="status" className="relative mt-4 rounded-2xl border border-emerald-400/25 bg-emerald-500/10 p-3 text-center text-sm text-emerald-200">
-          {success}
-        </div>
-      )}
-
-      <div className="relative mt-6 text-center">
+      <TrustIndicators>
         <button
           type="button"
           onClick={handleToggleMode}
           disabled={loading}
-          className="text-sm font-bold text-blue-300 transition-colors hover:text-blue-200 disabled:opacity-60"
+          className="ds-focus rounded-[var(--radius-md)] text-sm font-black text-[var(--color-text-primary)] underline-offset-4 transition hover:text-[var(--color-primary)] hover:underline disabled:opacity-60"
         >
-          {isLogin ? "Need an account? Create one" : "Already have an account? Sign in"}
+          {isLogin ? "New to ChessPlay? Create Account" : "Already have an account? Sign In"}
         </button>
-      </div>
-    </div>
+      </TrustIndicators>
+    </PremiumAuthShell>
   );
 
   if (isModal) return formContent;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#171512] p-4 text-white sm:p-6">
-      <div className="w-full max-w-md">
-        <div className="mb-6 text-center">
-          <h1 className="mb-2 text-3xl font-bold text-[#f5d78e]">ChessPlay</h1>
-          <p className="text-gray-400">Secure sign-in for your chess arena</p>
-        </div>
-        {formContent}
-      </div>
-    </main>
+    <PremiumAuthPage>
+      {formContent}
+    </PremiumAuthPage>
   );
 }

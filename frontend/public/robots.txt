@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://getchessplay.vercel.app/sitemap.xml
+Sitemap: https://getchessplay.com/sitemap.xml

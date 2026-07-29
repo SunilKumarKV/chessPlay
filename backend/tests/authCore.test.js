@@ -1,0 +1,368 @@
+const assert = require('node:assert');
+const { describe, it } = require('node:test');
+
+process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://localhost:5432/chessplay_test?schema=public';
+
+const authCore = require('../routes/authCore');
+const publicRoutes = require('../routes/public');
+const repo = require('../src/repositories/userRepository');
+const { hashOtp } = require('../utils/otp');
+const { validateEmailProviderConfig } = require('../utils/email');
+
+function withTemporaryEnv(nextEnv, fn) {
+  const previous = {};
+  for (const [key, value] of Object.entries(nextEnv)) {
+    previous[key] = process.env[key];
+    process.env[key] = value;
+  }
+  return Promise.resolve()
+    .then(fn)
+    .finally(() => {
+      for (const key of Object.keys(nextEnv)) {
+        if (previous[key] === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = previous[key];
+        }
+      }
+    });
+}
+
+describe('backend authCore route coverage', () => {
+  it('registers POST /reset-password', () => {
+    const routePaths = authCore.stack.filter((layer) => layer.route).map((layer) => layer.route.path);
+    assert(routePaths.includes('/reset-password'), 'Missing /reset-password route');
+  });
+
+  it('registers PUT /password', () => {
+    const routePaths = authCore.stack.filter((layer) => layer.route).map((layer) => layer.route.path);
+    assert(routePaths.includes('/password'), 'Missing /password route');
+  });
+
+  it('registers DELETE /account', () => {
+    const routePaths = authCore.stack.filter((layer) => layer.route).map((layer) => layer.route.path);
+    assert(routePaths.includes('/account'), 'Missing /account route');
+  });
+
+  it('registers OTP auth routes', () => {
+    const routePaths = authCore.stack.filter((layer) => layer.route).map((layer) => layer.route.path);
+    assert(routePaths.includes('/forgot-password'), 'Missing /forgot-password route');
+    assert(routePaths.includes('/reset-password'), 'Missing /reset-password route');
+    assert(routePaths.includes('/resend-verification'), 'Missing /resend-verification route');
+    assert(routePaths.includes('/verify-email'), 'Missing /verify-email route');
+    assert(routePaths.includes('/google'), 'Missing /google route');
+  });
+});
+
+describe('backend userRepository helper behavior', () => {
+  it('updateUserPassword sends correct update payload', async () => {
+    let called = false;
+    const client = {
+      user: {
+        update(args) {
+          called = true;
+          assert.deepStrictEqual(args, { where: { id: 'user-id' }, data: { passwordHash: 'hash123' } });
+          return { id: 'user-id' };
+        },
+      },
+    };
+
+    const result = await repo.updateUserPassword('user-id', 'hash123', client);
+    assert(called, 'Expected updateUserPassword to call prisma user.update');
+    assert.strictEqual(result.id, 'user-id');
+  });
+
+  it('softDeleteUser increments tokenVersion and clears refreshTokenHash', async () => {
+    let called = false;
+    const client = {
+      user: {
+        update(args) {
+          called = true;
+          assert.strictEqual(args.where.id, 'user-id');
+          assert.strictEqual(args.data.email, 'deleted-user@example.com');
+          assert.strictEqual(args.data.username, 'DeletedUser123456');
+          assert.strictEqual(args.data.passwordHash, 'hashedpass');
+          assert.strictEqual(args.data.refreshTokenHash, null);
+          assert(args.data.deletedAt instanceof Date, 'deletedAt should be a Date');
+          assert.deepStrictEqual(args.data.tokenVersion, { increment: 1 });
+          return { id: 'user-id' };
+        },
+      },
+    };
+
+    const result = await repo.softDeleteUser('user-id', {
+      email: 'deleted-user@example.com',
+      username: 'DeletedUser123456',
+      passwordHash: 'hashedpass',
+      deletedAt: new Date(),
+      refreshTokenHash: null,
+    }, client);
+    assert(called, 'Expected softDeleteUser to call prisma user.update');
+    assert.strictEqual(result.id, 'user-id');
+  });
+
+  it('clearPasswordResetToken resets token fields', async () => {
+    let called = false;
+    const client = {
+      user: {
+        update(args) {
+          called = true;
+          assert.deepStrictEqual(args, {
+            where: { id: 'user-id' },
+            data: {
+              passwordResetTokenHash: null,
+              passwordResetExpires: null,
+              passwordResetAttempts: 0,
+              passwordResetSentAt: null,
+            },
+          });
+          return { id: 'user-id' };
+        },
+      },
+    };
+
+    const result = await repo.clearPasswordResetToken('user-id', client);
+    assert(called, 'Expected clearPasswordResetToken to call prisma user.update');
+    assert.strictEqual(result.id, 'user-id');
+  });
+
+  it('setPasswordResetToken stores only hash metadata and resets attempts', async () => {
+    let called = false;
+    const expiresAt = new Date(Date.now() + 600000);
+    const client = {
+      user: {
+        update(args) {
+          called = true;
+          assert.strictEqual(args.where.id, 'user-id');
+          assert.strictEqual(args.data.passwordResetTokenHash, 'hashed-otp');
+          assert.strictEqual(args.data.passwordResetExpires, expiresAt);
+          assert.strictEqual(args.data.passwordResetAttempts, 0);
+          assert(args.data.passwordResetSentAt instanceof Date);
+          return { id: 'user-id' };
+        },
+      },
+    };
+
+    const result = await repo.setPasswordResetToken('user-id', 'hashed-otp', expiresAt, client);
+    assert(called, 'Expected setPasswordResetToken to call prisma user.update');
+    assert.strictEqual(result.id, 'user-id');
+  });
+
+  it('markEmailVerified clears OTP metadata', async () => {
+    let called = false;
+    const client = {
+      user: {
+        update(args) {
+          called = true;
+          assert.deepStrictEqual(args, {
+            where: { id: 'user-id' },
+            data: {
+              emailVerified: true,
+              emailVerificationTokenHash: null,
+              emailVerificationExpires: null,
+              emailVerificationAttempts: 0,
+              emailVerificationSentAt: null,
+            },
+          });
+          return { id: 'user-id' };
+        },
+      },
+    };
+
+    const result = await repo.markEmailVerified('user-id', client);
+    assert(called, 'Expected markEmailVerified to call prisma user.update');
+    assert.strictEqual(result.id, 'user-id');
+  });
+});
+
+describe('backend OTP and email safety', () => {
+  it('hashOtp does not store raw OTP values and is purpose scoped', async () => {
+    await withTemporaryEnv({ JWT_ACCESS_SECRET: 'test-access-secret-with-enough-length-12345' }, () => {
+      const resetHash = hashOtp({ userId: 'user-id', otp: '123456', purpose: 'password-reset' });
+      const verifyHash = hashOtp({ userId: 'user-id', otp: '123456', purpose: 'email-verification' });
+      assert.notStrictEqual(resetHash, '123456');
+      assert.notStrictEqual(resetHash, verifyHash);
+      assert.match(resetHash, /^[a-f0-9]{64}$/);
+    });
+  });
+
+  it('validates SMTP config while allowing mock mode', async () => {
+    await withTemporaryEnv({ EMAIL_MOCK_MODE: 'true' }, () => {
+      assert.deepStrictEqual(validateEmailProviderConfig(), { ok: true, mode: 'mock' });
+    });
+
+    await withTemporaryEnv({
+      EMAIL_MOCK_MODE: 'false',
+      SMTP_HOST: '',
+      SMTP_USER: '',
+      SMTP_PASS: '',
+      SMTP_PORT: '',
+      SMTP_FROM: '',
+      MAIL_FROM: '',
+    }, () => {
+      const result = validateEmailProviderConfig();
+      assert.strictEqual(result.ok, false);
+      assert(result.missing.includes('SMTP_HOST'));
+      assert(result.missing.includes('SMTP_PASS'));
+    });
+  });
+});
+
+describe('backend public stats route', () => {
+  it('registers GET /stats', () => {
+    const routePaths = publicRoutes.stack.filter((layer) => layer.route).map((layer) => layer.route.path);
+    assert(routePaths.includes('/stats'), 'Missing /stats route');
+  });
+
+  it('builds safe aggregate stats without exposing user data', async () => {
+    const stats = await publicRoutes.getPublicStats({
+      game: {
+        count(args) {
+          if (args.where?.OR) return 4;
+          if (args.where?.whitePlayerId?.not === null) return 3;
+          return 7;
+        },
+      },
+      user: {
+        count(args) {
+          assert.deepStrictEqual(args, { where: { deletedAt: null } });
+          return 5;
+        },
+      },
+      puzzleAttempt: {
+        count(args) {
+          assert.deepStrictEqual(args, { where: { success: true } });
+          return 2;
+        },
+      },
+    });
+
+    assert.deepStrictEqual(stats, {
+      totalGames: 7,
+      registeredUsers: 5,
+      aiGames: 4,
+      multiplayerGames: 3,
+      puzzlesSolved: 2,
+      activeRooms: 0,
+    });
+  });
+
+  it('returns zero for a metric when an aggregate query fails', async () => {
+    const stats = await publicRoutes.getPublicStats({
+      game: {
+        count(args) {
+          if (args.where?.OR) throw new Error('database offline');
+          if (args.where?.whitePlayerId?.not === null) return 3;
+          return 7;
+        },
+      },
+      user: { count: () => 5 },
+      puzzleAttempt: { count: () => 2 },
+    });
+
+    assert.strictEqual(stats.aiGames, 0);
+    assert.strictEqual(stats.totalGames, 7);
+    assert.strictEqual(stats.registeredUsers, 5);
+    assert.strictEqual(stats.multiplayerGames, 3);
+    assert.strictEqual(stats.puzzlesSolved, 2);
+    assert.strictEqual(stats.activeRooms, 0);
+  });
+});
+
+describe('backend production request boundary', () => {
+  it('rejects cookie-backed API requests without an Origin header in production', async () => {
+    await withTemporaryEnv({
+      NODE_ENV: 'production',
+      DATABASE_URL: process.env.DATABASE_URL || 'postgresql://localhost:5432/chessplay_test?schema=public',
+      JWT_ACCESS_SECRET: 'test-access-secret-with-enough-length-12345',
+      JWT_REFRESH_SECRET: 'test-refresh-secret-with-enough-length-123',
+    }, async () => {
+      const envPath = require.resolve('../src/config/env.ts');
+      const appPath = require.resolve('../src/app.ts');
+      delete require.cache[envPath];
+      delete require.cache[appPath];
+      const { createApp } = require('../src/app');
+      const app = createApp();
+      const server = app.listen(0);
+
+      try {
+        const { port } = server.address();
+        const response = await fetch(`http://127.0.0.1:${port}/api/auth/logout`, {
+          method: 'POST',
+          headers: { cookie: 'accessToken=present' },
+        });
+
+        assert.strictEqual(response.status, 403);
+        assert.deepStrictEqual(await response.json(), { message: 'Origin is required' });
+      } finally {
+        await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+        delete require.cache[appPath];
+        delete require.cache[envPath];
+      }
+    });
+  });
+
+  it('allows trusted production origins through the boundary', async () => {
+    await withTemporaryEnv({
+      NODE_ENV: 'production',
+      DATABASE_URL: process.env.DATABASE_URL || 'postgresql://localhost:5432/chessplay_test?schema=public',
+      JWT_ACCESS_SECRET: 'test-access-secret-with-enough-length-12345',
+      JWT_REFRESH_SECRET: 'test-refresh-secret-with-enough-length-123',
+    }, async () => {
+      const envPath = require.resolve('../src/config/env.ts');
+      const appPath = require.resolve('../src/app.ts');
+      delete require.cache[envPath];
+      delete require.cache[appPath];
+      const { createApp } = require('../src/app');
+      const app = createApp();
+      const server = app.listen(0);
+
+      try {
+        const { port } = server.address();
+        const response = await fetch(`http://127.0.0.1:${port}/api/auth/logout`, {
+          method: 'POST',
+          headers: { origin: 'https://getchessplay.vercel.app' },
+        });
+
+        assert.notStrictEqual(response.status, 403);
+      } finally {
+        await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+        delete require.cache[appPath];
+        delete require.cache[envPath];
+      }
+    });
+  });
+
+  it('treats Render-hosted runtime as production even when NODE_ENV is not production', async () => {
+    await withTemporaryEnv({
+      NODE_ENV: 'development',
+      RENDER: 'true',
+      DATABASE_URL: process.env.DATABASE_URL || 'postgresql://localhost:5432/chessplay_test?schema=public',
+      JWT_ACCESS_SECRET: 'test-access-secret-with-enough-length-12345',
+      JWT_REFRESH_SECRET: 'test-refresh-secret-with-enough-length-123',
+    }, async () => {
+      const envPath = require.resolve('../src/config/env.ts');
+      const appPath = require.resolve('../src/app.ts');
+      delete require.cache[envPath];
+      delete require.cache[appPath];
+      const { createApp } = require('../src/app');
+      const app = createApp();
+      const server = app.listen(0);
+
+      try {
+        const { port } = server.address();
+        const response = await fetch(`http://127.0.0.1:${port}/api/auth/logout`, {
+          method: 'POST',
+          headers: { cookie: 'accessToken=present' },
+        });
+
+        assert.strictEqual(response.status, 403);
+        assert.deepStrictEqual(await response.json(), { message: 'Origin is required' });
+      } finally {
+        await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+        delete require.cache[appPath];
+        delete require.cache[envPath];
+      }
+    });
+  });
+});

@@ -1,9 +1,22 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { BACKEND_URL } from "../config/runtime";
 import { apiClient } from "../services/apiClient";
 import { useTheme } from "../hooks/useTheme";
 import PlanBadge from "../components/billing/PlanBadge";
 import UpgradeModal from "../components/billing/UpgradeModal";
+import { Badge, Button, Card, EmptyState as DesignEmptyState } from "../components/ui";
+import { buildTrainingRecommendation } from "../features/dashboard/rules/trainingRules";
+import { buildWeakness, getPuzzleActivity } from "../features/dashboard/rules/weaknessRules";
+import {
+  ONBOARDING_STORAGE_KEYS,
+  TRAINING_STORAGE_KEYS,
+  WEAKNESS_STORAGE_KEYS,
+  safeGetLocalStorage,
+  safeGetSessionStorage,
+  safeSetLocalStorage,
+  safeSetSessionStorage,
+} from "../features/dashboard/storage/dashboardStorage";
+import { trackEvent } from "../services/analytics";
 
 const timeControls = [
   { id: "1+0", label: "1+0 Bullet" },
@@ -12,6 +25,9 @@ const timeControls = [
   { id: "10+0", label: "10+0 Rapid" },
   { id: "30+0", label: "30+0 Classical" },
 ];
+
+const GOAL_OPTIONS = ["Learn chess", "Improve rating", "Win more games", "Prepare for tournaments"];
+const LEVEL_OPTIONS = ["Beginner", "Intermediate", "Advanced"];
 
 function normalizeList(payload, key) {
   if (Array.isArray(payload)) return payload;
@@ -75,16 +91,169 @@ function DashboardSkeleton({ theme }) {
 
 function EmptyState({ title, message, actionLabel, onAction }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-black/20 p-5 text-center">
-      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-white/10 text-xl" aria-hidden="true">♙</div>
-      <h3 className="font-['Montserrat'] text-base font-black text-white">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-400">{message}</p>
-      {actionLabel && onAction && (
-        <button type="button" onClick={onAction} className="mt-4 rounded-lg bg-[#81b64c] px-4 py-2 text-sm font-black text-[#07100a] transition hover:bg-[#93c85f]">
-          {actionLabel}
-        </button>
-      )}
-    </div>
+    <DesignEmptyState
+      title={title}
+      message={message}
+      action={actionLabel && onAction ? <Button type="button" onClick={onAction}>{actionLabel}</Button> : null}
+    />
+  );
+}
+
+function OnboardingOptionGroup({ label, options, value, onChange }) {
+  return (
+    <fieldset className="space-y-3">
+      <legend className="text-sm font-black text-[var(--color-text-primary)]">{label}</legend>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map((option) => {
+          const selected = value === option;
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onChange(option)}
+              aria-pressed={selected}
+              className={`ds-focus min-h-11 rounded-[var(--radius-xl)] border px-4 py-3 text-left text-sm font-black transition hover:-translate-y-0.5 ${
+                selected
+                  ? "border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_16%,transparent)] text-[var(--color-primary)]"
+                  : "border-[var(--color-border-primary)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-strong)] hover:text-[var(--color-text-primary)]"
+              }`}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+function OnboardingActivationCard({
+  goal,
+  level,
+  onGoalChange,
+  onLevelChange,
+  onStartAi,
+  onStartPuzzle,
+  onDismiss,
+}) {
+  return (
+    <Card variant="glass" className="overflow-hidden p-5 sm:p-6" aria-labelledby="chessplay-onboarding-title">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-2xl">
+          <Badge tone="primary">First improvement step</Badge>
+          <h2 id="chessplay-onboarding-title" className="mt-3 font-[var(--font-display)] text-2xl font-black tracking-tight text-[var(--color-text-primary)]">
+            Welcome to ChessPlay
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)] sm:text-base">
+            Let’s personalize your first improvement step.
+          </p>
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={onDismiss}>
+          Skip for now
+        </Button>
+      </div>
+
+      <div className="mt-6 grid gap-5 lg:grid-cols-2">
+        <OnboardingOptionGroup label="What is your goal?" options={GOAL_OPTIONS} value={goal} onChange={onGoalChange} />
+        <OnboardingOptionGroup label="What is your current level?" options={LEVEL_OPTIONS} value={level} onChange={onLevelChange} />
+      </div>
+
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        <Button type="button" onClick={onStartAi}>
+          Start first AI game
+        </Button>
+        <Button type="button" variant="secondary" onClick={onStartPuzzle}>
+          Solve first puzzle
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+function WeaknessDetectionCard({ weakness, onCta, onDismiss }) {
+  if (!weakness) return null;
+
+  return (
+    <Card variant="glass" className="overflow-hidden p-5 sm:p-6" aria-labelledby="chessplay-weakness-title">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <Badge tone={weakness.tone || "primary"}>Rule-based recommendation</Badge>
+          <h2 id="chessplay-weakness-title" className="mt-3 font-[var(--font-display)] text-2xl font-black tracking-tight text-[var(--color-text-primary)]">
+            Your Biggest Weakness
+          </h2>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <span className="rounded-[var(--radius-xl)] bg-[color-mix(in_srgb,var(--color-primary)_14%,transparent)] px-4 py-2 font-[var(--font-display)] text-xl font-black text-[var(--color-text-primary)]">
+              {weakness.weakness}
+            </span>
+            <span className="text-sm font-bold text-[var(--color-text-tertiary)]">Detected from games, puzzle activity, and recent activity.</span>
+          </div>
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={onDismiss} aria-label="Dismiss weakness recommendation">
+          Dismiss
+        </Button>
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface)] p-4">
+          <h3 className="text-sm font-black uppercase text-[var(--color-text-tertiary)]">Why this matters</h3>
+          <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">{weakness.explanation}</p>
+        </div>
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface)] p-4">
+          <h3 className="text-sm font-black uppercase text-[var(--color-text-tertiary)]">What to practice next</h3>
+          <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">{weakness.suggestion}</p>
+        </div>
+      </div>
+
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <Button type="button" onClick={onCta}>
+          {weakness.ctaLabel}
+        </Button>
+        <span className="text-xs font-bold text-[var(--color-text-tertiary)]">MVP rule: {weakness.reason.replaceAll("_", " ")}</span>
+      </div>
+    </Card>
+  );
+}
+
+function TrainingRecommendationCard({ recommendation, onCta, onDismiss }) {
+  if (!recommendation) return null;
+
+  return (
+    <Card variant="glass" className="overflow-hidden p-5 sm:p-6" aria-labelledby="chessplay-training-title">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <Badge tone={recommendation.tone || "primary"}>Next best action</Badge>
+          <h2 id="chessplay-training-title" className="mt-3 font-[var(--font-display)] text-2xl font-black tracking-tight text-[var(--color-text-primary)]">
+            Recommended Training
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">
+            Built from your current weakness signal and recent activity.
+          </p>
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={onDismiss} aria-label="Dismiss training recommendation">
+          Dismiss
+        </Button>
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface)] p-4">
+          <h3 className="font-[var(--font-display)] text-xl font-black text-[var(--color-text-primary)]">{recommendation.title}</h3>
+          <p className="mt-2 text-sm font-black text-[var(--color-primary)]">{recommendation.action}</p>
+        </div>
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface)] p-4">
+          <h3 className="text-sm font-black uppercase text-[var(--color-text-tertiary)]">Why this is recommended</h3>
+          <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">{recommendation.reason}</p>
+        </div>
+      </div>
+
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <Button type="button" onClick={onCta}>
+          {recommendation.ctaLabel}
+        </Button>
+        <span className="text-xs font-bold text-[var(--color-text-tertiary)]">
+          Training type: {recommendation.trainingType.replaceAll("_", " ")}
+        </span>
+      </div>
+    </Card>
   );
 }
 
@@ -116,7 +285,20 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [entitlements, setEntitlements] = useState(null);
   const [puzzleLimits, setPuzzleLimits] = useState(null);
-  const [onboardingDismissed, setOnboardingDismissed] = useState(() => localStorage.getItem("chessplay_onboarding_dismissed") === "1");
+  const [puzzleStats, setPuzzleStats] = useState(null);
+  const [puzzleSignalsReady, setPuzzleSignalsReady] = useState(false);
+  const [onboardingGoal, setOnboardingGoal] = useState(() => safeGetLocalStorage(ONBOARDING_STORAGE_KEYS.goal) || "");
+  const [onboardingLevel, setOnboardingLevel] = useState(() => safeGetLocalStorage(ONBOARDING_STORAGE_KEYS.level) || "");
+  const [onboardingCompleted, setOnboardingCompleted] = useState(() => safeGetLocalStorage(ONBOARDING_STORAGE_KEYS.completed) === "true");
+  const [onboardingDismissed, setOnboardingDismissed] = useState(() => {
+    const dismissed = safeGetLocalStorage(ONBOARDING_STORAGE_KEYS.dismissed);
+    return dismissed === "true" || dismissed === "1";
+  });
+  const [dismissedWeaknessId, setDismissedWeaknessId] = useState(() => safeGetSessionStorage(WEAKNESS_STORAGE_KEYS.dismissedId) || "");
+  const [dismissedTrainingId, setDismissedTrainingId] = useState(() => safeGetSessionStorage(TRAINING_STORAGE_KEYS.dismissedId) || "");
+  const onboardingStartedTrackedRef = useRef(false);
+  const weaknessViewedRef = useRef("");
+  const trainingViewedRef = useRef("");
 
   const showDebugStatus = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -211,13 +393,17 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
   useEffect(() => {
     if (!user || isGuest) return undefined;
     let active = true;
+    setPuzzleSignalsReady(false);
     Promise.allSettled([
       apiClient("/api/me/entitlements"),
       apiClient("/api/puzzles/limits/me", { skipAuthRefresh: true }),
-    ]).then(([entitlementResult, limitsResult]) => {
+      apiClient("/api/puzzles/stats/me", { skipAuthRefresh: true }),
+    ]).then(([entitlementResult, limitsResult, puzzleStatsResult]) => {
       if (!active) return;
       if (entitlementResult.status === "fulfilled") setEntitlements(entitlementResult.value);
       if (limitsResult.status === "fulfilled") setPuzzleLimits(limitsResult.value.limits || null);
+      if (puzzleStatsResult.status === "fulfilled") setPuzzleStats(puzzleStatsResult.value || null);
+      setPuzzleSignalsReady(true);
     });
     return () => { active = false; };
   }, [isGuest, user]);
@@ -231,7 +417,7 @@ export default function Dashboard({ user, onStartGame, onNavigate, onAuthError }
     return () => controller.abort();
   }, [showDebugStatus]);
 
-  const safeStats = stats || user || {};
+  const safeStats = useMemo(() => stats || user || {}, [stats, user]);
   const displayName = safeStats.username || user?.username || "Player";
   const rating = safeStats.rating || user?.rating || 1200;
   const gamesPlayed = safeStats.gamesPlayed || 0;
@@ -291,6 +477,179 @@ const trialDaysLeft = trialEndsAt
     onStartGame?.(type, selectedTimeControl);
   };
 
+  const shouldShowOnboarding = !isGuest && gamesPlayed === 0 && !onboardingCompleted && !onboardingDismissed;
+  const puzzleActivity = useMemo(
+    () => getPuzzleActivity(puzzleStats, puzzleLimits, safeStats),
+    [puzzleLimits, puzzleStats, safeStats],
+  );
+  const weaknessRecommendation = useMemo(
+    () => buildWeakness({ gamesPlayed, wins, losses, draws, recentGames, userId, puzzleActivity }),
+    [draws, gamesPlayed, losses, puzzleActivity, recentGames, userId, wins],
+  );
+  const shouldShowWeakness = !isGuest && puzzleSignalsReady && weaknessRecommendation && weaknessRecommendation.id !== dismissedWeaknessId;
+  const trainingRecommendation = useMemo(
+    () => buildTrainingRecommendation({ weakness: weaknessRecommendation, gamesPlayed, puzzleActivity }),
+    [gamesPlayed, puzzleActivity, weaknessRecommendation],
+  );
+  const shouldShowTraining = !isGuest && puzzleSignalsReady && trainingRecommendation && trainingRecommendation.id !== dismissedTrainingId;
+
+  useEffect(() => {
+    if (!shouldShowOnboarding) return;
+    if (onboardingStartedTrackedRef.current) return;
+    if (safeGetLocalStorage(ONBOARDING_STORAGE_KEYS.started) === "true") return;
+    onboardingStartedTrackedRef.current = true;
+    safeSetLocalStorage(ONBOARDING_STORAGE_KEYS.started, "true");
+    trackEvent("onboarding_started", { gamesPlayed });
+  }, [gamesPlayed, shouldShowOnboarding]);
+
+  const updateOnboardingGoal = (goal) => {
+    setOnboardingGoal(goal);
+    safeSetLocalStorage(ONBOARDING_STORAGE_KEYS.goal, goal);
+    trackEvent("goal_selected", { goal });
+  };
+
+  const updateOnboardingLevel = (level) => {
+    setOnboardingLevel(level);
+    safeSetLocalStorage(ONBOARDING_STORAGE_KEYS.level, level);
+    trackEvent("level_selected", { level });
+  };
+
+  const completeOnboarding = (source) => {
+    safeSetLocalStorage(ONBOARDING_STORAGE_KEYS.completed, "true");
+    setOnboardingCompleted(true);
+    trackEvent("onboarding_completed", {
+      source,
+      goal: onboardingGoal || undefined,
+      level: onboardingLevel || undefined,
+    });
+  };
+
+  const startFirstAiGame = () => {
+    trackEvent("first_ai_game_started", {
+      goal: onboardingGoal || undefined,
+      level: onboardingLevel || undefined,
+    });
+    completeOnboarding("ai_game");
+    startGame("ai");
+  };
+
+  const startFirstPuzzle = () => {
+    trackEvent("first_puzzle_started", {
+      goal: onboardingGoal || undefined,
+      level: onboardingLevel || undefined,
+    });
+    completeOnboarding("puzzle");
+    onNavigate?.("puzzles");
+  };
+
+  const dismissOnboarding = () => {
+    safeSetLocalStorage(ONBOARDING_STORAGE_KEYS.dismissed, "true");
+    setOnboardingDismissed(true);
+    trackEvent("onboarding_dismissed", {
+      goal: onboardingGoal || undefined,
+      level: onboardingLevel || undefined,
+    });
+  };
+
+  useEffect(() => {
+    if (!shouldShowWeakness || !weaknessRecommendation) return;
+    if (weaknessViewedRef.current === weaknessRecommendation.id) return;
+    if (safeGetSessionStorage(WEAKNESS_STORAGE_KEYS.viewedId) === weaknessRecommendation.id) return;
+    weaknessViewedRef.current = weaknessRecommendation.id;
+    safeSetSessionStorage(WEAKNESS_STORAGE_KEYS.viewedId, weaknessRecommendation.id);
+    trackEvent("weakness_viewed", {
+      weakness: weaknessRecommendation.weakness,
+      rule: weaknessRecommendation.reason,
+      gamesPlayed,
+      puzzleStarted: puzzleActivity.started,
+      puzzleUsedToday: puzzleActivity.usedToday,
+    });
+  }, [gamesPlayed, puzzleActivity.started, puzzleActivity.usedToday, shouldShowWeakness, weaknessRecommendation]);
+
+  const handleWeaknessCta = () => {
+    if (!weaknessRecommendation) return;
+    trackEvent("weakness_cta_clicked", {
+      weakness: weaknessRecommendation.weakness,
+      rule: weaknessRecommendation.reason,
+      route: weaknessRecommendation.ctaRoute,
+    });
+    if (weaknessRecommendation.ctaRoute === "ai") {
+      startGame("ai");
+      return;
+    }
+    onNavigate?.(weaknessRecommendation.ctaRoute);
+  };
+
+  const dismissWeakness = () => {
+    if (!weaknessRecommendation) return;
+    safeSetSessionStorage(WEAKNESS_STORAGE_KEYS.dismissedId, weaknessRecommendation.id);
+    setDismissedWeaknessId(weaknessRecommendation.id);
+    trackEvent("weakness_dismissed", {
+      weakness: weaknessRecommendation.weakness,
+      rule: weaknessRecommendation.reason,
+    });
+  };
+
+  useEffect(() => {
+    if (!shouldShowTraining || !trainingRecommendation) return;
+    if (trainingViewedRef.current === trainingRecommendation.id) return;
+    if (safeGetSessionStorage(TRAINING_STORAGE_KEYS.viewedId) === trainingRecommendation.id) return;
+    trainingViewedRef.current = trainingRecommendation.id;
+    safeSetSessionStorage(TRAINING_STORAGE_KEYS.viewedId, trainingRecommendation.id);
+    trackEvent("training_recommendation_viewed", {
+      title: trainingRecommendation.title,
+      trainingType: trainingRecommendation.trainingType,
+      weakness: trainingRecommendation.weakness,
+      rule: trainingRecommendation.weaknessRule,
+    });
+  }, [shouldShowTraining, trainingRecommendation]);
+
+  const handleTrainingCta = () => {
+    if (!trainingRecommendation) return;
+    trackEvent("training_recommendation_clicked", {
+      title: trainingRecommendation.title,
+      trainingType: trainingRecommendation.trainingType,
+      weakness: trainingRecommendation.weakness,
+      route: trainingRecommendation.ctaRoute,
+    });
+    if (trainingRecommendation.timeControl) {
+      setSelectedTimeControl(trainingRecommendation.timeControl);
+      localStorage.setItem("selectedTimeControl", trainingRecommendation.timeControl);
+    }
+    if (trainingRecommendation.ctaRoute === "ai") {
+      onStartGame?.("ai", trainingRecommendation.timeControl || selectedTimeControl);
+      return;
+    }
+    onNavigate?.(trainingRecommendation.ctaRoute);
+  };
+
+  const dismissTraining = () => {
+    if (!trainingRecommendation) return;
+    safeSetSessionStorage(TRAINING_STORAGE_KEYS.dismissedId, trainingRecommendation.id);
+    setDismissedTrainingId(trainingRecommendation.id);
+    trackEvent("training_recommendation_dismissed", {
+      title: trainingRecommendation.title,
+      trainingType: trainingRecommendation.trainingType,
+      weakness: trainingRecommendation.weakness,
+    });
+  };
+
+  const startAiFromDashboard = () => {
+    if (shouldShowOnboarding) {
+      startFirstAiGame();
+      return;
+    }
+    startGame("ai");
+  };
+
+  const startPuzzleFromDashboard = () => {
+    if (shouldShowOnboarding) {
+      startFirstPuzzle();
+      return;
+    }
+    onNavigate?.("puzzles");
+  };
+
   const copyInvite = async () => {
     try {
       await navigator.clipboard.writeText(`${window.location.origin} — join me on ChessPlay`);
@@ -341,31 +700,32 @@ const trialDaysLeft = trialEndsAt
         </div>
       ) : null}
 
-      {!onboardingDismissed && !isGuest && gamesPlayed < 2 ? (
-        <section className="rounded-2xl border border-[#81b64c]/25 bg-[#81b64c]/10 p-5 text-white">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#b8f28f]">Welcome checklist</p>
-              <h2 className="mt-2 font-['Montserrat'] text-2xl font-black">Set up your ChessPlay rhythm</h2>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                {[
-                  ["Play vs AI", () => startGame("ai")],
-                  ["Try puzzles", () => onNavigate?.("puzzles")],
-                  ["Complete profile", () => onNavigate?.("profile")],
-                  ["Invite friend", () => onNavigate?.("referrals")],
-                  ["View pricing", () => onNavigate?.("pricing")],
-                ].map(([label, action]) => (
-                  <button key={label} type="button" onClick={action} className="rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-black text-white transition hover:bg-white/10">
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button type="button" onClick={() => { localStorage.setItem("chessplay_onboarding_dismissed", "1"); setOnboardingDismissed(true); }} className="rounded-xl border border-white/10 px-3 py-2 text-sm font-bold text-slate-200">
-              Dismiss
-            </button>
-          </div>
-        </section>
+      {shouldShowOnboarding ? (
+        <OnboardingActivationCard
+          goal={onboardingGoal}
+          level={onboardingLevel}
+          onGoalChange={updateOnboardingGoal}
+          onLevelChange={updateOnboardingLevel}
+          onStartAi={startFirstAiGame}
+          onStartPuzzle={startFirstPuzzle}
+          onDismiss={dismissOnboarding}
+        />
+      ) : null}
+
+      {shouldShowWeakness ? (
+        <WeaknessDetectionCard
+          weakness={weaknessRecommendation}
+          onCta={handleWeaknessCta}
+          onDismiss={dismissWeakness}
+        />
+      ) : null}
+
+      {shouldShowTraining ? (
+        <TrainingRecommendationCard
+          recommendation={trainingRecommendation}
+          onCta={handleTrainingCta}
+          onDismiss={dismissTraining}
+        />
       ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -405,7 +765,7 @@ const trialDaysLeft = trialEndsAt
               ) : null}
             </div>
             <div className="grid gap-3">
-              <button type="button" onClick={() => startGame("ai")} className="rounded-xl bg-[#81b64c] px-5 py-4 text-left font-['Montserrat'] text-lg font-black text-[#07100a] shadow-lg shadow-[#81b64c]/20 transition-all hover:-translate-y-1 hover:bg-[#93c85f]" aria-label="Play against AI">
+              <button type="button" onClick={startAiFromDashboard} className="rounded-xl bg-[#81b64c] px-5 py-4 text-left font-['Montserrat'] text-lg font-black text-[#07100a] shadow-lg shadow-[#81b64c]/20 transition-all hover:-translate-y-1 hover:bg-[#93c85f]" aria-label="Play against AI">
                 Play vs AI
                 <span className="block text-xs font-semibold opacity-80">Stockfish · {selectedTimeControl}</span>
               </button>
@@ -432,7 +792,7 @@ const trialDaysLeft = trialEndsAt
             <button type="button" onClick={() => requireLoginForGuest("game history") || onNavigate?.("history")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Game History</button>
             <button type="button" onClick={() => requireLoginForGuest("invites") || copyInvite()} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">{inviteCopied ? "Copied" : "Invite"}</button>
             <button type="button" onClick={() => requireLoginForGuest("leaderboard") || onNavigate?.("leaderboard")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Leaderboard</button>
-            <button type="button" onClick={() => requireLoginForGuest("saved puzzle progress") || onNavigate?.("puzzles")} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Puzzles</button>
+            <button type="button" onClick={() => requireLoginForGuest("saved puzzle progress") || startPuzzleFromDashboard()} className="rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left text-sm font-bold text-slate-200 transition hover:bg-white/10">Puzzles</button>
             {isAdmin && (
               <button type="button" onClick={() => onNavigate?.("admin")} className="col-span-2 rounded-lg border border-[#81b64c]/40 bg-[#81b64c]/15 px-3 py-3 text-left text-sm font-black text-[#dcf8c6] transition hover:bg-[#81b64c]/20">Open Admin Panel</button>
             )}
@@ -462,9 +822,9 @@ const trialDaysLeft = trialEndsAt
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {[
-                { title: "Play vs AI", meta: "Practice instantly", action: () => startGame("ai"), accent: "#81b64c" },
+                { title: "Play vs AI", meta: "Practice instantly", action: startAiFromDashboard, accent: "#81b64c" },
                 { title: "Play Online", meta: isGuest ? "Login required" : "Live rooms", action: () => startGame("multi"), accent: "#38bdf8" },
-                { title: "Puzzles", meta: "Train tactics", action: () => onNavigate?.("puzzles"), accent: "#a78bfa" },
+                { title: "Puzzles", meta: "Train tactics", action: startPuzzleFromDashboard, accent: "#a78bfa" },
                 { title: "Game History", meta: "Recent results", action: () => requireLoginForGuest("game history") || onNavigate?.("history"), accent: "#f59e0b" },
               ].map((item) => (
                 <button key={item.title} type="button" onClick={item.action} className="group rounded-xl border border-white/10 bg-black/20 p-4 text-left transition-all hover:-translate-y-1 hover:bg-white/10">
@@ -485,7 +845,7 @@ const trialDaysLeft = trialEndsAt
               <button type="button" onClick={() => requireLoginForGuest("game history") || onNavigate?.("history")} className="rounded-lg border border-white/10 px-4 py-2 text-sm font-bold text-slate-200 transition hover:bg-white/10">View all</button>
             </div>
             {recentGames.length === 0 ? (
-              <EmptyState title="No games yet" message="Start your first match to build your game history and rating profile." actionLabel="Play vs AI" onAction={() => startGame("ai")} />
+              <EmptyState title="No games yet" message="Play your first AI game to start detecting strengths, weaknesses, and improvement patterns." actionLabel="Play your first AI game" onAction={startAiFromDashboard} />
             ) : (
               <div className="overflow-hidden rounded-xl border border-white/10">
                 <div className="hidden grid-cols-[1fr_120px_120px_100px] gap-3 bg-black/30 px-4 py-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-500 md:grid">
@@ -538,15 +898,25 @@ const trialDaysLeft = trialEndsAt
           <div className="rounded-2xl border border-white/10 bg-white/10 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
             <h2 className="font-['Montserrat'] text-xl font-black text-white">Recent Activity</h2>
             <div className="mt-4 space-y-3">
-              {recentGames.slice(0, 3).map((game) => (
-                <div key={`activity-${game._id || game.id || game.createdAt}`} className="rounded-xl border border-white/10 bg-black/20 p-3">
+              {recentGames.slice(0, 3).map((game, index) => {
+                const activityKey = game._id || game.id || `${game.createdAt || game.startTime || game.endTime || "game"}-${index}`;
+                return (
+                <div key={`activity-${activityKey}`} className="rounded-xl border border-white/10 bg-black/20 p-3">
                   <div className="text-sm font-bold text-white">{getGameResult(game, userId)} against {getOpponent(game, userId)}</div>
-                  <div className="mt-1 text-xs text-slate-500">{formatDate(game.createdAt)}</div>
+                  <div className="mt-1 text-xs text-slate-500">{formatDate(game.createdAt || game.startTime || game.endTime)}</div>
                 </div>
-              ))}
+                );
+              })}
               {recentGames.length === 0 && (
-                <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-slate-400">No recent activity yet. Play a game to see updates here.</div>
+                <EmptyState title="No history" message="Your completed games will appear here." actionLabel="Play your first AI game" onAction={startAiFromDashboard} />
               )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/10 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+            <h2 className="font-['Montserrat'] text-xl font-black text-white">Puzzle Training</h2>
+            <div className="mt-4">
+              <EmptyState title="No puzzles yet" message="Solve your first puzzle to start building tactical pattern recognition." actionLabel="Solve your first puzzle" onAction={startPuzzleFromDashboard} />
             </div>
           </div>
         </aside>

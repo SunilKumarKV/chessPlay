@@ -20,9 +20,11 @@ import ErrorBoundary from "../components/ErrorBoundary";
 const PrivacyPolicyPage = lazy(() => import("../pages/legal/PrivacyPolicyPage"));
 const TermsPage = lazy(() => import("../pages/legal/TermsPage"));
 const DeleteAccountPage = lazy(() => import("../pages/legal/DeleteAccountPage"));
+const SupportPage = lazy(() => import("../pages/legal/SupportPage"));
 const ForgotPasswordPage = lazy(() => import("../pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("../pages/ResetPasswordPage"));
 const VerifyEmailPage = lazy(() => import("../pages/VerifyEmailPage"));
+const Auth = lazy(() => import("../features/auth/components/Auth"));
 const PricingPage = lazy(() => import("../pages/billing/PricingPage"));
 const BillingPage = lazy(() => import("../pages/billing/BillingPage"));
 const AdminSupportersPage = lazy(() => import("../pages/billing/AdminSupportersPage"));
@@ -45,10 +47,72 @@ const StorePage = lazy(() => import("../pages/growth/StorePage"));
 const ServicesPage = lazy(() => import("../pages/growth/ServicesPage"));
 const OpeningExplorerPage = lazy(() => import("../pages/growth/OpeningExplorerPage"));
 const PaymentStatusPage = lazy(() => import("../pages/billing/PaymentStatusPage"));
+const BrandConceptsPage = lazy(() => import("../pages/BrandConceptsPage"));
 import { getGuestFeatureMessage, isGuestRestrictedFeature, isGuestUser } from "../utils/guestAccess";
 import { trackEvent } from "../services/analytics";
 
 const REDUX_PAGES = new Set(["ai", "local", "settings"]);
+const AUTH_INTENT_STORAGE_KEY = "chessplay_auth_redirect";
+const LOGOUT_NAVIGATION_GUARD_KEY = "chessplay_logout_guard_active";
+
+// Auth pages render only when signed out. Guest pages are safe without a user.
+// Every route outside these sets is treated as protected by default.
+const AUTH_PAGES = new Set(["login", "register"]);
+const POST_LOGOUT_BLOCKED_PAGES = new Set([
+  "admin",
+  "admin-supporters",
+  "automation",
+  "billing",
+  "community",
+  "dashboard",
+  "history",
+  "leaderboard",
+  "messages",
+  "multi",
+  "multiplayer",
+  "profile",
+  "puzzles",
+  "referral",
+  "referrals",
+  "settings",
+  "tournaments",
+]);
+const PUBLIC_GUEST_PAGES = new Set([
+  "ai",
+  "analysis",
+  "chess-ai",
+  "chess-analysis",
+  "chess-puzzles",
+  "coaching",
+  "contact",
+  "cookie-policy",
+  "delete-account",
+  "forgot-password",
+  "hire-me",
+  "home",
+  "leaderboard",
+  "local",
+  "monetization",
+  "opening-explorer",
+  "openings",
+  "payment-failed",
+  "payment-success",
+  "play-chess-online",
+  "pricing",
+  "privacy",
+  "privacy-policy",
+  "profile-public",
+  "puzzles",
+  "referral",
+  "referrals",
+  "refund-policy",
+  "register",
+  "reset-password",
+  "services",
+  "store",
+  "support",
+  "terms",
+]);
 
 function getStoredUser() {
   const storedUser = localStorage.getItem("user");
@@ -104,7 +168,9 @@ const routeMap = {
   admin: "/admin",
   "admin-supporters": "/admin/payments",
   ai: "/play",
+  "play-ai": "/play-ai",
   multi: "/play/online",
+  multiplayer: "/multiplayer",
   local: "/play/local",
   lan: "/wifi",
   dashboard: "/dashboard",
@@ -145,21 +211,27 @@ const routeMap = {
   "forgot-password": "/forgot-password",
   "reset-password": "/reset-password",
   "verify-email": "/verify-email",
+  login: "/login",
+  register: "/register",
   "payment-success": "/payment/success",
   "payment-failed": "/payment/failed",
+  "brand-concepts": "/internal/brand-concepts",
 };
 
 function pageFromPathname(pathname) {
   const normalized = pathname.replace(/\/$/, "") || "/";
-  if (normalized === "/") return "dashboard";
+  if (normalized === "/") return "home";
   if (normalized === "/privacy-policy") return "privacy-policy";
   if (normalized === "/payment/success") return "payment-success";
   if (normalized === "/payment/failed") return "payment-failed";
   if (normalized === "/referrals") return "referrals";
   if (normalized === "/privacy") return "privacy";
   if (normalized === "/admin" || normalized === "/admin/dashboard") return "admin";
+  if (normalized === "/internal/brand-concepts") return "brand-concepts";
   if (normalized.startsWith("/profile/") && normalized.split("/")[2]) return "profile-public";
   if (["/admin/payments", "/admin/supporters"].includes(normalized)) return "admin-supporters";
+  if (["/play-ai", "/play/computer"].includes(normalized)) return "ai";
+  if (["/multiplayer", "/play-online"].includes(normalized)) return "multi";
   if (["/play-player", "/play/local"].includes(normalized)) return "local";
   if (["/lan", "/wifi", "/play-wifi"].includes(normalized)) return "lan";
   const entry = Object.entries(routeMap).find(([, path]) => path === normalized);
@@ -170,6 +242,71 @@ function profileUsernameFromPathname(pathname) {
   const parts = pathname.replace(/\/$/, "").split("/");
   if (parts[1] === "profile" && parts[2]) return decodeURIComponent(parts[2]);
   return null;
+}
+
+function clearClientAuthSession() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  localStorage.removeItem("guestMode");
+  sessionStorage.removeItem(AUTH_INTENT_STORAGE_KEY);
+  sessionStorage.removeItem("chessplay_access_token");
+  sessionStorage.removeItem("chessplay_socket_token");
+}
+
+function activateLogoutNavigationGuard() {
+  try {
+    sessionStorage.setItem(LOGOUT_NAVIGATION_GUARD_KEY, "true");
+  } catch {
+    // Back-navigation protection is best effort when sessionStorage is unavailable.
+  }
+}
+
+function clearLogoutNavigationGuard() {
+  try {
+    sessionStorage.removeItem(LOGOUT_NAVIGATION_GUARD_KEY);
+  } catch {
+    // Auth should still proceed if sessionStorage is unavailable.
+  }
+}
+
+function isLogoutNavigationGuardActive() {
+  try {
+    return sessionStorage.getItem(LOGOUT_NAVIGATION_GUARD_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function navigateToPublicHome(setCurrentPage, replace = true) {
+  if (window.location.pathname !== "/") {
+    const method = replace ? "replaceState" : "pushState";
+    window.history[method]({}, "", "/");
+  }
+  setCurrentPage("home");
+}
+
+function isAuthRequiredPage(page) {
+  return !PUBLIC_GUEST_PAGES.has(page) && !AUTH_PAGES.has(page) && page !== "verify-email";
+}
+
+function storeAuthRedirect(page) {
+  if (!routeMap[page] || !isAuthRequiredPage(page)) return;
+  try {
+    sessionStorage.setItem(AUTH_INTENT_STORAGE_KEY, page);
+  } catch {
+    // Losing redirect intent should not block authentication.
+  }
+}
+
+function consumeAuthRedirect() {
+  try {
+    const page = sessionStorage.getItem(AUTH_INTENT_STORAGE_KEY);
+    sessionStorage.removeItem(AUTH_INTENT_STORAGE_KEY);
+    if (page && routeMap[page] && isAuthRequiredPage(page)) return page;
+  } catch {
+    // Fall back to dashboard if sessionStorage is unavailable.
+  }
+  return "dashboard";
 }
 
 function navigateToAppPage(page, setCurrentPage, replace = false) {
@@ -205,19 +342,30 @@ export default function App() {
     async function restoreSession() {
       try {
         localStorage.removeItem("token");
-        const data = await apiClient("/api/auth/session", { skipAuthRefresh: true });
+        let data = await apiClient("/api/auth/session", { skipAuthRefresh: true });
         if (cancelled) return;
+
+        if (!data.user && localStorage.getItem("user")) {
+          try {
+            await apiClient("/api/auth/refresh", { method: "POST" });
+            data = await apiClient("/api/auth/session", { skipAuthRefresh: true });
+            if (cancelled) return;
+          } catch {
+            // Refresh failed; fall through to clear stale local session below.
+          }
+        }
+
         const nextUser = data.user || null;
         if (nextUser) {
           localStorage.setItem("user", JSON.stringify(nextUser));
         } else {
-          localStorage.removeItem("user");
+          clearClientAuthSession();
         }
         setUser(nextUser);
         notifyUserChanged();
       } catch {
         if (!cancelled) {
-          localStorage.removeItem("user");
+          clearClientAuthSession();
           setUser(null);
           notifyUserChanged();
         }
@@ -230,24 +378,47 @@ export default function App() {
       }
     }
 
-    const restoreTimer = user ? window.setTimeout(restoreSession, 0) : runWhenIdle(restoreSession);
+    const hadStoredUser = Boolean(getStoredUser());
+    const restoreTimer = hadStoredUser ? window.setTimeout(restoreSession, 0) : runWhenIdle(restoreSession);
     return () => {
       cancelled = true;
       window.removeEventListener("popstate", syncPageFromUrl);
       window.clearTimeout(fallbackTimer);
-      if (user) window.clearTimeout(restoreTimer);
+      if (hadStoredUser) window.clearTimeout(restoreTimer);
       else cancelIdleRun(restoreTimer);
     };
   }, []);
 
+  useEffect(() => {
+    if (authChecked && currentPage === "verify-email" && user?.emailVerified) {
+      navigateToAppPage(consumeAuthRedirect(), setCurrentPage, true);
+    }
+    if (authChecked && user && AUTH_PAGES.has(currentPage)) {
+      navigateToAppPage(user?.emailVerified === false ? "verify-email" : consumeAuthRedirect(), setCurrentPage, true);
+    }
+    if (authChecked && user && currentPage === "home") {
+      navigateToAppPage("dashboard", setCurrentPage, true);
+    }
+    if (authChecked && !user && isLogoutNavigationGuardActive() && POST_LOGOUT_BLOCKED_PAGES.has(currentPage)) {
+      navigateToPublicHome(setCurrentPage, true);
+      return;
+    }
+    if (authChecked && !user && isAuthRequiredPage(currentPage)) {
+      storeAuthRedirect(currentPage);
+      navigateToAppPage("login", setCurrentPage, true);
+    }
+  }, [authChecked, currentPage, user]);
+
   const handleLogin = (userData) => {
+    clearLogoutNavigationGuard();
     localStorage.removeItem("guestMode");
     setUser(userData);
-    navigateToAppPage("dashboard", setCurrentPage, true);
+    navigateToAppPage(userData?.emailVerified === false ? "verify-email" : consumeAuthRedirect(), setCurrentPage, true);
     notifyUserChanged();
   };
 
   const handleGuestPlay = () => {
+    clearLogoutNavigationGuard();
     const guestUser = {
       id: "guest",
       username: "Guest Player",
@@ -277,17 +448,18 @@ export default function App() {
     } catch {
       // Local logout should still complete if the session is already gone.
     }
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("guestMode");
-    sessionStorage.removeItem("chessplay_access_token");
-    sessionStorage.removeItem("chessplay_socket_token");
+    clearClientAuthSession();
+    activateLogoutNavigationGuard();
     setUser(null);
-    navigateToAppPage("dashboard", setCurrentPage, true);
+    navigateToPublicHome(setCurrentPage, true);
     notifyUserChanged();
   };
 
   if (!authChecked) {
+    return <AppSplash />;
+  }
+
+  if (user && (AUTH_PAGES.has(currentPage) || currentPage === "home")) {
     return <AppSplash />;
   }
 
@@ -307,10 +479,18 @@ export default function App() {
     );
   }
 
-  if (currentPage === "verify-email") {
+  if (currentPage === "login" || currentPage === "register") {
     return (
       <RouteFrame>
-        <VerifyEmailPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+        <Auth
+          onLogin={handleLogin}
+          initialIsLogin={currentPage === "login"}
+          onToggleMode={() => navigateToAppPage(currentPage === "login" ? "register" : "login", setCurrentPage, true)}
+          onNavigatePath={(path) => {
+            window.history.pushState({}, "", path);
+            setCurrentPage(pageFromPathname(path));
+          }}
+        />
       </RouteFrame>
     );
   }
@@ -324,26 +504,38 @@ export default function App() {
     );
   }
 
-  if (["privacy", "privacy-policy", "terms", "refund-policy", "cookie-policy", "contact", "chess-puzzles", "play-chess-online", "chess-ai", "chess-analysis", "coaching", "openings", "opening-explorer", "store", "hire-me", "services"].includes(currentPage)) {
+  if (currentPage === "brand-concepts") {
+    return (
+      <RouteFrame>
+        <BrandConceptsPage onBack={() => navigateToAppPage("dashboard", setCurrentPage, true)} />
+      </RouteFrame>
+    );
+  }
+
+  if (["privacy", "privacy-policy", "terms", "delete-account", "support", "refund-policy", "cookie-policy", "contact", "chess-puzzles", "play-chess-online", "chess-ai", "chess-analysis", "coaching", "openings", "opening-explorer", "store", "hire-me", "services"].includes(currentPage)) {
     const page = currentPage === "privacy" || currentPage === "privacy-policy"
       ? <PrivacyPolicyPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
       : currentPage === "terms"
         ? <TermsPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-        : currentPage === "refund-policy"
-          ? <RefundPolicyPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-          : currentPage === "cookie-policy"
-            ? <CookiePolicyPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-            : currentPage === "contact"
-              ? <ContactPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-              : currentPage === "coaching"
-                ? <CoachingPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-                : currentPage === "openings" || currentPage === "opening-explorer"
-                  ? <OpeningExplorerPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-                : currentPage === "store"
-                  ? <StorePage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-                  : currentPage === "hire-me" || currentPage === "services"
-                    ? <ServicesPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
-                    : <SeoLandingPage page={currentPage} onBack={() => navigateToAppPage("dashboard", setCurrentPage)} onNavigate={guardedNavigate} />;
+        : currentPage === "delete-account"
+          ? <DeleteAccountPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+          : currentPage === "support"
+            ? <SupportPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+            : currentPage === "refund-policy"
+              ? <RefundPolicyPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+              : currentPage === "cookie-policy"
+                ? <CookiePolicyPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                : currentPage === "contact"
+                  ? <ContactPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                  : currentPage === "coaching"
+                    ? <CoachingPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                    : currentPage === "openings" || currentPage === "opening-explorer"
+                      ? <OpeningExplorerPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                      : currentPage === "store"
+                        ? <StorePage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                        : currentPage === "hire-me" || currentPage === "services"
+                          ? <ServicesPage onBack={() => navigateToAppPage("dashboard", setCurrentPage)} />
+                          : <SeoLandingPage page={currentPage} onBack={() => navigateToAppPage("dashboard", setCurrentPage)} onNavigate={guardedNavigate} />;
     return <RouteFrame>{page}<DeferredFeedbackButton user={user} /></RouteFrame>;
   }
 
@@ -362,6 +554,22 @@ export default function App() {
     );
   }
 
+  if (!user && currentPage === "ai") {
+    const selectedTimeControl = localStorage.getItem("selectedTimeControl") || "3+0";
+    return (
+      <RouteFrame>
+        <RouteProviders page={currentPage}>
+          <Chess
+            onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
+            onNavigate={guardedNavigate}
+            initialAiEnabled
+            timeControl={selectedTimeControl}
+          />
+        </RouteProviders>
+      </RouteFrame>
+    );
+  }
+
   if (!user && currentPage === "analysis") {
     return (
       <RouteFrame>
@@ -374,7 +582,7 @@ export default function App() {
     );
   }
 
-  if (!user && (currentPage === "pricing" || currentPage === "support" || currentPage === "monetization")) {
+  if (!user && (currentPage === "pricing" || currentPage === "monetization")) {
     return (
       <RouteFrame>
         {currentPage === "monetization" ? (
@@ -447,6 +655,25 @@ export default function App() {
     return (
       <RouteFrame>
         <LandingPage onLogin={handleLogin} onGuestPlay={handleGuestPlay} onNavigatePath={(path) => { window.history.pushState({}, "", path); setCurrentPage(pageFromPathname(path)); }} />
+      </RouteFrame>
+    );
+  }
+
+  if (user?.emailVerified === false && !isGuestUser(user)) {
+    return (
+      <RouteFrame>
+        <VerifyEmailPage
+          user={user}
+          onVerified={(nextUser) => {
+            const verifiedUser = nextUser || { ...user, emailVerified: true };
+            localStorage.setItem("user", JSON.stringify(verifiedUser));
+            setUser(verifiedUser);
+            notifyUserChanged();
+            navigateToAppPage("dashboard", setCurrentPage, true);
+          }}
+          onLogout={handleLogout}
+          onBack={() => navigateToAppPage("dashboard", setCurrentPage)}
+        />
       </RouteFrame>
     );
   }
@@ -526,7 +753,7 @@ export default function App() {
           />
         );
       case "history":
-        return <GameHistory onBack={goDashboard} />;
+        return <GameHistory onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "leaderboard":
         return <Leaderboard user={user} onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "profile":
@@ -549,7 +776,6 @@ export default function App() {
       case "analysis":
         return <AnalysisPage user={user} onBack={goDashboard} onNavigate={guardedNavigate} />;
       case "pricing":
-      case "support":
         return (
           <PricingPage
             user={user}
@@ -557,6 +783,8 @@ export default function App() {
             onNavigate={guardedNavigate}
           />
         );
+      case "support":
+        return <SupportPage onBack={goDashboard} />;
       case "billing":
         return (
           <BillingPage
@@ -620,6 +848,8 @@ export default function App() {
         return <DeleteAccountPage onBack={() => navigateToAppPage("settings", setCurrentPage)} onDeleted={handleLogout} />;
       case "forgot-password":
         return <ForgotPasswordPage onBack={goDashboard} />;
+      case "verify-email":
+        return <Dashboard user={user} onStartGame={handleStartGame} onNavigate={guardedNavigate} onAuthError={handleLogout} />;
       default:
         return (
           <div className="p-8">

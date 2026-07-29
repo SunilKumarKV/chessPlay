@@ -40,7 +40,10 @@ function validateProductionEmail(email) {
 function validateStrongPassword(password) {
   const value = String(password || '');
   if (value.length < 8) return 'Password must be at least 8 characters.';
-  if (!/[A-Za-z]/.test(value) || !/\d/.test(value)) return 'Password must include at least one letter and one number.';
+  if (!/[a-z]/.test(value)) return 'Password must include a lowercase letter.';
+  if (!/[A-Z]/.test(value)) return 'Password must include an uppercase letter.';
+  if (!/\d/.test(value)) return 'Password must include a number.';
+  if (!/[^A-Za-z0-9]/.test(value)) return 'Password must include a symbol.';
   return '';
 }
 
@@ -51,7 +54,7 @@ function getJwtSecret(kind = 'access') {
 
 function signAccessToken(user) {
   return jwt.sign(
-    { userId: String(user._id), username: user.username, type: 'access' },
+    { userId: String(user._id), username: user.username, tokenVersion: user.tokenVersion || 0, type: 'access' },
     getJwtSecret('access'),
     { expiresIn: process.env.ACCESS_TOKEN_EXPIRES || '15m' },
   );
@@ -73,12 +76,20 @@ function randomToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+function requiresCrossSiteCookies() {
+  if (process.env.NODE_ENV === 'production') return true;
+  if (process.env.COOKIE_SAMESITE === 'none') return true;
+  // Render-hosted API + Vercel frontend needs SameSite=None even if NODE_ENV is mis-set.
+  if (process.env.RENDER || process.env.RENDER_EXTERNAL_URL) return true;
+  return false;
+}
+
 function cookieOptions(maxAgeMs) {
-  const isProduction = process.env.NODE_ENV === 'production';
+  const crossSite = requiresCrossSiteCookies();
   const options = {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
+    secure: crossSite,
+    sameSite: crossSite ? 'none' : 'lax',
     path: '/',
   };
   if (maxAgeMs) options.maxAge = maxAgeMs;
@@ -158,6 +169,7 @@ function sanitizeText(value, maxLength = 500) {
 
 export { authUserPayload,
   clearSessionCookies,
+  cookieOptions,
   getBearerToken,
   getCookie,
   getJwtSecret,
@@ -167,6 +179,7 @@ export { authUserPayload,
   getRequestAccessToken,
   isConfiguredAdminEmail,
   randomToken,
+  requiresCrossSiteCookies,
   sanitizeText,
   signAccessToken,
   validateProductionEmail,

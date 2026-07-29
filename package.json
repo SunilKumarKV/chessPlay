@@ -11,19 +11,34 @@
     "lint": "pnpm --filter frontend lint",
     "test": "pnpm test:production && pnpm --filter backend test",
     "test:production": "node TEST_PRODUCTION_SMOKE.js && node TEST_STOCKFISH.js",
+    "test:prod-smoke": "playwright test tests/production-smoke.spec.ts",
     "preview": "pnpm --filter frontend preview",
     "install:all": "pnpm install",
     "start": "pnpm dev:multi",
     "build:frontend": "pnpm --filter frontend build",
-    "build:backend": "pnpm --filter backend build"
+    "build:backend": "pnpm --filter backend build",
+    "test:frontend": "pnpm --filter frontend test:run",
+    "test:backend": "pnpm --filter backend test",
+    "test:e2e": "playwright test",
+    "test:all": "pnpm test:frontend && pnpm test:backend && pnpm test:e2e && pnpm build",
+    "lighthouse": "lighthouse http://localhost:5173 --view"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@playwright/test": "^1.51.1",
+    "concurrently": "^8.2.2",
+    "k6": "^0.0.0",
+    "lighthouse": "^13.3.0"
   },
   "dependencies": {
-    "helmet": "^8.1.0",
+    "helmet": "^8.2.0",
     "morgan": "^1.10.1",
     "stockfish.js": "^10.0.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "@hono/node-server": "1.19.13",
+      "ws": "8.20.1"
+    }
   },
   "engines": {
     "node": "20.x",

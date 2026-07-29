@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Chess } from "chess.js";
 import Board from "../features/chess/components/Board";
 import MoveListPanel from "../features/chess/components/MoveListPanel";
-import { useStockfish } from "../features/chess/hooks/useStockfish";
-import { useTheme } from "../hooks/useTheme";
+import { Badge, Button, Card, EmptyState as DesignEmptyState, FormTextarea } from "../components/ui";
 import { apiClient } from "../services/apiClient";
-import SupporterBadge from "../components/billing/SupporterBadge";
 
 const START_FEN = new Chess().fen();
 const MAX_NOTE_LENGTH = 2000;
@@ -29,21 +27,6 @@ function groupMoves(verboseMoves) {
   return rows.map((row, index) => ({ ...row, isLatest: index === rows.length - 1 }));
 }
 
-function evaluationCopy(evaluation) {
-  if (!evaluation) return "Run analysis to see the evaluation.";
-  if (evaluation.type === "mate") {
-    if (evaluation.value > 0) return `White has a forced mate in ${evaluation.value}.`;
-    if (evaluation.value < 0) return `Black has a forced mate in ${Math.abs(evaluation.value)}.`;
-    return "Forced mate is detected.";
-  }
-  const value = Number(evaluation.value || 0);
-  if (Math.abs(value) < 0.25) return "Equal position.";
-  if (value > 1.5) return "White is clearly better.";
-  if (value > 0.25) return "White is slightly better.";
-  if (value < -1.5) return "Black is clearly better.";
-  return "Black is slightly better.";
-}
-
 function validateFenText(value) {
   try {
     return new Chess(value).fen();
@@ -58,59 +41,133 @@ function validatePgnText(value) {
   try {
     const game = new Chess();
     game.loadPgn(pgn);
-    return { ok: true, game };
+    return { ok: true, game, headers: game.getHeaders?.() || game.header?.() || {} };
   } catch {
     return { ok: false, message: "Invalid PGN. Paste a complete game or use FEN for a single position." };
   }
+}
+
+function resultLabel(result) {
+  if (result === "1-0") return "White win";
+  if (result === "0-1") return "Black win";
+  if (result === "1/2-1/2") return "Draw";
+  return "Not recorded";
+}
+
+function buildRuleGuidance({ source, moveCount, headers }) {
+  if (source === "fen") {
+    return {
+      summary: "Single position loaded",
+      finding: "ChessPlay can review the position structure, but it cannot claim move mistakes without engine analysis.",
+      priority: "Write one candidate move and one reason before checking alternatives.",
+      training: {
+        title: "Game Stability",
+        reason: "A position review is best used to slow down and compare plans.",
+        action: "Play one focused AI game and review the moments where your plan changed.",
+        ctaLabel: "Start AI game",
+        route: "ai",
+      },
+    };
+  }
+
+  if (moveCount === 0) {
+    return {
+      summary: "PGN imported without moves",
+      finding: "The game headers loaded, but there is no move sequence to review yet.",
+      priority: "Paste a complete PGN with moves to unlock a stronger review flow.",
+      training: {
+        title: "Review Setup",
+        reason: "ChessPlay needs a move list before it can build rule-based game guidance.",
+        action: "Choose a completed game from history or paste a complete PGN.",
+        ctaLabel: "Choose from history",
+        route: "history",
+      },
+    };
+  }
+
+  if (moveCount < 12) {
+    return {
+      summary: `${moveCount} plies imported`,
+      finding: "This is a short game segment, so opening habits and early move discipline are the clearest review signals.",
+      priority: "Replay the first 10 moves and write down where development, king safety, or threats changed.",
+      training: {
+        title: "Opening Practice",
+        reason: "Short PGNs are most useful for reviewing early plans, not full-game conclusions.",
+        action: "Review the first 10 moves, then solve a short puzzle set.",
+        ctaLabel: "Start puzzles",
+        route: "puzzles",
+      },
+    };
+  }
+
+  if (headers?.Result && headers.Result !== "*") {
+    return {
+      summary: `${moveCount} plies imported · ${resultLabel(headers.Result)}`,
+      finding: "ChessPlay found enough game data for a rule-based review, but not enough to label blunders or accuracy.",
+      priority: "Mark the first moment where your plan became unclear, then train the matching pattern.",
+      training: {
+        title: "Tactical Practice",
+        reason: "A completed game review pairs well with tactical pattern training.",
+        action: "Solve 5 tactics today, then replay this game once without moving pieces.",
+        ctaLabel: "Start puzzles",
+        route: "puzzles",
+      },
+    };
+  }
+
+  return {
+    summary: `${moveCount} plies imported`,
+    finding: "The move list is ready. Result metadata is missing, so ChessPlay will keep the guidance focused on review process.",
+    priority: "Replay the game in chunks of 10 moves and capture one lesson per chunk.",
+    training: {
+      title: "Game Review",
+      reason: "The fastest next step is turning the move list into one concrete training action.",
+      action: "Review your recent games and compare recurring decision points.",
+      ctaLabel: "Open history",
+      route: "history",
+    },
+  };
 }
 
 function Toast({ toast, onClose }) {
   if (!toast) return null;
   const isError = toast.type === "error";
   return (
-    <div className="fixed bottom-4 right-4 z-[80] max-w-sm rounded-2xl border border-white/10 bg-[#101816] p-4 text-sm text-white shadow-2xl" role={isError ? "alert" : "status"}>
+    <div className="fixed bottom-4 right-4 z-[var(--z-toast)] max-w-sm rounded-[var(--radius-2xl)] border border-[var(--color-border-primary)] bg-[var(--color-bg-elevated)] p-4 text-sm text-[var(--color-text-primary)] shadow-[var(--shadow-xl)]" role={isError ? "alert" : "status"}>
       <div className="flex items-start gap-3">
-        <span className={isError ? "text-red-300" : "text-[#b8f28f]"}>{isError ? "⚠" : "✓"}</span>
+        <span className={isError ? "text-[var(--color-danger)]" : "text-[var(--color-success)]"} aria-hidden="true">{isError ? "!" : "✓"}</span>
         <p className="leading-6">{toast.message}</p>
-        <button type="button" onClick={onClose} className="ml-2 text-slate-400 hover:text-white" aria-label="Close message">×</button>
+        <button type="button" onClick={onClose} className="ds-focus ml-2 rounded-[var(--radius-md)] px-2 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]" aria-label="Close message">×</button>
       </div>
     </div>
   );
 }
 
-function StatusBadge({ children, tone = "default" }) {
-  const toneClass = tone === "success"
-    ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-    : tone === "warning"
-      ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
-      : tone === "supporter"
-        ? "border-[#f4c96b]/40 bg-[#f4c96b]/10 text-[#ffe3a1]"
-        : "border-white/10 bg-white/10 text-slate-200";
-  return <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.18em] ${toneClass}`}>{children}</span>;
-}
-
 export default function AnalysisPage({ user = null, onBack, onNavigate }) {
-  const { theme } = useTheme();
+  const fileInputRef = useRef(null);
   const [fen, setFen] = useState(START_FEN);
   const [pgnInput, setPgnInput] = useState("");
   const [verboseMoves, setVerboseMoves] = useState([]);
-  const [bestMove, setBestMove] = useState("");
+  const [gameHeaders, setGameHeaders] = useState({});
+  const [gameSource, setGameSource] = useState(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [engineEnabled, setEngineEnabled] = useState(false);
   const [flipped, setFlipped] = useState(false);
   const [notes, setNotes] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [toast, setToast] = useState(null);
-  const [tab, setTab] = useState("fen");
-  const stockfish = useStockfish({ enabled: engineEnabled });
+  const [activeInput, setActiveInput] = useState("pgn");
+
+  const hasGame = Boolean(gameSource);
   const board = useMemo(() => buildBoardFromFen(fen), [fen]);
   const moveRows = useMemo(() => groupMoves(verboseMoves), [verboseMoves]);
-  const engineStatus = stockfish.error ? "Engine unavailable" : stockfish.ready ? "Engine ready" : engineEnabled ? "Engine loading" : "Engine idle";
+  const guidance = useMemo(
+    () => buildRuleGuidance({ source: gameSource, moveCount: verboseMoves.length, headers: gameHeaders }),
+    [gameHeaders, gameSource, verboseMoves.length],
+  );
 
   useEffect(() => {
     document.title = "Game Analysis | ChessPlay";
-    const description = "Review chess positions, import PGN games, explore engine suggestions, and save analysis notes in ChessPlay.";
+    const description = "Analyze chess games in ChessPlay with honest rule-based improvement guidance, PGN review, and focused training next steps.";
     let meta = document.querySelector('meta[name="description"]');
     if (!meta) {
       meta = document.createElement("meta");
@@ -128,75 +185,53 @@ export default function AnalysisPage({ user = null, onBack, onNavigate }) {
       setToast({ type: "error", message: "Invalid FEN position." });
       return;
     }
-    const game = new Chess(normalized);
-    setFen(game.fen());
+    setFen(normalized);
     setVerboseMoves([]);
-    setBestMove("");
-    setTab("fen");
-    setToast({ type: "success", message: "Position loaded for analysis." });
+    setGameHeaders({});
+    setGameSource("fen");
+    setToast({ type: "success", message: "Position loaded." });
   };
 
-  const loadPgn = () => {
+  const importPgn = (value = pgnInput) => {
     setError("");
-    const result = validatePgnText(pgnInput);
+    const result = validatePgnText(value);
     if (!result.ok) {
       setError(result.message);
       setToast({ type: "error", message: result.message });
       return;
     }
+    setPgnInput(value);
     setFen(result.game.fen());
     setVerboseMoves(result.game.history({ verbose: true }));
-    setBestMove("");
-    setTab("pgn");
-    setToast({ type: "success", message: "PGN imported successfully." });
+    setGameHeaders(result.headers);
+    setGameSource("pgn");
+    setActiveInput("pgn");
+    setToast({ type: "success", message: "PGN imported." });
   };
 
-  const clearPgn = () => {
-    setPgnInput("");
-    setVerboseMoves([]);
-    setBestMove("");
-    setToast({ type: "success", message: "PGN cleared." });
-  };
-
-  const analyze = async () => {
-    setError("");
-    setBestMove("");
-    setLoading(true);
-    setEngineEnabled(true);
-    try {
-      const normalized = validateFenText(fen);
-      if (!normalized) throw new Error("Invalid FEN position. Please load a valid position first.");
-      if (!stockfish.ready) throw new Error("Chess engine is starting. Try again in a moment.");
-      const uci = await stockfish.getBestMove(normalized, { movetime: user?.isSupporter || user?.isPremium ? 1800 : 1000 });
-      if (!uci) throw new Error("No engine move returned for this position.");
-      const game = new Chess(normalized);
-      const move = game.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] || undefined });
-      setBestMove(move ? `${move.san} (${uci})` : uci);
-      setToast({ type: "success", message: "Analysis completed." });
-    } catch (err) {
-      const message = err.message || "Analysis failed. Please try again.";
-      setError(message);
-      setToast({ type: "error", message });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const retryEngine = () => {
-    setEngineEnabled(true);
-    stockfish.retry?.();
-    setError("");
-    setToast({ type: "success", message: "Restarting analysis engine." });
-  };
-
-  const reset = () => {
+  const clearGame = () => {
     const game = new Chess();
     setFen(game.fen());
     setPgnInput("");
     setVerboseMoves([]);
-    setBestMove("");
+    setGameHeaders({});
+    setGameSource(null);
     setError("");
-    setToast({ type: "success", message: "Board reset." });
+    setNotes("");
+    setToast({ type: "success", message: "Analysis cleared." });
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      importPgn(text);
+    } catch {
+      setToast({ type: "error", message: "Unable to read PGN file." });
+    } finally {
+      event.target.value = "";
+    }
   };
 
   const saveNotes = async () => {
@@ -222,130 +257,258 @@ export default function AnalysisPage({ user = null, onBack, onNavigate }) {
     }
   };
 
+  const openRoute = (route) => {
+    onNavigate?.(route);
+  };
+
   return (
-    <div className="min-h-screen w-full p-4 text-white md:p-6 xl:p-8" style={{ color: theme.text.primary }}>
+    <main className="min-h-screen bg-[var(--color-bg-primary)] px-4 py-5 text-[var(--color-text-primary)] sm:px-6 lg:px-8">
       <Toast toast={toast} onClose={() => setToast(null)} />
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section className="overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#162016] via-[#101816] to-[#080c09] p-5 shadow-2xl md:p-7">
-          <button type="button" onClick={onBack} className="mb-4 rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-[#b8f28f] hover:bg-white/10">Back to Dashboard</button>
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <section className="rounded-[var(--radius-3xl)] border border-[var(--color-border-primary)] bg-[radial-gradient(circle_at_top_left,color-mix(in_srgb,var(--color-primary)_20%,transparent),transparent_34%),var(--color-bg-elevated)] p-5 shadow-[var(--shadow-xl)] sm:p-7">
+          <Button type="button" variant="ghost" onClick={onBack} className="mb-5">
+            Back
+          </Button>
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
             <div>
               <div className="flex flex-wrap gap-2">
-                <StatusBadge tone="success">Analysis</StatusBadge>
-                <StatusBadge>Guest Mode</StatusBadge>
-                <StatusBadge tone="warning">Experimental Engine</StatusBadge>
-                {(user?.isSupporter || user?.isPremium) && <SupporterBadge user={user} />}
+                <Badge tone="primary">Analysis</Badge>
+                <Badge tone="info">Rule-based MVP</Badge>
+                <Badge tone={user ? "success" : "neutral"}>{user ? "Signed in" : "Guest access"}</Badge>
               </div>
-              <h1 className="mt-4 font-['Montserrat'] text-3xl font-black md:text-5xl">Game Analysis</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300 md:text-base">
-                Review positions, explore variations, import PGN games, and understand key moments from your games. Computer analysis is experimental and may vary by engine depth.
+              <h1 className="mt-5 max-w-4xl font-[var(--font-display)] text-4xl font-black leading-tight text-[var(--color-text-primary)] sm:text-5xl lg:text-6xl">
+                Analyze your game. Understand what to improve.
+              </h1>
+              <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--color-text-secondary)] sm:text-lg">
+                Review your games, find improvement signals, and turn mistakes into focused training.
               </p>
-              {!user && (
-                <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">
-                  Sign in to save analysis notes and review your game history. Basic FEN and PGN analysis remains free.
-                </div>
-              )}
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <Button type="button" onClick={() => fileInputRef.current?.click()}>Upload PGN</Button>
+                <Button type="button" variant="secondary" onClick={() => setActiveInput("pgn")}>Paste PGN</Button>
+                <Button type="button" variant="ghost" onClick={() => openRoute(user ? "history" : "login")}>
+                  {user ? "Review recent game" : "Sign in for history"}
+                </Button>
+              </div>
+              <input ref={fileInputRef} type="file" accept=".pgn,.txt,text/plain" className="sr-only" onChange={handleFileUpload} aria-label="Upload PGN file" />
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
-              <h2 className="font-['Montserrat'] text-lg font-black">Supporter status</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-300">Supporter payments unlock only released benefits. Deeper review reports and extra themes are roadmap items and are not sold as active features.</p>
-              <button type="button" onClick={() => onNavigate?.("pricing")} className="mt-4 w-full rounded-xl bg-[#81b64c] px-4 py-3 text-sm font-black text-[#07100a] hover:bg-[#93c85f]">Support ChessPlay</button>
-              <p className="mt-3 text-xs text-slate-400">PayPal, UPI, and bank payments are manually verified by admin.</p>
-            </div>
+            <Card variant="glass" className="p-5">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--color-primary)]">Honest analysis</p>
+              <p className="mt-3 text-sm leading-6 text-[var(--color-text-secondary)]">
+                Engine analysis is not enabled yet. ChessPlay is showing rule-based improvement guidance from available game data.
+              </p>
+            </Card>
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
-          <div className="rounded-3xl border border-white/10 bg-[#101816] p-4 shadow-2xl md:p-5">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="font-['Montserrat'] text-2xl font-black">Analysis board</h2>
-                <p className="mt-1 text-sm text-slate-400">Use FEN for a single position or PGN for a full game.</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => setFlipped((value) => !value)} className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold hover:bg-white/15" aria-label="Flip analysis board">Flip board</button>
-                <button type="button" onClick={reset} className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold hover:bg-white/15">Reset board</button>
-              </div>
-            </div>
-            <div className="mx-auto max-w-[720px] overflow-hidden rounded-2xl"><Board board={board} flipped={flipped} disabled /></div>
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="space-y-6">
+            {!hasGame ? (
+              <DesignEmptyState
+                title="Start with a game"
+                message="Paste a PGN, choose a completed game from history, or play an AI game and come back with a position to review."
+                icon="♙"
+                className="min-h-[320px]"
+                action={(
+                  <div className="grid w-full max-w-xl gap-3 sm:grid-cols-3">
+                    <Button type="button" onClick={() => setActiveInput("pgn")}>Paste PGN</Button>
+                    <Button type="button" variant="secondary" onClick={() => openRoute(user ? "history" : "login")}>Choose history</Button>
+                    <Button type="button" variant="ghost" onClick={() => openRoute("ai")}>Start AI game</Button>
+                  </div>
+                )}
+              />
+            ) : (
+              <AnalysisWorkspace
+                board={board}
+                flipped={flipped}
+                guidance={guidance}
+                gameHeaders={gameHeaders}
+                gameSource={gameSource}
+                moveRows={moveRows}
+                notes={notes}
+                savingNote={savingNote}
+                user={user}
+                onClear={clearGame}
+                onFlip={() => setFlipped((value) => !value)}
+                onNavigate={openRoute}
+                onNotesChange={setNotes}
+                onSaveNotes={saveNotes}
+              />
+            )}
           </div>
 
-          <aside className="space-y-4">
-            <div className="rounded-3xl border border-white/10 bg-[#101816] p-5 shadow-2xl">
-              <div className="flex rounded-2xl border border-white/10 bg-black/20 p-1" role="tablist" aria-label="Analysis input mode">
-                {[["fen", "FEN"], ["pgn", "PGN"]].map(([id, label]) => (
-                  <button key={id} type="button" onClick={() => setTab(id)} className={`flex-1 rounded-xl px-4 py-2 text-sm font-black ${tab === id ? "bg-[#81b64c] text-[#07100a]" : "text-slate-300 hover:bg-white/10"}`} role="tab" aria-selected={tab === id}>{label}</button>
+          <aside className="space-y-5">
+            <Card variant="glass" className="space-y-4">
+              <div className="flex rounded-[var(--radius-2xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface)] p-1" role="tablist" aria-label="Analysis input mode">
+                {[["pgn", "PGN"], ["fen", "FEN"]].map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setActiveInput(id)}
+                    className={`ds-focus flex-1 rounded-[var(--radius-xl)] px-4 py-2 text-sm font-black transition ${activeInput === id ? "bg-[var(--color-primary)] text-[var(--color-primary-contrast)]" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-strong)] hover:text-[var(--color-text-primary)]"}`}
+                    role="tab"
+                    aria-selected={activeInput === id}
+                  >
+                    {label}
+                  </button>
                 ))}
               </div>
 
-              {tab === "fen" ? (
-                <div className="mt-4">
-                  <label className="block text-sm font-bold" htmlFor="analysis-fen">FEN position</label>
-                  <textarea id="analysis-fen" value={fen} onChange={(e) => setFen(e.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-white outline-none focus:border-[#81b64c]" />
-                  <button type="button" onClick={loadFen} className="mt-3 w-full rounded-xl bg-[#81b64c] px-4 py-3 text-sm font-black text-[#07100a] hover:bg-[#93c85f]">Load position</button>
-                </div>
-              ) : (
-                <div className="mt-4">
-                  <label className="block text-sm font-bold" htmlFor="analysis-pgn">PGN import</label>
-                  <textarea id="analysis-pgn" value={pgnInput} onChange={(e) => setPgnInput(e.target.value)} rows={6} placeholder="Paste PGN here…" className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-white outline-none focus:border-[#81b64c]" />
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <button type="button" onClick={loadPgn} className="rounded-xl bg-[#81b64c] px-4 py-3 text-sm font-black text-[#07100a] hover:bg-[#93c85f]">Import PGN</button>
-                    <button type="button" onClick={clearPgn} className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-black hover:bg-white/15">Clear PGN</button>
+              {activeInput === "pgn" ? (
+                <>
+                  <FormTextarea
+                    id="analysis-pgn"
+                    label="Paste PGN"
+                    value={pgnInput}
+                    onChange={(event) => setPgnInput(event.target.value)}
+                    rows={8}
+                    placeholder="1. e4 e5 2. Nf3 Nc6 ..."
+                    error={activeInput === "pgn" ? error : ""}
+                    helperText="ChessPlay will import the move list and show rule-based guidance only."
+                  />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Button type="button" onClick={() => importPgn()}>Import PGN</Button>
+                    <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()}>Upload file</Button>
                   </div>
-                </div>
+                </>
+              ) : (
+                <>
+                  <FormTextarea
+                    id="analysis-fen"
+                    label="FEN position"
+                    value={fen}
+                    onChange={(event) => setFen(event.target.value)}
+                    rows={4}
+                    error={activeInput === "fen" ? error : ""}
+                    helperText="Use FEN for a single-position review. No blunder labels are generated."
+                  />
+                  <Button type="button" className="w-full" onClick={loadFen}>Load position</Button>
+                </>
               )}
-            </div>
+            </Card>
 
-            <div className="rounded-3xl border border-white/10 bg-[#101816] p-5 shadow-2xl">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="font-['Montserrat'] text-xl font-black">Engine tools</h2>
-                  <p className="mt-1 text-sm text-slate-400">{engineStatus}</p>
-                </div>
-                <StatusBadge tone={stockfish.ready ? "success" : stockfish.error ? "warning" : "default"}>{stockfish.depth ? `Depth ${stockfish.depth}` : "Engine"}</StatusBadge>
-              </div>
-              <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-                <p className="text-sm font-bold text-slate-200">Evaluation</p>
-                <p className="mt-1 text-sm text-slate-400">{evaluationCopy(stockfish.evaluation)}</p>
-              </div>
-              {bestMove ? <div className="mt-4 rounded-2xl border border-[#81b64c]/30 bg-[#81b64c]/10 p-4 text-sm font-bold text-[#b8f28f]">Best move: {bestMove}</div> : null}
-              {error || stockfish.error ? <div className="mt-4 rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-200">{error || stockfish.error}</div> : null}
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <button type="button" onClick={analyze} disabled={loading || stockfish.thinking} className="rounded-xl bg-[#81b64c] px-4 py-3 text-sm font-black text-[#07100a] hover:bg-[#93c85f] disabled:cursor-not-allowed disabled:opacity-60">{loading || stockfish.thinking ? "Analyzing…" : "Analyze position"}</button>
-                <button type="button" onClick={retryEngine} className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-black hover:bg-white/15">Retry engine</button>
-              </div>
-            </div>
+            <Card variant="subtle">
+              <h2 className="font-[var(--font-display)] text-lg font-black">Trust boundary</h2>
+              <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">
+                No accuracy score, blunder count, mistake label, or engine verdict appears unless real analysis data exists.
+              </p>
+            </Card>
+
+            <Card variant="subtle">
+              <h2 className="font-[var(--font-display)] text-lg font-black">Next best action</h2>
+              <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">
+                Import a game, capture one lesson, then convert it into a short training action.
+              </p>
+            </Card>
           </aside>
         </section>
-
-        <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="rounded-3xl border border-white/10 bg-[#101816] p-5 shadow-2xl">
-            <h2 className="font-['Montserrat'] text-xl font-black">Move list and variations</h2>
-            <div className="mt-4 max-h-80 overflow-auto rounded-2xl border border-white/10 bg-black/20"><MoveListPanel moves={moveRows} emptyMessage="Imported PGN moves appear here. FEN-only positions have no move list yet." /></div>
-          </div>
-          <div className="rounded-3xl border border-white/10 bg-[#101816] p-5 shadow-2xl">
-            <h2 className="font-['Montserrat'] text-xl font-black">Analysis notes</h2>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value.slice(0, MAX_NOTE_LENGTH))} rows={7} placeholder={user ? "Write your ideas, candidate moves, and lessons here…" : "Sign in to save notes."} className="mt-4 w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-white outline-none focus:border-[#81b64c]" aria-label="Analysis notes" />
-            <div className="mt-2 flex items-center justify-between text-xs text-slate-400"><span>{notes.length}/{MAX_NOTE_LENGTH}</span><span>{user ? "Saved to your account" : "Guest notes are not saved"}</span></div>
-            <button type="button" onClick={saveNotes} disabled={!user || savingNote} className="mt-4 w-full rounded-xl bg-[#81b64c] px-4 py-3 text-sm font-black text-[#07100a] hover:bg-[#93c85f] disabled:cursor-not-allowed disabled:opacity-60">{savingNote ? "Saving…" : user ? "Save notes" : "Sign in to save notes"}</button>
-          </div>
-        </section>
-
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {[
-            ["Phase 1", "FEN board review", "Available now"],
-            ["Phase 2", "PGN import", "Available now"],
-            ["Phase 3", "Engine best move", "Experimental"],
-            ["Phase 4", "Full game report", "Supporter preview"],
-          ].map(([phase, title, status]) => (
-            <div key={phase} className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#b8f28f]">{phase}</p>
-              <h3 className="mt-2 font-['Montserrat'] text-lg font-black">{title}</h3>
-              <p className="mt-2 text-sm text-slate-400">{status}</p>
-            </div>
-          ))}
-        </section>
       </div>
+    </main>
+  );
+}
+
+function AnalysisWorkspace({
+  board,
+  flipped,
+  guidance,
+  gameHeaders,
+  gameSource,
+  moveRows,
+  notes,
+  savingNote,
+  user,
+  onClear,
+  onFlip,
+  onNavigate,
+  onNotesChange,
+  onSaveNotes,
+}) {
+  const white = gameHeaders.White && gameHeaders.White !== "?" ? gameHeaders.White : "White";
+  const black = gameHeaders.Black && gameHeaders.Black !== "?" ? gameHeaders.Black : "Black";
+  const result = resultLabel(gameHeaders.Result);
+
+  return (
+    <div className="space-y-6">
+      <Card variant="glass" className="p-4 sm:p-5">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <Badge tone="info">{gameSource === "pgn" ? "Game loaded" : "Position loaded"}</Badge>
+            <h2 className="mt-3 font-[var(--font-display)] text-2xl font-black">Analysis workspace</h2>
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Board, replay, summary, findings, priority, and training in one review flow.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={onFlip}>Flip board</Button>
+            <Button type="button" variant="ghost" onClick={onClear}>Clear</Button>
+          </div>
+        </div>
+        <div className="grid gap-5 lg:grid-cols-[minmax(280px,560px)_minmax(0,1fr)]">
+          <div className="mx-auto w-full max-w-[560px] overflow-hidden rounded-[var(--radius-2xl)]">
+            <Board board={board} flipped={flipped} disabled />
+          </div>
+          <div className="min-w-0 space-y-4">
+            <Card variant="subtle">
+              <h3 className="font-[var(--font-display)] text-lg font-black">Game summary</h3>
+              <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                <SummaryItem label="Players" value={`${white} vs ${black}`} />
+                <SummaryItem label="Result" value={result} />
+                <SummaryItem label="Moves" value={moveRows.length ? `${moveRows.length} move pairs` : "Position only"} />
+                <SummaryItem label="Review mode" value="Rule-based guidance" />
+              </dl>
+            </Card>
+            <Card variant="subtle">
+              <h3 className="font-[var(--font-display)] text-lg font-black">Key findings</h3>
+              <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">{guidance.finding}</p>
+            </Card>
+            <Card variant="subtle">
+              <h3 className="font-[var(--font-display)] text-lg font-black">Improvement priority</h3>
+              <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">{guidance.priority}</p>
+            </Card>
+          </div>
+        </div>
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <Card variant="glass">
+          <h2 className="font-[var(--font-display)] text-xl font-black">Move list</h2>
+          <div className="mt-4 max-h-80 overflow-auto rounded-[var(--radius-2xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface)]">
+            <MoveListPanel moves={moveRows} emptyMessage="FEN-only positions have no move list yet." />
+          </div>
+        </Card>
+        <Card variant="glass">
+          <h2 className="font-[var(--font-display)] text-xl font-black">Recommended training</h2>
+          <p className="mt-2 text-sm font-bold text-[var(--color-text-primary)]">{guidance.training.title}</p>
+          <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">{guidance.training.reason}</p>
+          <p className="mt-4 rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface)] p-3 text-sm font-bold text-[var(--color-text-primary)]">
+            {guidance.training.action}
+          </p>
+          <Button type="button" className="mt-4 w-full" onClick={() => onNavigate(guidance.training.route)}>
+            {guidance.training.ctaLabel}
+          </Button>
+        </Card>
+      </div>
+
+      <Card variant="subtle">
+        <FormTextarea
+          id="analysis-notes"
+          label="Analysis notes"
+          value={notes}
+          onChange={(event) => onNotesChange(event.target.value.slice(0, MAX_NOTE_LENGTH))}
+          rows={5}
+          placeholder={user ? "Write the lesson you want to remember..." : "Sign in to save notes."}
+          helperText={`${notes.length}/${MAX_NOTE_LENGTH} · ${user ? "Saved to your account when you choose Save notes." : "Guest notes are local to this screen only."}`}
+        />
+        <Button type="button" className="mt-4" onClick={onSaveNotes} disabled={!user || savingNote} loading={savingNote} loadingText="Saving">
+          {user ? "Save notes" : "Sign in to save notes"}
+        </Button>
+      </Card>
+    </div>
+  );
+}
+
+function SummaryItem({ label, value }) {
+  return (
+    <div className="rounded-[var(--radius-xl)] border border-[var(--color-border-primary)] bg-[var(--color-surface)] p-3">
+      <dt className="text-xs font-black uppercase tracking-[0.14em] text-[var(--color-text-tertiary)]">{label}</dt>
+      <dd className="mt-1 truncate text-sm font-bold text-[var(--color-text-primary)]">{value}</dd>
     </div>
   );
 }

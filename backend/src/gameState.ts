@@ -48,7 +48,10 @@ function toGameResult(status) {
     status === "draw-50move" ||
     status === "draw-repetition"
   ) {
-    return "draw";
+    return "DRAW";
+  }
+  if (status === "abandoned" || status === "timeout" || status === "resigned") {
+    return "ABANDONED";
   }
   return status;
 }

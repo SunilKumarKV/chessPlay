@@ -116,20 +116,21 @@ async function referralDashboardForUser(userId) {
 async function applyReferralForUser(req, res, rawCode) {
   const code = normalizeReferralCode(rawCode);
   if (!/^[A-Z0-9]{6,16}$/.test(code)) return res.status(400).json({ message: "Invalid referral code." });
-  const referrer = await User.findOne({ referralCode: code }).select("_id username referralCode");
+  const referrer = await User.findOne({ referralCode: code, deletedAt: null }).select("_id username referralCode");
   if (!referrer || String(referrer._id) === String(req.user.userId)) return res.status(400).json({ message: "Referral code cannot be used." });
-  const user = await User.findById(req.user.userId).select("referredBy referralCode");
-  if (!user) return res.status(404).json({ message: "User not found" });
+  const user = await User.findById(req.user.userId).select("referredBy referralCode deletedAt createdAt");
+  if (!user || user.deletedAt) return res.status(404).json({ message: "User not found" });
   if (user.referredBy) return res.status(409).json({ message: "Referral already connected to this account." });
+  if (String(user.referralCode || "").toUpperCase() === code) return res.status(400).json({ message: "You cannot apply your own referral code." });
+
   user.referredBy = referrer._id;
   await user.save();
-  const result = await Referral.updateOne(
+  await Referral.updateOne(
     { referrer: referrer._id, referred: user._id },
-    { $setOnInsert: { referrer: referrer._id, referred: user._id, code, status: "joined", rewardNote: "Joined through referral. Referrer received 3 bonus puzzle credits." } },
+    { $setOnInsert: { referrer: referrer._id, referred: user._id, code, status: "joined", rewardNote: "Joined through referral. Rewards require manual review." } },
     { upsert: true },
   );
-  if (result.upsertedCount > 0) await User.findByIdAndUpdate(referrer._id, { $inc: { bonusPuzzleCredits: 3 } }).catch(() => {});
-  await writeAudit(req, "referral_created", "Referral", user._id, { referrer: String(referrer._id) });
+  await writeAudit(req, "referral_created", "Referral", user._id, { referrer: String(referrer._id), rewardMode: "manual_review" });
   return res.json({ message: "Referral connected successfully. Rewards are reviewed manually." });
 }
 

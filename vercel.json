@@ -1,7 +1,7 @@
 {
   "installCommand": "npm i -g pnpm@10.15.0 && pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm build",
-  "outputDirectory": "dist",
+  "buildCommand": "pnpm --filter frontend build",
+  "outputDirectory": "frontend/dist",
   "framework": "vite",
   "headers": [
     {
@@ -10,8 +10,11 @@
         { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" },
         { "key": "Cross-Origin-Embedder-Policy", "value": "credentialless" },
         { "key": "Cross-Origin-Resource-Policy", "value": "cross-origin" },
-        { "key": "Permissions-Policy", "value": "usb=(), payment=(), usb-serial=()" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://chessplay-b5ve.onrender.com wss://chessplay-b5ve.onrender.com https://accounts.google.com https://oauth2.googleapis.com https://cdn.jsdelivr.net; worker-src 'self' blob:; frame-src 'self' https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'" }
+        { "key": "Permissions-Policy", "value": "usb=(), payment=()" },
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://chessplay-b5ve.onrender.com wss://chessplay-b5ve.onrender.com https://accounts.google.com https://oauth2.googleapis.com https://cdn.jsdelivr.net; worker-src 'self' blob:; frame-src 'self' https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" }
       ]
     },
     { "source": "/stockfish.js", "headers": [{ "key": "Content-Type", "value": "application/javascript" }] },
@@ -20,5 +23,5 @@
     { "source": "/stockfish/stockfish.wasm", "headers": [{ "key": "Content-Type", "value": "application/wasm" }] },
     { "source": "/stockfish/(.*)", "headers": [{ "key": "Cross-Origin-Resource-Policy", "value": "cross-origin" }] }
   ],
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [{ "source": "/((?!assets|stockfish|workers|.*\\..*).*)", "destination": "/index.html" }]
 }

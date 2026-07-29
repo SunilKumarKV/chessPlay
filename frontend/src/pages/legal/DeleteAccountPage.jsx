@@ -1,42 +1,54 @@
-import { useState } from "react";
-import { apiClient } from "../../services/apiClient";
+import LegalShell from "./LegalShell";
+import { useLegalSeo } from "./useLegalSeo";
 
-export default function DeleteAccountPage({ onBack, onDeleted }) {
-  const [confirm, setConfirm] = useState("");
-  const [status, setStatus] = useState("");
-  const [loading, setLoading] = useState(false);
+const SUPPORT_EMAIL = "support@getchessplay.com";
 
-  const handleDelete = async () => {
-    if (confirm !== "DELETE") {
-      setStatus('Type DELETE to confirm account deletion.');
-      return;
-    }
-    setLoading(true);
-    setStatus("");
-    try {
-      await apiClient("/api/auth/account", { method: "DELETE" });
-      localStorage.removeItem("user");
-      localStorage.removeItem("token");
-      localStorage.removeItem("guestMode");
-      setStatus("Account deleted.");
-      onDeleted?.();
-    } catch (error) {
-      setStatus(error.message || "Could not delete account.");
-    } finally {
-      setLoading(false);
-    }
-  };
+export default function DeleteAccountPage({ onBack }) {
+  useLegalSeo({
+    title: "Delete Account",
+    description: "How to request deletion of a ChessPlay account, what is deleted, what may be retained, and how to contact support.",
+    path: "/delete-account",
+  });
 
   return (
-    <main className="min-h-screen bg-[var(--bg-primary,#0b0f14)] px-6 py-10 text-[var(--text-primary,#f8fafc)]">
-      <div className="mx-auto max-w-xl rounded-2xl border border-red-500/30 bg-red-950/20 p-6 shadow-2xl">
-        <button onClick={onBack} className="mb-6 rounded-lg border border-white/10 px-4 py-2 text-sm hover:bg-white/10">← Back</button>
-        <h1 className="mb-3 text-3xl font-black">Delete Account</h1>
-        <p className="mb-5 text-slate-300">This anonymizes your profile and revokes active sessions. Type <b>DELETE</b> to continue.</p>
-        <input value={confirm} onChange={(e) => setConfirm(e.target.value)} className="mb-3 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 outline-none" placeholder="Type DELETE" />
-        <button onClick={handleDelete} disabled={loading} className="rounded-lg bg-red-500 px-5 py-3 font-bold text-white disabled:opacity-60">{loading ? "Deleting..." : "Delete my account"}</button>
-        {status && <p className="mt-4 text-sm text-slate-300">{status}</p>}
-      </div>
-    </main>
+    <LegalShell
+      title="Delete Account"
+      eyebrow="Account support"
+      description="You can request deletion of your ChessPlay account and associated personal data. This page is public so mobile store reviewers and users can access it without logging in."
+      onBack={onBack}
+    >
+      <h2>How To Request Deletion</h2>
+      <ol>
+        <li>Open ChessPlay and go to <strong>Settings → Legal and account → Request account deletion</strong>, if available in your app version.</li>
+        <li>Or email <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> from the email address connected to your ChessPlay account.</li>
+        <li>Include your ChessPlay username and the phrase "Delete my ChessPlay account" in the message.</li>
+        <li>Support may ask you to verify account ownership before deletion is processed.</li>
+      </ol>
+
+      <h2>What Gets Deleted Or Anonymized</h2>
+      <ul>
+        <li>Account profile details such as username display, bio, avatar, and account preferences.</li>
+        <li>Authentication sessions, refresh tokens, push notification device tokens, and connected device records.</li>
+        <li>Private social data where possible, including direct messages, friend relationships, and support records linked only to your account.</li>
+        <li>Personal identifiers attached to future leaderboard, profile, and community views.</li>
+      </ul>
+
+      <h2>What May Remain</h2>
+      <p>Some records may be retained or anonymized when needed for legal, security, payment, anti-abuse, fair-play, or operational reasons. This can include completed game records, move history, payment references, moderation evidence, security logs, support audit trails, or aggregated analytics that no longer identify you directly.</p>
+
+      <h2>Processing Time</h2>
+      <p>We aim to review verified deletion requests promptly. Complex requests, payment disputes, security investigations, or incomplete verification may take longer.</p>
+
+      <h2>FAQ</h2>
+      <h3>Can I delete my account from inside the app?</h3>
+      <p>If your current mobile app version includes the Settings deletion link, use it to start the request. If not, email support.</p>
+      <h3>Can I recover a deleted account?</h3>
+      <p>Deletion may be permanent. Some usernames, ratings, games, or messages may not be recoverable after processing.</p>
+      <h3>Will my games disappear from other players' history?</h3>
+      <p>Completed games may remain for integrity, ratings, anti-cheat, and opponent history, but personal identifiers may be removed or minimized.</p>
+
+      <h2>Contact</h2>
+      <p>Send deletion requests to <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.</p>
+    </LegalShell>
   );
 }
