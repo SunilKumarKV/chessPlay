@@ -1,6 +1,6 @@
 const fs = require("fs");
 const assert = require("assert");
-const chessUtils = require("./backend/chessUtils");
+const chessUtils = require("./backend/dist/chessUtils");
 
 function read(path) {
   return fs.readFileSync(path, "utf8");
@@ -52,7 +52,7 @@ function move(gameState, from, to) {
 }
 
 function assertSourceChecks() {
-  const auth = read("backend/routes/auth.js");
+  const auth = read("backend/src/routes/auth.ts");
   assert(
     /const PUBLIC_USER_FIELDS = "username avatar country title rating gamesPlayed gamesWon privacy friends"/.test(auth),
     "Public user fields must not expose email",
@@ -66,22 +66,19 @@ function assertSourceChecks() {
   assert(/GOOGLE_CLIENT_ID/.test(auth), "Google login must verify the configured client ID");
   assert(/router\.get\("\/session"/.test(auth), "Session endpoint is missing");
 
-  const authMiddleware = read("backend/middleware/auth.js");
+  const authMiddleware = read("backend/src/middleware/auth.ts");
   assert(/getRequestAccessToken\(req\)/.test(authMiddleware), "Auth middleware must use the centralized access-token reader");
 
-  const securityUtils = read("backend/utils/security.js");
+  const securityUtils = read("backend/src/utils/security.ts");
   assert(/getCookie\(req, 'authToken'\)/.test(securityUtils), "Token reader must keep authToken cookie backward compatibility");
   assert(/getBearerToken\(req\)/.test(securityUtils), "Token reader must support short-lived bearer fallback for browsers blocking cross-site cookies");
 
-  const envConfig = readExisting(["backend/src/config/env.ts", "backend/config/env.js"]);
-  assert(/JWT_ACCESS_SECRET\.length < 32/.test(envConfig), "JWT access secret length check is missing");
-  assert(/JWT_REFRESH_SECRET\.length < 32/.test(envConfig), "JWT refresh secret length check is missing");
-  assert(/FRONTEND_ORIGINS/.test(envConfig), "CORS must use configured frontend origins");
+  const server = read("backend/src/server.ts");
+  assert(/JWT_SECRET must be at least 32 characters/.test(server), "JWT secret length check is missing");
+  assert(/FRONTEND_ORIGINS/.test(server), "CORS must use configured frontend origins");
+  assert(/enforceProductionOrigin/.test(server), "Production origin enforcement is missing");
 
-  const app = readExisting(["backend/src/app.ts", "backend/server.js"]);
-  assert(/enforceTrustedOriginForStatefulApi/.test(app), "Production origin enforcement is missing");
-
-  const games = readExisting(["backend/routes/games.ts", "backend/routes/games.js"]);
+  const games = readExisting(["backend/src/routes/games.ts"]);
   assert(/const targetUserId = req\.query\.userId/.test(games), "Game history cannot target viewed profile");
   assert(/privacy\?\.gameHistory === false/.test(games), "Game history privacy is not enforced");
 

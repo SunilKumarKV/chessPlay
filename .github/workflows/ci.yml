@@ -40,8 +40,11 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+<<<<<<< HEAD
+=======
         with:
           version: 10.15.0
+>>>>>>> origin/main
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

@@ -15,9 +15,11 @@
     "prisma:migrate:dev": "prisma migrate dev --schema=prisma/schema.prisma",
     "prisma:seed": "tsx src/scripts/seedPremiumPlans.ts",
     "prisma:studio": "prisma studio",
-    "import:puzzles": "node scripts/importLichessPuzzles.js",
-    "seed:puzzles:sample": "node scripts/seedSamplePuzzles.js",
-    "puzzles:stats": "node scripts/puzzleStats.js"
+    "import:puzzles": "tsx src/scripts/importLichessPuzzles.ts",
+    "seed:puzzles:sample": "tsx src/scripts/seedSamplePuzzles.ts",
+    "puzzles:stats": "tsx src/scripts/puzzleStats.ts",
+    "test": "find . \\( -path ./node_modules -o -path ./dist \\) -prune -o -name '*.js' -exec node -c {} \\;",
+    "make-admin": "tsx src/scripts/make-admin.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",

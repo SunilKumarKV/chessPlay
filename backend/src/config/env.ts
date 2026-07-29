@@ -1,58 +1,42 @@
-import dotenv from 'dotenv';
-
+import dotenv from "dotenv";
 dotenv.config();
 
-const WEAK_JWT_SECRETS = new Set([
-  'your-placeholder-secret-key',
-  'your-super-secret-jwt-key-change-this-in-production',
-  'dev-jwt-secret-not-for-production',
+const isProduction = process.env.NODE_ENV === "production";
+const weakJwtSecrets = new Set([
+  "your-placeholder-secret-key",
+  "your-super-secret-jwt-key-change-this-in-production",
+  "dev-jwt-secret-not-for-production",
 ]);
 
-function parseCsvEnv(value: string | undefined): string[] {
-  return String(value || '').split(',').map((item) => item.trim()).filter(Boolean);
+export function parseCsvEnv(value?: string) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+export function validateEnv() {
+  const accessSecret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
+  const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+
+  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required.");
+  if (!accessSecret) throw new Error("JWT_ACCESS_SECRET is required.");
+  if (!refreshSecret) throw new Error("JWT_REFRESH_SECRET is required.");
+  if (accessSecret.length < 32 || refreshSecret.length < 32) throw new Error("JWT secrets must be at least 32 characters long.");
+  if (weakJwtSecrets.has(accessSecret) || weakJwtSecrets.has(refreshSecret)) throw new Error("JWT secrets use known weak/default values.");
+  if (isProduction && accessSecret === refreshSecret) throw new Error("JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different in production.");
+  if (isProduction && !(process.env.FRONTEND_URL || process.env.FRONTEND_ORIGINS || process.env.CLIENT_URL || process.env.CORS_ALLOWED_ORIGINS)) {
+    throw new Error("FRONTEND_URL or FRONTEND_ORIGINS is required in production.");
+  }
 }
 
 export const env = {
-  NODE_ENV: process.env.NODE_ENV || 'development',
-  PORT: Number.parseInt(process.env.PORT || '5000', 10),
-  DATABASE_URL: process.env.DATABASE_URL || '',
-  JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || '',
-  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || '',
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '',
-  CORS_ALLOWED_ORIGINS: [
+  isProduction,
+  port: Number(process.env.PORT || 5001),
+  frontendOrigins: Array.from(new Set([
     ...parseCsvEnv(process.env.CORS_ALLOWED_ORIGINS),
     ...parseCsvEnv(process.env.FRONTEND_ORIGINS),
     ...parseCsvEnv(process.env.CLIENT_URL),
     ...parseCsvEnv(process.env.FRONTEND_URL),
-  ],
+  ])),
 };
-
-export const isProduction = env.NODE_ENV === 'production' || Boolean(process.env.RENDER || process.env.RENDER_EXTERNAL_URL);
-
-function emailMockMode(): boolean {
-  return process.env.EMAIL_MOCK_MODE === 'true' || env.NODE_ENV === 'test';
-}
-
-function missingEmailConfig(): string[] {
-  if (emailMockMode()) return [];
-  const required = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'];
-  if (!process.env.SMTP_FROM && !process.env.MAIL_FROM && !process.env.SMTP_USER) required.push('SMTP_FROM');
-  return required.filter((key) => !process.env[key]);
-}
-
-export function validateEnv() {
-  if (!env.JWT_ACCESS_SECRET || !env.JWT_REFRESH_SECRET) throw new Error('JWT secrets missing');
-  if (env.JWT_ACCESS_SECRET.length < 32 || env.JWT_REFRESH_SECRET.length < 32) throw new Error('JWT secrets too weak');
-  if (WEAK_JWT_SECRETS.has(env.JWT_ACCESS_SECRET) || WEAK_JWT_SECRETS.has(env.JWT_REFRESH_SECRET)) throw new Error('Weak JWT secrets detected');
-  if (isProduction && !env.DATABASE_URL) throw new Error('DATABASE_URL required');
-  if (isProduction) {
-    const missingEmail = missingEmailConfig();
-    if (missingEmail.length) throw new Error(`Email provider configuration missing: ${missingEmail.join(', ')}`);
-  }
-  if ((process.env.RENDER || process.env.RENDER_EXTERNAL_URL) && process.env.NODE_ENV !== 'production') {
-    console.warn('[env] NODE_ENV is not "production" on Render. Cross-origin cookies will still use SameSite=None via RENDER detection.');
-  }
-  if (process.env.COOKIE_DOMAIN && (process.env.RENDER || process.env.RENDER_EXTERNAL_URL)) {
-    console.warn('[env] COOKIE_DOMAIN is set on a hosted API. Leave COOKIE_DOMAIN empty when frontend and API are on different domains (e.g. Vercel + Render).');
-  }
-}
